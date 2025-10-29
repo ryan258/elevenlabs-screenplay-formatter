@@ -1,0 +1,24 @@
+Characters:
+- DETECTIVE JONES
+- SUSPECT
+- LAWYER
+
+INT. INTERROGATION ROOM - NIGHT
+
+DETECTIVE JONES
+Where were you on the night of October 15th?
+
+SUSPECT
+I was home. Alone.
+
+DETECTIVE JONES
+Can anyone verify that?
+
+SUSPECT
+No. But I didn't do anything wrong.
+
+LAWYER
+My client has answered your question, Detective.
+
+DETECTIVE JONES
+Then we're done here. For now.

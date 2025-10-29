@@ -8,14 +8,15 @@ import OutputDisplay from './components/OutputDisplay';
 import Modal from './components/Modal';
 import { useScriptParser } from './hooks/useScriptParser';
 import { CharacterConfigs, ProjectSettings } from './types';
-import { generateElevenLabsScript, validateConfiguration } from './utils/scriptGenerator';
+import { validateConfiguration } from './utils/scriptGenerator';
+import { generateAllAudio, GenerationProgress } from './utils/elevenLabsApi';
 
 // Implemented the main App component to structure the application and manage state.
 function App() {
   const [scriptText, setScriptText] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { characters, dialogueChunks } = useScriptParser(scriptText);
-  const [apiKey, setApiKey] = useState('');
+  const [apiKey, setApiKey] = useState(process.env.ELEVENLABS_API_KEY || '');
   const [characterConfigs, setCharacterConfigs] = useState<CharacterConfigs>({});
   const [projectSettings, setProjectSettings] = useState<ProjectSettings>({
     model: 'eleven_multilingual_v2',
@@ -24,80 +25,57 @@ function App() {
   });
   const [generatedOutput, setGeneratedOutput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [progressMessages, setProgressMessages] = useState<string[]>([]);
 
   const handleExpand = () => setIsModalOpen(true);
   const handleCloseModal = () => setIsModalOpen(false);
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     setIsLoading(true);
     setGeneratedOutput('');
+    setProgressMessages([]);
 
-    // Small delay to show loading state
-    setTimeout(() => {
-      try {
-        // Validate configuration
-        const validation = validateConfiguration(dialogueChunks, characterConfigs, apiKey);
+    try {
+      // Validate configuration
+      const validation = validateConfiguration(dialogueChunks, characterConfigs, apiKey);
 
-        if (!validation.valid) {
-          setGeneratedOutput(`❌ Configuration Errors:\n\n${validation.errors.join('\n')}\n\nPlease fix these issues and try again.`);
-          setIsLoading(false);
-          return;
-        }
-
-        // Generate the script
-        const { jsonPayload, bashScript } = generateElevenLabsScript(
-          dialogueChunks,
-          characterConfigs,
-          projectSettings,
-          apiKey
-        );
-
-        // Format output
-        const output = `✅ Generation Complete!
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📋 SUMMARY
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Total Dialogue Chunks: ${jsonPayload.length}
-Characters: ${Object.keys(characterConfigs).join(', ')}
-Model: ${projectSettings.model}
-Output Format: ${projectSettings.outputFormat}
-Concatenate: ${projectSettings.concatenate ? 'Yes' : 'No'}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📝 JSON PAYLOAD
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-${JSON.stringify(jsonPayload, null, 2)}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🚀 BASH SCRIPT
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-${bashScript}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📦 USAGE INSTRUCTIONS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-1. Copy the bash script above
-2. Save it to a file (e.g., generate_audio.sh)
-3. Make it executable: chmod +x generate_audio.sh
-4. Run it: ./generate_audio.sh
-
-The script will create an 'audio_output' directory with all generated audio files.
-${projectSettings.concatenate ? 'A final concatenated file (final_output.mp3) will also be created if ffmpeg is installed.' : ''}
-`;
-
-        setGeneratedOutput(output);
+      if (!validation.valid) {
+        setGeneratedOutput(`❌ Configuration Errors:\n\n${validation.errors.join('\n')}\n\nPlease fix these issues and try again.`);
         setIsLoading(false);
-      } catch (error) {
-        console.error('Generation error:', error);
-        setGeneratedOutput(`❌ Error during generation:\n\n${error.message || 'Unknown error occurred'}`);
-        setIsLoading(false);
+        return;
       }
-    }, 500);
+
+      const startMessage = `🚀 Starting audio generation...\n\nTotal dialogue chunks: ${dialogueChunks.length}\nCharacters: ${Object.keys(characterConfigs).join(', ')}\nModel: ${projectSettings.model}\nConcatenate: ${projectSettings.concatenate ? 'Yes' : 'No'}\n\n`;
+      setProgressMessages([startMessage]);
+
+      // Generate all audio files
+      await generateAllAudio(
+        dialogueChunks,
+        characterConfigs,
+        apiKey,
+        projectSettings.model,
+        projectSettings.outputFormat,
+        projectSettings.concatenate,
+        (progress: GenerationProgress, current: number, total: number) => {
+          setProgressMessages(prev => [...prev, `[${current}/${total}] ${progress.message}`]);
+        }
+      );
+
+      // Success message
+      const successMessage = projectSettings.concatenate
+        ? `\n✅ Generation Complete!\n\nAll ${dialogueChunks.length} audio files have been generated and concatenated into a single file.\nCheck your Downloads folder for "concatenated_audio.mp3".`
+        : `\n✅ Generation Complete!\n\nAll ${dialogueChunks.length} audio files have been generated and downloaded.\nCheck your Downloads folder for the audio files.`;
+      setProgressMessages(prev => [...prev, successMessage]);
+      setGeneratedOutput(successMessage);
+      setIsLoading(false);
+
+    } catch (error) {
+      console.error('Generation error:', error);
+      const errorMessage = `❌ Error during generation:\n\n${error instanceof Error ? error.message : 'Unknown error occurred'}`;
+      setProgressMessages(prev => [...prev, errorMessage]);
+      setGeneratedOutput(errorMessage);
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -114,7 +92,7 @@ ${projectSettings.concatenate ? 'A final concatenated file (final_output.mp3) wi
             setScriptText={setScriptText}
             onExpand={handleExpand}
           />
-          <OutputDisplay generatedOutput={generatedOutput} isLoading={isLoading} />
+          <OutputDisplay generatedOutput={generatedOutput} isLoading={isLoading} progressMessages={progressMessages} />
         </div>
 
         <aside className="xl:col-span-1 flex flex-col gap-8">
