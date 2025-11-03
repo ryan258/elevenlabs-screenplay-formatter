@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import ScriptInput from './components/ScriptInput';
@@ -33,7 +33,8 @@ function App() {
     undo: undoScript,
     redo: redoScript,
     canUndo,
-    canRedo
+    canRedo,
+    reset: resetScriptHistory
   } = useUndoRedo<string>('', 50);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -58,6 +59,8 @@ function App() {
   const [resumeState, setResumeState] = useState<any>(null);
   const [abortController, setAbortController] = useState<AbortController | null>(null);
   const [refreshVoiceListToggle, setRefreshVoiceListToggle] = useState(false);
+  const hasLoadedUrlConfigRef = useRef(false);
+  const urlConfigUserRef = useRef<string | null>(null);
 
   const getScriptLength = useCallback((chunks: { text: string }[]) =>
     chunks.reduce((sum, chunk) => sum + chunk.text.length, 0),
@@ -142,6 +145,10 @@ function App() {
   const [scriptFiles, setScriptFiles] = useState<File[]>([]);
 
   useEffect(() => {
+    if (hasLoadedUrlConfigRef.current) {
+      return;
+    }
+
     const urlParams = new URLSearchParams(window.location.search);
     const encodedConfig = urlParams.get('config');
     if (encodedConfig) {
@@ -151,15 +158,26 @@ function App() {
         setCharacterConfigs(decodedConfig.characterConfigs);
         setProjectSettings(decodedConfig.projectSettings);
         setSfxConfigs(decodedConfig.sfxConfigs);
+        urlConfigUserRef.current = currentUser;
         toast.success('Project configuration loaded from URL!', { autoClose: 3000 });
       } else {
         toast.error('Failed to load project configuration from URL.', { autoClose: 3000 });
       }
     }
 
+    hasLoadedUrlConfigRef.current = true;
+  }, []);
+
+  useEffect(() => {
     const savedScript = localStorage.getItem(`${currentUser}-scriptText`);
     if (savedScript) {
-      setScriptText(savedScript);
+      if (urlConfigUserRef.current === currentUser) {
+        urlConfigUserRef.current = null;
+      } else {
+        setScriptText(savedScript);
+      }
+    } else if (urlConfigUserRef.current === currentUser) {
+      urlConfigUserRef.current = null;
     }
 
     const savedState = localStorage.getItem(`${currentUser}-generationState`);
@@ -181,7 +199,9 @@ function App() {
     if (savedComments) {
       setComments(new Map(JSON.parse(savedComments)));
     }
+  }, [currentUser]);
 
+  useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       // Ctrl+Enter or Cmd+Enter: Generate
       if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
