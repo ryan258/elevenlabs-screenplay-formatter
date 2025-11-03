@@ -1,3 +1,11 @@
+export interface ProjectState {
+  timestamp: number;
+  scriptText: string;
+  characterConfigs: CharacterConfigs;
+  projectSettings: ProjectSettings;
+  sfxConfigs: SFX[];
+}
+
 export interface GenerationStat {
   timestamp: number;
   scriptLength: number;
@@ -16,9 +24,10 @@ export interface Voice {
 export interface DialogueChunk {
   character: string;
   text: string;
+  originalText: string;
+  emotion?: string;
   startTime?: number;
   endTime?: number;
-  emotion?: string;
 }
 
 export interface VoiceSettings {
@@ -52,4 +61,5 @@ export interface ProjectSettings {
   generateSubtitles?: boolean;
   subtitleFormat?: 'srt' | 'vtt';
   masteringPreset?: string;
+  multiTrackExport?: boolean;
 }

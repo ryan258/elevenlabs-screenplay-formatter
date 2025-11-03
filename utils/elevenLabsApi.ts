@@ -1,4 +1,4 @@
-import { DialogueChunk, CharacterConfig, VoiceSettings } from '../types';
+import { DialogueChunk, CharacterConfig, VoiceSettings, ProjectSettings, SFX } from '../types';
 
 export interface GenerationProgress {
   current: number;
@@ -6,6 +6,59 @@ export interface GenerationProgress {
   currentCharacter: string;
   status: 'generating' | 'downloading' | 'complete' | 'error';
   message: string;
+}
+
+/**
+ * Enhanced fetch with exponential backoff retry logic
+ * Retries on network errors, timeouts, and 5xx server errors
+ */
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  maxRetries: number = 3,
+  baseDelay: number = 1000
+): Promise<Response> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await fetch(url, options);
+
+      // Don't retry on client errors (4xx) except 429 (rate limit)
+      if (response.status >= 400 && response.status < 500 && response.status !== 429) {
+        return response;
+      }
+
+      // Retry on 5xx server errors or 429 rate limit
+      if (response.status >= 500 || response.status === 429) {
+        if (attempt < maxRetries) {
+          const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 1000;
+          console.warn(`Server error ${response.status}, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+      }
+
+      return response;
+    } catch (error) {
+      lastError = error as Error;
+
+      // Don't retry on abort
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw error;
+      }
+
+      // Retry on network errors
+      if (attempt < maxRetries) {
+        const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 1000;
+        console.warn(`Network error: ${error}, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+    }
+  }
+
+  throw new Error(`Failed after ${maxRetries} retries: ${lastError?.message || 'Unknown error'}`);
 }
 
 /**
@@ -148,27 +201,55 @@ export const getAvailableVoices = async (apiKey: string): Promise<any> => {
   const data = await response.json();
   return data.voices;
 };
-  const url = 'https://api.elevenlabs.io/v1/user/subscription';
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      'xi-api-key': apiKey
-    }
-  });
-  return response.ok;
+
+/**
+ * Validates the API key by making a test request
+ */
+export const validateApiKey = async (apiKey: string): Promise<boolean> => {
+  try {
+    const url = 'https://api.elevenlabs.io/v1/user/subscription';
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'xi-api-key': apiKey
+      }
+    });
+    return response.ok;
+  } catch (error) {
+    console.error('API key validation failed:', error);
+    return false;
+  }
 };
+
+/**
+ * Enhanced rate limit handling with user-friendly warnings
+ */
+async function handleRateLimiting(headers: Headers): Promise<void> {
   const remaining = headers.get('ratelimit-remaining');
   const reset = headers.get('ratelimit-reset');
+  const limit = headers.get('ratelimit-limit');
 
-  if (remaining && reset && parseInt(remaining) < 5) {
+  if (remaining && reset) {
+    const remainingCount = parseInt(remaining);
     const resetTime = new Date(parseInt(reset) * 1000);
     const now = new Date();
     const waitTime = resetTime.getTime() - now.getTime();
-    if (waitTime > 0) {
+
+    // Warn when approaching rate limit
+    if (remainingCount < 10 && remainingCount > 0) {
+      console.warn(`Approaching rate limit: ${remainingCount} requests remaining. Limit resets at ${resetTime.toLocaleTimeString()}`);
+    }
+
+    // Wait if we've hit the rate limit
+    if (remainingCount < 5 && waitTime > 0) {
+      console.warn(`Rate limit nearly exhausted. Waiting ${Math.round(waitTime / 1000)}s until reset...`);
       await new Promise(resolve => setTimeout(resolve, waitTime));
     }
   }
-};
+
+  // Add standard delay to avoid hitting rate limits
+  await new Promise(resolve => setTimeout(resolve, 500));
+}
 export const generateAudioPreview = async (
   voiceId: string,
   voiceSettings: VoiceSettings,
@@ -328,7 +409,7 @@ export const generateAllAudio = async (
 
       const filename = `${String(i).padStart(4, '0')}_${chunk.character.replace(/\s+/g, '_')}.mp3`;
 
-      if (concatenate) {
+      if (projectSettings.concatenate) {
         // Store blob for later concatenation
         generatedBlobs.push({ blob, filename });
         localStorage.setItem('generatedBlobs', JSON.stringify(generatedBlobs));
@@ -364,7 +445,7 @@ export const generateAllAudio = async (
   }
 
   // If concatenation is enabled, send all files to the server
-  if (concatenate && generatedBlobs.length > 0) {
+  if (projectSettings.concatenate && generatedBlobs.length > 0) {
     try {
       const concatenatedBlob = await concatenateAudioFiles(generatedBlobs, dialogueChunks, projectSettings, projectSettings.backgroundMusicUrl, sfxConfigs, onProgress);
       downloadBlob(concatenatedBlob, 'concatenated_audio.mp3');

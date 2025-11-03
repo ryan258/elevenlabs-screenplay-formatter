@@ -7,9 +7,22 @@ interface ScriptInputProps {
   setScriptText: (text: string) => void;
   onExpand: () => void;
   onFilesDrop: (files: File[]) => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
+  onUndo?: () => void;
+  onRedo?: () => void;
 }
 
-const ScriptInput: React.FC<ScriptInputProps> = ({ scriptText, setScriptText, onExpand, onFilesDrop }) => {
+const ScriptInput: React.FC<ScriptInputProps> = ({
+  scriptText,
+  setScriptText,
+  onExpand,
+  onFilesDrop,
+  canUndo = false,
+  canRedo = false,
+  onUndo,
+  onRedo
+}) => {
   const [isDragging, setIsDragging] = useState(false);
 
   const placeholderText = `Required format:
@@ -57,6 +70,24 @@ See EXAMPLE_SCREENPLAY.md for detailed formatting guide.`;
       <div className="flex justify-between items-center mb-2">
         <h2 className="text-xl font-bold text-highlight">Screenplay Input</h2>
         <div className="flex items-center space-x-2">
+            <button
+                onClick={onUndo}
+                disabled={!canUndo}
+                className="text-sm px-3 py-1 bg-accent hover:bg-highlight rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-label="Undo last change"
+                title="Undo (Ctrl+Z)"
+            >
+                ↶ Undo
+            </button>
+            <button
+                onClick={onRedo}
+                disabled={!canRedo}
+                className="text-sm px-3 py-1 bg-accent hover:bg-highlight rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-label="Redo last undone change"
+                title="Redo (Ctrl+Y)"
+            >
+                ↷ Redo
+            </button>
             <button
                 onClick={onExpand}
                 className="text-sm px-3 py-1 bg-accent hover:bg-highlight rounded-md transition-colors flex items-center space-x-1.5"

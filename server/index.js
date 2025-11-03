@@ -6,6 +6,8 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fetch from 'node-fetch';
+import { v4 as uuidv4 } from 'uuid';
+import AdmZip from 'adm-zip';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -50,6 +52,7 @@ app.post('/concatenate', upload.array('audioFiles'), async (req, res) => {
   const pauseDuration = parseFloat(req.body.pauseDuration) || 0;
   const outputFormat = req.body.outputFormat || 'mp3_44100_128'; // Default to mp3
   const masteringPreset = req.body.masteringPreset || 'none'; // Default to none
+  const multiTrackExport = req.body.multiTrackExport === 'true'; // Default to false
 
   if (!uploadedFiles || uploadedFiles.length === 0) {
     return res.status(400).json({ error: 'No audio files provided' });
