@@ -46,7 +46,8 @@ const VoiceCloningPanel: React.FC<VoiceCloningPanelProps> = ({ apiKey, onVoiceAd
       setAudioFiles(null);
       onVoiceAdded(); // Notify parent to refresh voice list
     } catch (err) {
-      setError(err.message);
+      const message = err instanceof Error ? err.message : 'Unknown error occurred';
+      setError(message);
     } finally {
       setIsLoading(false);
     }

@@ -27,7 +27,6 @@ export const useScriptParser = (scriptText: string): { characters: string[], dia
         
         let currentCharacterFullName: string | null = null;
         let currentDialogue: string[] = [];
-        let currentEmotion: string | undefined = undefined;
         
         type ParsingMode = 'metadata' | 'characterList' | 'scriptBody';
         let mode: ParsingMode = 'metadata';
@@ -58,7 +57,8 @@ export const useScriptParser = (scriptText: string): { characters: string[], dia
 
         const flushDialogue = () => {
             if (currentCharacterFullName && currentDialogue.length > 0) {
-                let text = currentDialogue.join(' ');
+                const originalText = currentDialogue.join(' ').trim();
+                let text = originalText;
                 let emotion: string | undefined;
 
                 const emotionMatch = text.match(emotionTagRegex);
@@ -68,11 +68,10 @@ export const useScriptParser = (scriptText: string): { characters: string[], dia
                 }
 
                 if (text) {
-                    chunks.push({ character: currentCharacterFullName, text: cleanDialogue(text), emotion });
+                    chunks.push({ character: currentCharacterFullName, text: cleanDialogue(text), originalText, emotion });
                 }
             }
             currentDialogue = [];
-            currentEmotion = undefined;
         };
         
         const parseScriptBodyLine = (trimmedLine: string) => {
@@ -107,7 +106,10 @@ export const useScriptParser = (scriptText: string): { characters: string[], dia
                     flushDialogue();
                     
                     if (dialoguePart) {
-                        chunks.push({ character: foundCharacter.fullName, text: cleanDialogue(dialoguePart) });
+                        const originalText = dialoguePart.trim();
+                        if (originalText) {
+                            chunks.push({ character: foundCharacter.fullName, text: cleanDialogue(dialoguePart), originalText });
+                        }
                     }
                     currentCharacterFullName = foundCharacter.fullName; // Keep character for potential multi-line dialogue
                     return;
@@ -116,7 +118,10 @@ export const useScriptParser = (scriptText: string): { characters: string[], dia
                     potentialCharacters.add(potentialCharacterName.toUpperCase());
                     flushDialogue();
                     if (dialoguePart) {
-                        chunks.push({ character: potentialCharacterName.toUpperCase(), text: cleanDialogue(dialoguePart) });
+                        const originalText = dialoguePart.trim();
+                        if (originalText) {
+                            chunks.push({ character: potentialCharacterName.toUpperCase(), text: cleanDialogue(dialoguePart), originalText });
+                        }
                     }
                     currentCharacterFullName = potentialCharacterName.toUpperCase();
                     return;

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { CharacterConfigs, CharacterConfig, VoiceSettings } from '../types';
 import Slider from './Slider';
 import { generateAudioPreview } from '../utils/elevenLabsApi';
@@ -19,6 +19,49 @@ const CharacterConfigPanel: React.FC<CharacterConfigPanelProps> = ({ characters,
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
   const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
   const [currentEditingChar, setCurrentEditingChar] = useState<string | null>(null);
+  
+  const handleExportConfig = useCallback(() => {
+    const data = JSON.stringify(configs, null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'character-configs.json';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, [configs]);
+
+  const handleImportConfig = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const result = e.target?.result;
+        if (typeof result !== 'string') {
+          throw new Error('Unsupported file content');
+        }
+        const parsed = JSON.parse(result) as CharacterConfigs;
+        setConfigs(parsed);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        console.error('Error importing character configs:', err);
+        alert(`Failed to import config: ${message}`);
+      } finally {
+        event.target.value = '';
+      }
+    };
+    reader.onerror = () => {
+      alert('Failed to read configuration file.');
+      event.target.value = '';
+    };
+    reader.readAsText(file);
+  }, [setConfigs]);
 
   const handleConfigChange = (character: string, field: keyof CharacterConfig, value: any) => {
     const newConfig: CharacterConfig = {
@@ -62,7 +105,8 @@ const CharacterConfigPanel: React.FC<CharacterConfigPanelProps> = ({ characters,
       };
     } catch (error) {
       console.error('Error generating audio preview:', error);
-      alert(`Failed to generate preview for ${character}: ${error.message}`);
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      alert(`Failed to generate preview for ${character}: ${message}`);
     } finally {
       setPreviewLoading(prev => ({ ...prev, [character]: false }));
     }

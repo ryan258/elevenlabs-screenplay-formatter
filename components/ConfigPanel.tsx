@@ -12,6 +12,7 @@ interface ConfigPanelProps {
   characters: string[];
   characterConfigs: CharacterConfigs;
   setCharacterConfigs: (configs: CharacterConfigs) => void;
+  refreshVoiceListToggle?: boolean;
 }
 
 // Implemented ConfigPanel to group related settings panels together.
@@ -23,12 +24,20 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({
   characters,
   characterConfigs,
   setCharacterConfigs,
+  refreshVoiceListToggle,
 }) => {
   return (
     <>
       <ApiKeyPanel apiKey={apiKey} setApiKey={setApiKey} />
       <ProjectSettingsPanel settings={projectSettings} setSettings={setProjectSettings} />
-      <CharacterConfigPanel characters={characters} configs={characterConfigs} setConfigs={setCharacterConfigs} />
+      <CharacterConfigPanel
+        characters={characters}
+        configs={characterConfigs}
+        setConfigs={setCharacterConfigs}
+        apiKey={apiKey}
+        modelId={projectSettings.model}
+        refreshVoiceListToggle={refreshVoiceListToggle ?? false}
+      />
     </>
   );
 };

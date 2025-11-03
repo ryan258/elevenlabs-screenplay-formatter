@@ -59,6 +59,10 @@ function App() {
   const [abortController, setAbortController] = useState<AbortController | null>(null);
   const [refreshVoiceListToggle, setRefreshVoiceListToggle] = useState(false);
 
+  const getScriptLength = useCallback((chunks: { text: string }[]) =>
+    chunks.reduce((sum, chunk) => sum + chunk.text.length, 0),
+  []);
+
   const handleVoiceAdded = useCallback(() => {
     setRefreshVoiceListToggle(prev => !prev);
   }, []);
@@ -130,56 +134,12 @@ function App() {
     })
     .catch(error => {
       console.error('Error generating ZIP:', error);
-      toast.update('zip-gen', { render: `Error generating ZIP: ${error.message}`, type: 'error', autoClose: 5000 });
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      toast.update('zip-gen', { render: `Error generating ZIP: ${message}`, type: 'error', autoClose: 5000 });
     });
   }, [scriptText, characterConfigs, projectSettings, sfxConfigs, currentUser]);
 
   const [scriptFiles, setScriptFiles] = useState<File[]>([]);
-
-  const processScriptQueue = useCallback(async (files: File[]) => {
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const reader = new FileReader();
-      const scriptName = file.name;
-
-      toast.info(`Processing script: ${scriptName} (${i + 1}/${files.length})`, { autoClose: false, toastId: `batch-progress-${scriptName}` });
-
-      try {
-        const scriptContent = await new Promise<string>((resolve, reject) => {
-          reader.onload = (e) => {
-            if (e.target && typeof e.target.result === 'string') {
-              resolve(e.target.result);
-            } else {
-              reject(new Error('Failed to read file content.'));
-            }
-          };
-          reader.onerror = reject;
-          reader.readAsText(file);
-        });
-
-        setScriptText(scriptContent);
-        // Wait for scriptText to update and parser to run
-        await new Promise(resolve => setTimeout(resolve, 100)); 
-
-        // Trigger generation for the current script
-        await handleGenerate();
-        toast.update(`batch-progress-${scriptName}`, { render: `✅ Completed script: ${scriptName}`, type: 'success', autoClose: 3000 });
-
-      } catch (error) {
-        console.error(`Error processing ${scriptName}:`, error);
-        toast.update(`batch-progress-${scriptName}`, { render: `❌ Failed script: ${scriptName} - ${error.message}`, type: 'error', autoClose: 5000 });
-      }
-    }
-    setScriptFiles([]); // Clear queue after processing
-    toast.success('Batch processing complete!', { autoClose: 3000 });
-  }, []); // Dependencies will be added after handleGenerate is defined
-
-  const handleFilesDrop = useCallback((files: File[]) => {
-    setScriptFiles(files);
-    if (files.length > 0) {
-      processScriptQueue(files);
-    }
-  }, [processScriptQueue]);
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -295,6 +255,8 @@ function App() {
     const controller = new AbortController();
     setAbortController(controller);
 
+    const startTime = Date.now();
+
     try {
       // Validate API Key
       const isApiKeyValid = await validateApiKey(apiKey);
@@ -318,8 +280,6 @@ function App() {
       toast.update(generationToastId, { render: `🚀 Starting audio generation...\nTotal chunks: ${dialogueChunks.length}` });
 
       localStorage.setItem(`${currentUser}-generationState`, JSON.stringify({ dialogueChunks, characterConfigs, modelId: projectSettings.model, outputFormat: projectSettings.outputFormat, concatenate: projectSettings.concatenate, backgroundMusicUrl: projectSettings.backgroundMusicUrl, pauseDuration: projectSettings.pauseDuration, generateSubtitles: projectSettings.generateSubtitles, subtitleFormat: projectSettings.subtitleFormat, masteringPreset: projectSettings.masteringPreset, multiTrackExport: projectSettings.multiTrackExport, resumeIndex: 0 }));
-
-      const startTime = Date.now();
 
       // Generate all audio files
       await generateAllAudio(
@@ -353,11 +313,12 @@ function App() {
       }]);
 
       if (projectSettings.generateSubtitles) {
-        const subtitleContent = projectSettings.subtitleFormat === 'srt' 
-          ? generateSrtFile(dialogueChunks) 
+        const subtitleFormat = projectSettings.subtitleFormat ?? 'srt';
+        const subtitleContent = subtitleFormat === 'srt'
+          ? generateSrtFile(dialogueChunks)
           : generateVttFile(dialogueChunks);
-        const subtitleBlob = new Blob([subtitleContent], { type: `text/${projectSettings.subtitleFormat}` });
-        const subtitleFilename = `subtitles.${projectSettings.subtitleFormat}`;
+        const subtitleBlob = new Blob([subtitleContent], { type: `text/${subtitleFormat}` });
+        const subtitleFilename = `subtitles.${subtitleFormat}`;
         const url = URL.createObjectURL(subtitleBlob);
         const a = document.createElement('a');
         a.href = url;
@@ -366,7 +327,7 @@ function App() {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        toast.success(`Subtitle file (${projectSettings.subtitleFormat.toUpperCase()}) generated and downloaded!`, { autoClose: 3000 });
+        toast.success(`Subtitle file (${subtitleFormat.toUpperCase()}) generated and downloaded!`, { autoClose: 3000 });
       }
 
       setIsLoading(false);
@@ -377,13 +338,13 @@ function App() {
     } catch (error) {
       const endTime = Date.now();
       const duration = (endTime - startTime) / 1000;
-      if (error.name === 'AbortError') {
-        toast.update(generationToastId, { render: 'Generation cancelled by user.', type: 'warn', autoClose: 5000, closeButton: true });
+      if (error instanceof Error && error.name === 'AbortError') {
+        toast.update(generationToastId, { render: 'Generation cancelled by user.', type: 'warning', autoClose: 5000, closeButton: true });
         setGenerationStats(prev => [...prev, {
           timestamp: Date.now(),
           scriptLength: scriptText.length,
           characterCount: totalCharacters,
-          estimatedCost: estimatedCost,
+          estimatedCost,
           duration: duration,
           status: 'cancelled',
         }]);
@@ -395,7 +356,7 @@ function App() {
           timestamp: Date.now(),
           scriptLength: scriptText.length,
           characterCount: totalCharacters,
-          estimatedCost: estimatedCost,
+          estimatedCost,
           duration: duration,
           status: 'error',
         }]);
@@ -404,6 +365,52 @@ function App() {
       setAbortController(null);
     }
   };
+
+  const processScriptQueue = useCallback(async (files: File[]) => {
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const reader = new FileReader();
+      const scriptName = file.name;
+
+      toast.info(`Processing script: ${scriptName} (${i + 1}/${files.length})`, { autoClose: false, toastId: `batch-progress-${scriptName}` });
+
+      try {
+        const scriptContent = await new Promise<string>((resolve, reject) => {
+          reader.onload = (e) => {
+            if (e.target && typeof e.target.result === 'string') {
+              resolve(e.target.result);
+            } else {
+              reject(new Error('Failed to read file content.'));
+            }
+          };
+          reader.onerror = reject;
+          reader.readAsText(file);
+        });
+
+        setScriptText(scriptContent);
+        // Wait for scriptText to update and parser to run
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Trigger generation for the current script
+        await handleGenerate();
+        toast.update(`batch-progress-${scriptName}`, { render: `✅ Completed script: ${scriptName}`, type: 'success', autoClose: 3000 });
+
+      } catch (error) {
+        console.error(`Error processing ${scriptName}:`, error);
+        const message = error instanceof Error ? error.message : 'Unknown error occurred';
+        toast.update(`batch-progress-${scriptName}`, { render: `❌ Failed script: ${scriptName} - ${message}`, type: 'error', autoClose: 5000 });
+      }
+    }
+    setScriptFiles([]); // Clear queue after processing
+    toast.success('Batch processing complete!', { autoClose: 3000 });
+  }, [handleGenerate]);
+
+  const handleFilesDrop = useCallback((files: File[]) => {
+    setScriptFiles(files);
+    if (files.length > 0) {
+      processScriptQueue(files);
+    }
+  }, [processScriptQueue]);
 
   const handleResume = async () => {
     if (!resumeState) return;
@@ -442,21 +449,24 @@ function App() {
         : `✅ Generation Complete! All ${resumeState.dialogueChunks.length} audio files have been generated and downloaded. Check your Downloads folder for the audio files.`;
       toast.update(generationToastId, { render: successMessage, type: 'success', autoClose: 5000, closeButton: true });
 
+      const resumeScriptLength = getScriptLength(resumeState.dialogueChunks);
+
       setGenerationStats(prev => [...prev, {
         timestamp: Date.now(),
-        scriptLength: resumeState.dialogueChunks.reduce((sum, chunk) => sum + chunk.text.length, 0),
+        scriptLength: resumeScriptLength,
         characterCount: resumeState.dialogueChunks.length,
-        estimatedCost: (resumeState.dialogueChunks.reduce((sum, chunk) => sum + chunk.text.length, 0) / 1000) * 0.15,
-        duration: duration,
+        estimatedCost: (resumeScriptLength / 1000) * 0.15,
+        duration,
         status: 'success',
       }]);
 
       if (resumeState.generateSubtitles) {
-        const subtitleContent = resumeState.subtitleFormat === 'srt' 
-          ? generateSrtFile(resumeState.dialogueChunks) 
+        const resumeSubtitleFormat = resumeState.subtitleFormat ?? 'srt';
+        const subtitleContent = resumeSubtitleFormat === 'srt'
+          ? generateSrtFile(resumeState.dialogueChunks)
           : generateVttFile(resumeState.dialogueChunks);
-        const subtitleBlob = new Blob([subtitleContent], { type: `text/${resumeState.subtitleFormat}` });
-        const subtitleFilename = `subtitles.${resumeState.subtitleFormat}`;
+        const subtitleBlob = new Blob([subtitleContent], { type: `text/${resumeSubtitleFormat}` });
+        const subtitleFilename = `subtitles.${resumeSubtitleFormat}`;
         const url = URL.createObjectURL(subtitleBlob);
         const a = document.createElement('a');
         a.href = url;
@@ -465,7 +475,7 @@ function App() {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        toast.success(`Subtitle file (${resumeState.subtitleFormat.toUpperCase()}) generated and downloaded!`, { autoClose: 3000 });
+        toast.success(`Subtitle file (${resumeSubtitleFormat.toUpperCase()}) generated and downloaded!`, { autoClose: 3000 });
       }
 
       setIsLoading(false);
@@ -476,26 +486,28 @@ function App() {
     } catch (error) {
       const endTime = Date.now();
       const duration = (endTime - startTime) / 1000;
-      if (error.name === 'AbortError') {
-        toast.update(generationToastId, { render: 'Generation cancelled by user.', type: 'warn', autoClose: 5000, closeButton: true });
+      if (error instanceof Error && error.name === 'AbortError') {
+        toast.update(generationToastId, { render: 'Generation cancelled by user.', type: 'warning', autoClose: 5000, closeButton: true });
+        const resumeScriptLength = getScriptLength(resumeState.dialogueChunks);
         setGenerationStats(prev => [...prev, {
           timestamp: Date.now(),
-          scriptLength: resumeState.dialogueChunks.reduce((sum, chunk) => sum + chunk.text.length, 0),
+          scriptLength: resumeScriptLength,
           characterCount: resumeState.dialogueChunks.length,
-          estimatedCost: (resumeState.dialogueChunks.reduce((sum, chunk) => sum + chunk.text.length, 0) / 1000) * 0.15,
-          duration: duration,
+          estimatedCost: (resumeScriptLength / 1000) * 0.15,
+          duration,
           status: 'cancelled',
         }]);
       } else {
         console.error('Generation error:', error);
         const errorMessage = `❌ Error during generation: ${error instanceof Error ? error.message : 'Unknown error occurred'}`;
         toast.update(generationToastId, { render: errorMessage, type: 'error', autoClose: 5000, closeButton: true });
+        const resumeScriptLength = getScriptLength(resumeState.dialogueChunks);
         setGenerationStats(prev => [...prev, {
           timestamp: Date.now(),
-          scriptLength: resumeState.dialogueChunks.reduce((sum, chunk) => sum + chunk.text.length, 0),
+          scriptLength: resumeScriptLength,
           characterCount: resumeState.dialogueChunks.length,
-          estimatedCost: (resumeState.dialogueChunks.reduce((sum, chunk) => sum + chunk.text.length, 0) / 1000) * 0.15,
-          duration: duration,
+          estimatedCost: (resumeScriptLength / 1000) * 0.15,
+          duration,
           status: 'error',
         }]);
       }

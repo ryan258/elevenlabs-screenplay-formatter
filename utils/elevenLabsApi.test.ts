@@ -34,7 +34,7 @@ describe('elevenLabsApi', () => {
         blob: () => Promise.resolve(mockAudioBlob),
       });
 
-      const chunk = { character: 'TEST', text: 'Hello world.' };
+      const chunk = { character: 'TEST', text: 'Hello world.', originalText: 'Hello world.' };
       const config = { voiceId: 'voice123', voiceSettings: { stability: 0.5, similarity_boost: 0.75, style: 0.1, speed: 1.0 } };
       const apiKey = 'test-api-key';
       const modelId = 'eleven_multilingual_v2';
@@ -60,7 +60,7 @@ describe('elevenLabsApi', () => {
       vi.useFakeTimers();
       mockFetch.mockRejectedValue(new Error('Network error'));
 
-      const chunk = { character: 'TEST', text: 'Hello world.' };
+      const chunk = { character: 'TEST', text: 'Hello world.', originalText: 'Hello world.' };
       const config = { voiceId: 'voice123', voiceSettings: { stability: 0.5, similarity_boost: 0.75, style: 0.1, speed: 1.0 } };
       const apiKey = 'test-api-key';
       const modelId = 'eleven_multilingual_v2';

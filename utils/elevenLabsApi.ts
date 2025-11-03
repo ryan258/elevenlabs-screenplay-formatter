@@ -344,16 +344,17 @@ const concatenateAudioFiles = async (
 
     return concatenatedBlob;
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     if (onProgress) {
       onProgress({
         current: blobs.length,
         total: blobs.length,
         currentCharacter: 'All',
         status: 'error',
-        message: `✗ Concatenation failed: ${error.message}`
+        message: `✗ Concatenation failed: ${message}`
       }, blobs.length, blobs.length);
     }
-    throw new Error(`Failed to concatenate audio: ${error.message}`);
+    throw new Error(`Failed to concatenate audio: ${message}`);
   }
 };
 
@@ -430,13 +431,14 @@ export const generateAllAudio = async (
 
       
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       if (onProgress) {
         onProgress({
           current: i + 1,
           total,
           currentCharacter: chunk.character,
           status: 'error',
-          message: `✗ Failed: ${error.message}`
+          message: `✗ Failed: ${message}`
         }, i + 1, total);
       }
       localStorage.setItem('generationState', JSON.stringify({ dialogueChunks, characterConfigs, modelId: projectSettings.model, outputFormat: projectSettings.outputFormat, concatenate: projectSettings.concatenate, backgroundMusicUrl: projectSettings.backgroundMusicUrl, pauseDuration: projectSettings.pauseDuration, resumeIndex: 0 }));

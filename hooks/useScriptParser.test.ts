@@ -28,8 +28,8 @@ Hello, John.
     const { result } = renderHook(() => useScriptParser(script));
     expect(result.current.characters).toEqual(['JANE', 'JOHN']);
     expect(result.current.dialogueChunks).toEqual([
-      { character: 'JOHN', text: 'Hello, Jane.' },
-      { character: 'JANE', text: 'Hello, John.' },
+      expect.objectContaining({ character: 'JOHN', text: 'Hello, Jane.', originalText: 'Hello, Jane.' }),
+      expect.objectContaining({ character: 'JANE', text: 'Hello, John.', originalText: 'Hello, John.' }),
     ]);
   });
 
@@ -42,7 +42,7 @@ Hi there.
     const { result } = renderHook(() => useScriptParser(script));
     expect(result.current.characters).toEqual(['ALEX']);
     expect(result.current.dialogueChunks).toEqual([
-      { character: 'ALEX', text: 'Hi there.' },
+      expect.objectContaining({ character: 'ALEX', text: 'Hi there.', originalText: 'Hi there.' }),
     ]);
   });
 
@@ -59,7 +59,7 @@ This is a test. [He sighs].
     const { result } = renderHook(() => useScriptParser(script));
     expect(result.current.characters).toEqual(['JOHN (V.O.)']);
     expect(result.current.dialogueChunks).toEqual([
-      { character: 'JOHN (V.O.)', text: 'This is a test.' },
+      expect.objectContaining({ character: 'JOHN (V.O.)', text: 'This is a test.', originalText: '(sadly) This is a test. [He sighs].' }),
     ]);
   });
 
@@ -74,7 +74,7 @@ JOHN: This is a test.
     const { result } = renderHook(() => useScriptParser(script));
     expect(result.current.characters).toEqual(['JOHN']);
     expect(result.current.dialogueChunks).toEqual([
-      { character: 'JOHN', text: 'This is a test.' },
+      expect.objectContaining({ character: 'JOHN', text: 'This is a test.', originalText: 'This is a test.' }),
     ]);
   });
 
@@ -91,7 +91,7 @@ This is the second line.
     const { result } = renderHook(() => useScriptParser(script));
     expect(result.current.characters).toEqual(['JOHN']);
     expect(result.current.dialogueChunks).toEqual([
-      { character: 'JOHN', text: 'This is the first line. This is the second line.' },
+      expect.objectContaining({ character: 'JOHN', text: 'This is the first line. This is the second line.', originalText: 'This is the first line. This is the second line.' }),
     ]);
   });
 
@@ -107,7 +107,7 @@ JOHN
     const { result } = renderHook(() => useScriptParser(script));
     expect(result.current.characters).toEqual(['JOHN']);
     expect(result.current.dialogueChunks).toEqual([
-      { character: 'JOHN', text: 'Hello there!', emotion: 'EXCITED' },
+      expect.objectContaining({ character: 'JOHN', text: 'Hello there!', originalText: '[EXCITED] Hello there!', emotion: 'EXCITED' }),
     ]);
   });
 });

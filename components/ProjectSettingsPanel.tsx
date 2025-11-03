@@ -8,7 +8,7 @@ interface ProjectSettingsPanelProps {
 
 // Implemented ProjectSettingsPanel to provide UI for project-level configurations.
 const ProjectSettingsPanel: React.FC<ProjectSettingsPanelProps> = ({ settings, setSettings }) => {
-  const handleSettingChange = (field: keyof ProjectSettings, value: string | boolean) => {
+  const handleSettingChange = (field: keyof ProjectSettings, value: string | boolean | number | undefined) => {
     setSettings({ ...settings, [field]: value });
   };
 
@@ -74,7 +74,10 @@ const ProjectSettingsPanel: React.FC<ProjectSettingsPanelProps> = ({ settings, s
             min="0"
             step="0.1"
             value={settings.pauseDuration || 0}
-            onChange={(e) => handleSettingChange('pauseDuration', parseFloat(e.target.value))}
+            onChange={(e) => {
+              const nextValue = e.target.value;
+              handleSettingChange('pauseDuration', nextValue === '' ? undefined : parseFloat(nextValue));
+            }}
             placeholder="e.g., 0.5"
             className="w-full p-2 bg-primary border border-accent rounded-md focus:outline-none focus:ring-2 focus:ring-highlight"
           />

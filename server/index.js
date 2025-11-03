@@ -195,7 +195,7 @@ app.post('/concatenate', upload.array('audioFiles'), async (req, res) => {
         cumulativeDuration += estimatedDuration + 0.5; // Add a small buffer between chunks
       }
 
-      let currentAudioStream = speechStream;
+      currentAudioStream = '[speech_faded]';
 
       // Mix background music
       if (bgMusicStream) {

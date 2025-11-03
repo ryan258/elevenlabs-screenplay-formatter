@@ -4,9 +4,9 @@ import { DialogueChunk } from '../types';
 
 describe('subtitleGenerator', () => {
   const mockDialogueChunks: DialogueChunk[] = [
-    { character: 'JOHN', text: 'Hello, world!', startTime: 0.5, endTime: 2.123 },
-    { character: 'JANE', text: 'How are you?', startTime: 2.5, endTime: 3.876 },
-    { character: 'JOHN', text: 'I am fine, thank you.', startTime: 4.0, endTime: 6.0 },
+    { character: 'JOHN', text: 'Hello, world!', originalText: 'Hello, world!', startTime: 0.5, endTime: 2.123 },
+    { character: 'JANE', text: 'How are you?', originalText: 'How are you?', startTime: 2.5, endTime: 3.876 },
+    { character: 'JOHN', text: 'I am fine, thank you.', originalText: 'I am fine, thank you.', startTime: 4.0, endTime: 6.0 },
   ];
 
   const parseSrtTimestamp = (timestamp: string) => {
@@ -34,7 +34,7 @@ describe('subtitleGenerator', () => {
 
     it('should handle chunks without timestamps', () => {
       const chunksWithoutTimestamps: DialogueChunk[] = [
-        { character: 'JOHN', text: 'Hello, world!' },
+        { character: 'JOHN', text: 'Hello, world!', originalText: 'Hello, world!' },
       ];
       const srt = generateSrtFile(chunksWithoutTimestamps);
       expect(srt).toEqual('');
@@ -54,7 +54,7 @@ describe('subtitleGenerator', () => {
 
     it('should handle chunks without timestamps', () => {
       const chunksWithoutTimestamps: DialogueChunk[] = [
-        { character: 'JOHN', text: 'Hello, world!' },
+        { character: 'JOHN', text: 'Hello, world!', originalText: 'Hello, world!' },
       ];
       const vtt = generateVttFile(chunksWithoutTimestamps);
       expect(vtt).toEqual('WEBVTT\n\n');

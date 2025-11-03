@@ -34,7 +34,8 @@ const VoiceCompareModal: React.FC<VoiceCompareModalProps> = ({
           const fetchedVoices = await getAvailableVoices(apiKey);
           setVoices(fetchedVoices);
         } catch (err) {
-          setError(err.message);
+          const message = err instanceof Error ? err.message : 'Unknown error occurred';
+          setError(message);
         } finally {
           setLoading(false);
         }
@@ -64,7 +65,8 @@ const VoiceCompareModal: React.FC<VoiceCompareModalProps> = ({
       };
     } catch (err) {
       console.error('Error playing preview:', err);
-      alert(`Failed to play preview: ${err.message}`);
+      const message = err instanceof Error ? err.message : 'Unknown error occurred';
+      alert(`Failed to play preview: ${message}`);
     } finally {
       setPreviewLoading(null);
     }
