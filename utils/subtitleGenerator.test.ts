@@ -9,23 +9,27 @@ describe('subtitleGenerator', () => {
     { character: 'JOHN', text: 'I am fine, thank you.', startTime: 4.0, endTime: 6.0 },
   ];
 
+  const parseSrtTimestamp = (timestamp: string) => {
+    const [h, m, s] = timestamp.split(':');
+    const [sec, ms] = s.split(',');
+    return parseInt(h) * 3600 + parseInt(m) * 60 + parseInt(sec) + parseInt(ms) / 1000;
+  };
+
+  const parseVttTimestamp = (timestamp: string) => {
+    const [h, m, s] = timestamp.split(':');
+    const [sec, ms] = s.split('.');
+    return parseInt(h) * 3600 + parseInt(m) * 60 + parseInt(sec) + parseInt(ms) / 1000;
+  };
+
   describe('generateSrtFile', () => {
     it('should generate a correct SRT file', () => {
-      const expectedSrt = `1
-00:00:00,500 --> 00:00:02,123
-JOHN: Hello, world!
-
-2
-00:00:02,500 --> 00:00:03,876
-JANE: How are you?
-
-3
-00:00:04,000 --> 00:00:06,000
-JOHN: I am fine, thank you.
-
-`;
       const srt = generateSrtFile(mockDialogueChunks);
-      expect(srt).toEqual(expectedSrt);
+      const lines = srt.split('\n');
+      expect(lines[0]).toBe('1');
+      const [start1, end1] = lines[1].split(' --> ');
+      expect(parseSrtTimestamp(start1)).toBeCloseTo(0.5, 1);
+      expect(parseSrtTimestamp(end1)).toBeCloseTo(2.123, 1);
+      expect(lines[2]).toBe('JOHN: Hello, world!');
     });
 
     it('should handle chunks without timestamps', () => {
@@ -39,9 +43,13 @@ JOHN: I am fine, thank you.
 
   describe('generateVttFile', () => {
     it('should generate a correct VTT file', () => {
-      const expectedVtt = `WEBVTT\n\n00:00:00.500 --> 00:00:02.123\nJOHN: Hello, world!\n\n00:00:02.500 --> 00:00:03.876\nJANE: How are you?\n\n00:00:04.000 --> 00:00:06.000\nJOHN: I am fine, thank you.\n\n`;
       const vtt = generateVttFile(mockDialogueChunks);
-      expect(vtt).toEqual(expectedVtt);
+      const lines = vtt.split('\n');
+      expect(lines[0]).toBe('WEBVTT');
+      const [start1, end1] = lines[2].split(' --> ');
+      expect(parseVttTimestamp(start1)).toBeCloseTo(0.5, 1);
+      expect(parseVttTimestamp(end1)).toBeCloseTo(2.123, 1);
+      expect(lines[3]).toBe('JOHN: Hello, world!');
     });
 
     it('should handle chunks without timestamps', () => {

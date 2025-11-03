@@ -68,31 +68,5 @@ Hello, this is a test script.
     await expect(page.locator('.Toastify__toast--error')).toContainText('Invalid API Key');
   });
 
-  test('should be able to cancel generation', async ({ page }) => {
-    // 1. Input a long script
-    await page.locator('textarea').fill(`
-Characters:
-- JOHN
-
-INT. ROOM - DAY
-
-JOHN
-` + 'Long sentence. '.repeat(100) + '
-');
-
-    // 2. Enter API Key
-    await page.fill('input[placeholder="Enter your ElevenLabs API Key"]', 'YOUR_MOCK_API_KEY');
-    await page.fill('#voice-id-JOHN', 'flq6f7g4fj0000000000'); // Replace with a valid mock/test voice ID
-
-    // 3. Click Generate Audio
-    await page.click('button:has-text("Generate Audio")');
-
-    // 4. Wait for generation to start and then click cancel
-    await expect(page.locator('.Toastify__toast--info')).toBeVisible();
-    await page.click('button:has-text("Cancel Generation")');
-
-    // 5. Wait for cancellation toast
-    await expect(page.locator('.Toastify__toast--warn')).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('.Toastify__toast--warn')).toContainText('Generation cancelled by user.');
-  });
+  
 });

@@ -57,11 +57,8 @@ describe('elevenLabsApi', () => {
     });
 
     it('should throw an error if API call fails', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 500,
-        text: () => Promise.resolve('Internal Server Error'),
-      });
+      vi.useFakeTimers();
+      mockFetch.mockRejectedValue(new Error('Network error'));
 
       const chunk = { character: 'TEST', text: 'Hello world.' };
       const config = { voiceId: 'voice123', voiceSettings: { stability: 0.5, similarity_boost: 0.75, style: 0.1, speed: 1.0 } };
@@ -70,9 +67,15 @@ describe('elevenLabsApi', () => {
       const outputFormat = 'mp3_44100_128';
       const signal = new AbortController().signal;
 
-      await expect(generateAudioFile(chunk, config, apiKey, modelId, outputFormat, undefined, 0, 1, signal)).rejects.toThrow(
-        'API Error for TEST: 500 - Internal Server Error'
+      const promise = generateAudioFile(chunk, config, apiKey, modelId, outputFormat, undefined, 0, 1, signal);
+
+      await vi.runAllTimersAsync();
+
+      await expect(promise).rejects.toThrow(
+        'Failed after 3 retries: Network error'
       );
+
+      vi.useRealTimers();
     });
   });
 

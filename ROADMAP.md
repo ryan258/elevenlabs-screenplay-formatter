@@ -22,7 +22,7 @@ Transform the ElevenLabs Screenplay Formatter from a functional prototype into a
 - **Voice Cloning**: Upload custom voice samples via ElevenLabs API
 - **Quality of Life**: Keyboard shortcuts (Ctrl+Enter, Ctrl+Z, Ctrl+Y), cost estimator, script templates, drag & drop
 - **Developer Experience**: TypeScript strict mode, unit tests (Vitest), E2E tests (Playwright)
-- **DevOps**: GitHub Actions CI/CD pipeline, Sentry error tracking
+- **DevOps**: GitHub Actions CI/CD pipeline, client-side error boundary logging
 - **UI/UX**: Responsive dark theme, statistics panel, history panel, voice library browser with preview
 
 ### 🎉 **Recently Completed (Phase 1 - December 2024)**
@@ -50,7 +50,7 @@ Transform the ElevenLabs Screenplay Formatter from a functional prototype into a
 - **Frontend**: React 19.2, TypeScript 5.8, Vite 6.2, React Toastify, JSZip, File-saver
 - **Backend**: Node.js + Express, Multer, Fluent-FFmpeg, CORS
 - **Testing**: Vitest (unit), Playwright (E2E)
-- **Monitoring**: Sentry
+- **Monitoring**: Evaluate lightweight client-side monitoring solution
 - **CI/CD**: GitHub Actions
 
 ---
@@ -64,7 +64,7 @@ Transform the ElevenLabs Screenplay Formatter from a functional prototype into a
 - [x] **Performance Optimization**: Added React.memo, useMemo, useCallback for expensive operations ✅
 - [ ] **Bundle Size Reduction**: Implement code splitting and lazy loading for components
 - [ ] **Memory Management**: Optimize audio blob handling for large screenplays (stream processing)
-- [x] **Error Boundaries**: Error boundary integrated at app root with Sentry reporting ✅
+- [x] **Error Boundaries**: Error boundary integrated at app root with console logging ✅
 - [x] **Better Rate Limit Handling**: Enhanced backoff strategy with automatic waiting and console warnings ✅
 
 ### 1.2 User Experience Improvements
@@ -196,7 +196,7 @@ Transform the ElevenLabs Screenplay Formatter from a functional prototype into a
 - **E2E Tests**: Playwright configured with basic generation workflow test
 - **Error Boundaries**: ErrorBoundary component exists (needs wider integration)
 - **CI/CD Pipeline**: GitHub Actions workflow for test/build/deploy
-- **Error Tracking**: Sentry integration for production error monitoring
+- **Error Tracking**: Evaluate production monitoring options
 
 ### 🔥 High Priority (Do Soon)
 - [ ] **Performance Optimization**: Add React.memo, useMemo, useCallback to prevent unnecessary re-renders
@@ -228,7 +228,7 @@ Transform the ElevenLabs Screenplay Formatter from a functional prototype into a
 
 ### ✅ Currently Implemented
 - **GitHub Actions CI/CD**: Automated testing and build pipeline
-- **Sentry Error Tracking**: Production error monitoring and alerts
+- **Error Tracking**: Plan production monitoring and alerts
 - **Local Development**: Vite dev server with hot reload
 - **Backend Server**: Express server for audio concatenation (optional)
 
@@ -344,7 +344,7 @@ Based on completed Phase 1 work, here are the **most impactful next steps**:
 ### ✅ Recently Completed (December 2024)
 
 **Phase 1.1 (Core Stability)**
-1. ~~Integrate Error Boundaries~~ ✅ Already integrated with Sentry
+1. ~~Integrate Error Boundaries~~ ✅ Already integrated with custom reporting
 2. ~~Add Performance Optimizations~~ ✅ Memoization added to App.tsx
 3. ~~Improve Accessibility~~ ✅ ARIA labels added throughout
 4. ~~Enhanced Error Messages~~ ✅ Comprehensive error utility created
@@ -442,7 +442,7 @@ Based on completed Phase 1 work, here are the **most impactful next steps**:
 
 **📦 Build & Deploy**
 - Build now succeeds with no errors (471 KB bundle, 147 KB gzipped)
-- Minor Sentry import warnings (non-breaking)
+- Minor optional monitoring import warnings (non-breaking)
 
 **📊 Metrics**
 - Phase 1 Progress: 6/18 items complete (33%)
@@ -455,3 +455,4 @@ Based on completed Phase 1 work, here are the **most impactful next steps**:
 - Better performance with memoized operations
 - More accessible for screen reader users
 - More reliable API calls with retry logic
+

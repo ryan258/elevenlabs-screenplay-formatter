@@ -13,8 +13,6 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@sentry/react": "^10.22.0",
-    "@sentry/tracing": "^7.120.4",
     "file-saver": "^2.0.5",
     "jszip": "^3.10.1",
     "node-fetch": "^3.3.2",
@@ -24,8 +22,10 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.56.1",
+    "@testing-library/react": "^16.0.0",
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "jsdom": "^27.1.0",
     "playwright": "^1.56.1",
     "typescript": "~5.8.2",
     "vite": "^6.2.0",

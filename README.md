@@ -134,7 +134,7 @@ elevenlabs-screenplay-formatter/
 │   ├── ApiKeyPanel.tsx             # API key input
 │   ├── CharacterConfigPanel.tsx    # Voice configuration per character
 │   ├── CommentsPanel.tsx           # Comments for dialogue chunks
-│   ├── ErrorBoundary.tsx           # Error boundary with Sentry
+│   ├── ErrorBoundary.tsx           # Root-level error boundary
 │   ├── GeneratePanel.tsx           # Generation controls with accessibility
 │   ├── HistoryPanel.tsx            # Project version history
 │   ├── Modal.tsx                   # Full-screen editor modal
@@ -172,7 +172,7 @@ elevenlabs-screenplay-formatter/
 │
 ├── App.tsx                         # Main application with state management
 ├── types.ts                        # TypeScript type definitions
-├── index.tsx                       # React entry point with Sentry
+├── index.tsx                       # React entry point
 ├── index.html                      # HTML template
 ├── package.json                    # Frontend dependencies
 ├── vite.config.ts                  # Vite build configuration
@@ -428,7 +428,7 @@ The app includes comprehensive error handling with user-friendly messages and tr
 - GitHub Actions CI/CD pipeline
 
 **Monitoring:**
-- Sentry for error tracking
+- Custom error boundary for graceful failures
 - Error boundaries for graceful failures
 
 **APIs:**
@@ -590,7 +590,7 @@ Make your workflow faster with these keyboard shortcuts:
 - ✨ Performance optimizations (React.memo, useMemo, useCallback)
 - ✨ Better rate limit handling with automatic backoff
 - ✨ Accessibility improvements (ARIA labels, screen reader support)
-- ✨ Error boundaries with Sentry integration
+- ✨ Error boundary with friendly fallback UI
 
 ### v0.2.0 - Initial Release
 **Feature-Complete Prototype**
@@ -653,8 +653,9 @@ Production-ready error handling:
 - User-friendly error messages
 - Automatic retry with backoff
 - Helpful troubleshooting steps
-- Sentry error tracking
+- Client-side error handling with React ErrorBoundary
 
 ---
 
 **Happy voice acting!** 🎙️✨
+

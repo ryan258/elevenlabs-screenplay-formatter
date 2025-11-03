@@ -67,9 +67,8 @@ export const useScriptParser = (scriptText: string): { characters: string[], dia
                     text = text.replace(emotionTagRegex, '').trim(); // Remove the tag from the text
                 }
 
-                text = cleanDialogue(text);
                 if (text) {
-                    chunks.push({ character: currentCharacterFullName, text, emotion });
+                    chunks.push({ character: currentCharacterFullName, text: cleanDialogue(text), emotion });
                 }
             }
             currentDialogue = [];
@@ -107,9 +106,8 @@ export const useScriptParser = (scriptText: string): { characters: string[], dia
                 if (foundCharacter) {
                     flushDialogue();
                     
-                    const text = cleanDialogue(dialoguePart);
-                    if (text) {
-                        chunks.push({ character: foundCharacter.fullName, text });
+                    if (dialoguePart) {
+                        chunks.push({ character: foundCharacter.fullName, text: cleanDialogue(dialoguePart) });
                     }
                     currentCharacterFullName = foundCharacter.fullName; // Keep character for potential multi-line dialogue
                     return;
@@ -117,9 +115,8 @@ export const useScriptParser = (scriptText: string): { characters: string[], dia
                     // Dynamically add character if not found but matches character name pattern
                     potentialCharacters.add(potentialCharacterName.toUpperCase());
                     flushDialogue();
-                    const text = cleanDialogue(dialoguePart);
-                    if (text) {
-                        chunks.push({ character: potentialCharacterName.toUpperCase(), text });
+                    if (dialoguePart) {
+                        chunks.push({ character: potentialCharacterName.toUpperCase(), text: cleanDialogue(dialoguePart) });
                     }
                     currentCharacterFullName = potentialCharacterName.toUpperCase();
                     return;
