@@ -85,7 +85,7 @@ A production-ready React application that converts screenplay dialogue into AI-g
 
 2. **Open your browser:**
 
-   - Navigate to `http://localhost:5173`
+   - Navigate to `http://localhost:3000`
 
 3. **Configure and generate:**
    - Enter your ElevenLabs API key
@@ -118,7 +118,7 @@ A production-ready React application that converts screenplay dialogue into AI-g
    ```
 
 3. **Generate concatenated audio:**
-   - Open `http://localhost:5173`
+   - Open `http://localhost:3000`
    - Enter your ElevenLabs API key
    - Paste your screenplay
    - Configure character voices
@@ -482,7 +482,7 @@ npm run test:e2e
 
 ### Project Scripts:
 
-- `npm run dev` - Start development server (localhost:5173)
+- `npm run dev` - Start development server (localhost:3000)
 - `npm run build` - Build for production (outputs to `/dist`)
 - `npm run preview` - Preview production build
 - `npm test` - Run unit tests once
