@@ -1,13 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ExpandIcon } from './icons';
+import ScriptTemplateSelector from './ScriptTemplateSelector';
 
 interface ScriptInputProps {
   scriptText: string;
   setScriptText: (text: string) => void;
   onExpand: () => void;
+  onFilesDrop: (files: File[]) => void;
 }
 
-const ScriptInput: React.FC<ScriptInputProps> = ({ scriptText, setScriptText, onExpand }) => {
+const ScriptInput: React.FC<ScriptInputProps> = ({ scriptText, setScriptText, onExpand, onFilesDrop }) => {
+  const [isDragging, setIsDragging] = useState(false);
+
   const placeholderText = `Required format:
 
 Characters:
@@ -24,8 +28,32 @@ Response here.
 
 See EXAMPLE_SCREENPLAY.md for detailed formatting guide.`;
 
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsDragging(false);
+
+    const files = Array.from(event.dataTransfer.files);
+    if (files.length > 0) {
+      onFilesDrop(files);
+    }
+  };
+
   return (
-    <div className="flex flex-col h-full bg-secondary p-4 rounded-lg shadow-lg">
+    <div 
+      className={`flex flex-col h-full bg-secondary p-4 rounded-lg shadow-lg border-2 border-dashed ${isDragging ? 'border-highlight' : 'border-transparent'}`}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       <div className="flex justify-between items-center mb-2">
         <h2 className="text-xl font-bold text-highlight">Screenplay Input</h2>
         <div className="flex items-center space-x-2">
@@ -55,7 +83,8 @@ See EXAMPLE_SCREENPLAY.md for detailed formatting guide.`;
         >
           formatting guide
         </a>
-        {' '}or{' '}
+        {' '}
+        or{' '}
         <a
           href="example.txt"
           target="_blank"
@@ -65,6 +94,7 @@ See EXAMPLE_SCREENPLAY.md for detailed formatting guide.`;
           example
         </a>
       </div>
+      <ScriptTemplateSelector onSelectTemplate={setScriptText} />
       <textarea
         value={scriptText}
         onChange={(e) => setScriptText(e.target.value)}
@@ -77,3 +107,4 @@ See EXAMPLE_SCREENPLAY.md for detailed formatting guide.`;
 };
 
 export default ScriptInput;
+

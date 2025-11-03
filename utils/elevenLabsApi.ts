@@ -1,4 +1,4 @@
-import { DialogueChunk, CharacterConfig } from '../types';
+import { DialogueChunk, CharacterConfig, VoiceSettings } from '../types';
 
 export interface GenerationProgress {
   current: number;
@@ -8,6 +8,20 @@ export interface GenerationProgress {
   message: string;
 }
 
+/**
+ * Generates an audio file for a given dialogue chunk using the ElevenLabs API, including character-level timestamps.
+ * Implements retry logic with exponential backoff for API calls.
+ * @param chunk The dialogue chunk to generate audio for.
+ * @param config The character configuration for the voice.
+ * @param apiKey The ElevenLabs API key.
+ * @param modelId The ID of the voice model to use.
+ * @param outputFormat The desired output audio format.
+ * @param onProgress Callback function for progress updates.
+ * @param index The current index of the chunk in the generation queue.
+ * @param total The total number of chunks in the generation queue.
+ * @param signal AbortSignal to cancel the API request.
+ * @returns A Promise that resolves to an object containing the audio blob, response headers, and alignment data.
+ */
 export const generateAudioFile = async (
   chunk: DialogueChunk,
   config: CharacterConfig,
@@ -16,9 +30,10 @@ export const generateAudioFile = async (
   outputFormat: string,
   onProgress?: (progress: GenerationProgress, current: number, total: number) => void,
   index: number = 0,
-  total: number = 1
-): Promise<Blob> => {
-  const url = `https://api.elevenlabs.io/v1/text-to-speech/${config.voiceId}`;
+  total: number = 1,
+  signal?: AbortSignal
+): Promise<{blob: Blob, headers: Headers, alignment?: any}> => {
+  const url = `https://api.elevenlabs.io/v1/text-to-speech/${config.voiceId}/with-timestamps`;
 
   if (onProgress) {
     onProgress({
@@ -30,29 +45,34 @@ export const generateAudioFile = async (
     }, index + 1, total);
   }
 
-  const response = await fetch(url, {
+  const response = await fetchWithRetry(url, {
     method: 'POST',
     headers: {
-      'Accept': 'audio/mpeg',
+      'Accept': 'application/json',
       'Content-Type': 'application/json',
       'xi-api-key': apiKey
     },
     body: JSON.stringify({
-      text: chunk.text,
+      text: chunk.emotion ? `[${chunk.emotion}] ${chunk.text}` : chunk.text,
       model_id: modelId,
       voice_settings: {
         stability: config.voiceSettings.stability,
         similarity_boost: config.voiceSettings.similarity_boost,
         style: config.voiceSettings.style || 0,
         use_speaker_boost: true
-      }
-    })
+      },
+      output_format: outputFormat
+    }),
+    signal
   });
 
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(`API Error for ${chunk.character}: ${response.status} - ${errorText}`);
   }
+
+  const data = await response.json();
+  const audioBlob = await (await fetch(`data:audio/mpeg;base64,${data.audio_base64}`)).blob(); // Decode base64 audio to blob
 
   if (onProgress) {
     onProgress({
@@ -64,8 +84,7 @@ export const generateAudioFile = async (
     }, index + 1, total);
   }
 
-  const blob = await response.blob();
-  return blob;
+  return { blob: audioBlob, headers: response.headers, alignment: data.alignment };
 };
 
 export const downloadBlob = (blob: Blob, filename: string) => {
@@ -79,8 +98,118 @@ export const downloadBlob = (blob: Blob, filename: string) => {
   URL.revokeObjectURL(url);
 };
 
+export const addVoice = async (
+  name: string,
+  description: string,
+  labels: { [key: string]: string },
+  files: File[],
+  apiKey: string
+): Promise<any> => {
+  const url = 'https://api.elevenlabs.io/v1/voices/add';
+  const formData = new FormData();
+  formData.append('name', name);
+  formData.append('description', description);
+  formData.append('labels', JSON.stringify(labels));
+  files.forEach((file, index) => {
+    formData.append(`files`, file);
+  });
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'xi-api-key': apiKey
+    },
+    body: formData
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`API Error adding voice: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json();
+  return data;
+};
+
+export const getAvailableVoices = async (apiKey: string): Promise<any> => {
+  const url = 'https://api.elevenlabs.io/v1/voices';
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'xi-api-key': apiKey
+    }
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`API Error fetching voices: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json();
+  return data.voices;
+};
+  const url = 'https://api.elevenlabs.io/v1/user/subscription';
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'xi-api-key': apiKey
+    }
+  });
+  return response.ok;
+};
+  const remaining = headers.get('ratelimit-remaining');
+  const reset = headers.get('ratelimit-reset');
+
+  if (remaining && reset && parseInt(remaining) < 5) {
+    const resetTime = new Date(parseInt(reset) * 1000);
+    const now = new Date();
+    const waitTime = resetTime.getTime() - now.getTime();
+    if (waitTime > 0) {
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+    }
+  }
+};
+export const generateAudioPreview = async (
+  voiceId: string,
+  voiceSettings: VoiceSettings,
+  apiKey: string,
+  modelId: string
+): Promise<Blob> => {
+  const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Accept': 'audio/mpeg',
+      'Content-Type': 'application/json',
+      'xi-api-key': apiKey
+    },
+    body: JSON.stringify({
+      text: "Hello, I am a preview voice.",
+      model_id: modelId,
+      voice_settings: {
+        stability: voiceSettings.stability,
+        similarity_boost: voiceSettings.similarity_boost,
+        style: voiceSettings.style || 0,
+        use_speaker_boost: true
+      }
+    })
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`API Error for preview: ${response.status} - ${errorText}`);
+  }
+
+  const blob = await response.blob();
+  return blob;
+};
+
 const concatenateAudioFiles = async (
   blobs: { blob: Blob; filename: string }[],
+  dialogueChunks: DialogueChunk[],
+  projectSettings: ProjectSettings,
+  backgroundMusicUrl?: string,
+  sfxConfigs?: SFX[],
   onProgress?: (progress: GenerationProgress, current: number, total: number) => void
 ): Promise<Blob> => {
   const serverUrl = 'http://localhost:3001/concatenate';
@@ -100,6 +229,14 @@ const concatenateAudioFiles = async (
   blobs.forEach(({ blob, filename }) => {
     formData.append('audioFiles', blob, filename);
   });
+  if (backgroundMusicUrl) {
+    formData.append('backgroundMusicUrl', backgroundMusicUrl);
+  }
+  if (sfxConfigs && sfxConfigs.length > 0) {
+    formData.append('sfxConfigs', JSON.stringify(sfxConfigs));
+  }
+  formData.append('dialogueChunks', JSON.stringify(dialogueChunks));
+  formData.append('outputFormat', projectSettings.outputFormat);
 
   try {
     const response = await fetch(serverUrl, {
@@ -143,16 +280,24 @@ export const generateAllAudio = async (
   dialogueChunks: DialogueChunk[],
   characterConfigs: { [key: string]: CharacterConfig },
   apiKey: string,
-  modelId: string,
-  outputFormat: string,
-  concatenate: boolean,
-  onProgress?: (progress: GenerationProgress, current: number, total: number) => void
+  projectSettings: ProjectSettings,
+  sfxConfigs: SFX[],
+  signal: AbortSignal,
+  onProgress?: (progress: GenerationProgress, current: number, total: number) => void,
+  resumeIndex: number = 0
 ): Promise<void> => {
   const total = dialogueChunks.length;
-  const generatedBlobs: { blob: Blob; filename: string }[] = [];
+  let generatedBlobs: { blob: Blob; filename: string }[] = [];
+
+  if (resumeIndex > 0) {
+    const savedBlobs = localStorage.getItem('generatedBlobs');
+    if (savedBlobs) {
+      generatedBlobs = JSON.parse(savedBlobs);
+    }
+  }
 
   // Generate all audio files
-  for (let i = 0; i < dialogueChunks.length; i++) {
+  for (let i = resumeIndex; i < dialogueChunks.length; i++) {
     const chunk = dialogueChunks[i];
     const config = characterConfigs[chunk.character];
 
@@ -161,22 +306,32 @@ export const generateAllAudio = async (
     }
 
     try {
-      const blob = await generateAudioFile(
+      const { blob, headers, alignment } = await generateAudioFile(
         chunk,
         config,
         apiKey,
-        modelId,
-        outputFormat,
+        projectSettings.model,
+        projectSettings.outputFormat,
         onProgress,
         i,
-        total
+        total,
+        signal
       );
+
+      // Store timestamp information
+      if (alignment && alignment.normalized_alignment && alignment.normalized_alignment.word_start_times_seconds && alignment.normalized_alignment.word_end_times_seconds) {
+        chunk.startTime = alignment.normalized_alignment.word_start_times_seconds[0];
+        chunk.endTime = alignment.normalized_alignment.word_end_times_seconds[alignment.normalized_alignment.word_end_times_seconds.length - 1];
+      }
+
+      await handleRateLimiting(headers);
 
       const filename = `${String(i).padStart(4, '0')}_${chunk.character.replace(/\s+/g, '_')}.mp3`;
 
       if (concatenate) {
         // Store blob for later concatenation
         generatedBlobs.push({ blob, filename });
+        localStorage.setItem('generatedBlobs', JSON.stringify(generatedBlobs));
       } else {
         // Download immediately if not concatenating
         downloadBlob(blob, filename);
@@ -192,10 +347,7 @@ export const generateAllAudio = async (
         }, i + 1, total);
       }
 
-      // Small delay between requests to avoid rate limiting
-      if (i < dialogueChunks.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
+      
     } catch (error) {
       if (onProgress) {
         onProgress({
@@ -206,6 +358,7 @@ export const generateAllAudio = async (
           message: `✗ Failed: ${error.message}`
         }, i + 1, total);
       }
+      localStorage.setItem('generationState', JSON.stringify({ dialogueChunks, characterConfigs, modelId: projectSettings.model, outputFormat: projectSettings.outputFormat, concatenate: projectSettings.concatenate, backgroundMusicUrl: projectSettings.backgroundMusicUrl, pauseDuration: projectSettings.pauseDuration, resumeIndex: 0 }));
       throw error;
     }
   }
@@ -213,7 +366,7 @@ export const generateAllAudio = async (
   // If concatenation is enabled, send all files to the server
   if (concatenate && generatedBlobs.length > 0) {
     try {
-      const concatenatedBlob = await concatenateAudioFiles(generatedBlobs, onProgress);
+      const concatenatedBlob = await concatenateAudioFiles(generatedBlobs, dialogueChunks, projectSettings, projectSettings.backgroundMusicUrl, sfxConfigs, onProgress);
       downloadBlob(concatenatedBlob, 'concatenated_audio.mp3');
     } catch (error) {
       // If concatenation fails, fallback to individual downloads
@@ -234,4 +387,6 @@ export const generateAllAudio = async (
       throw error;
     }
   }
+  localStorage.removeItem('generationState');
+  localStorage.removeItem('generatedBlobs');
 };

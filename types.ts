@@ -1,6 +1,24 @@
+export interface GenerationStat {
+  timestamp: number;
+  scriptLength: number;
+  characterCount: number;
+  estimatedCost: number;
+  duration: number;
+  status: 'success' | 'error' | 'cancelled';
+}
+
+export interface Voice {
+  voice_id: string;
+  name: string;
+  category: string;
+}
+
 export interface DialogueChunk {
   character: string;
   text: string;
+  startTime?: number;
+  endTime?: number;
+  emotion?: string;
 }
 
 export interface VoiceSettings {
@@ -19,8 +37,19 @@ export interface CharacterConfigs {
   [character: string]: CharacterConfig;
 }
 
+export interface SFX {
+  keyword: string;
+  url: string;
+  volume: number;
+}
+
 export interface ProjectSettings {
   model: string;
   outputFormat: string;
   concatenate: boolean;
+  backgroundMusicUrl?: string;
+  pauseDuration?: number;
+  generateSubtitles?: boolean;
+  subtitleFormat?: 'srt' | 'vtt';
+  masteringPreset?: string;
 }
