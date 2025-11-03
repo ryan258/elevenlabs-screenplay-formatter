@@ -483,6 +483,8 @@ npm run test:e2e
 npx vitest run --config vitest.config.unit.ts --coverage
 ```
 
+> Playwright E2E tests currently mock ElevenLabs API responses so they can run offline. Run `npx playwright install` once to fetch browsers, and update the tests/config if you add scenarios that hit the real service.
+
 ### Project Scripts:
 
 - `npm run dev` - Start development server (localhost:3000)
@@ -534,7 +536,7 @@ These features have been fully implemented:
 - [x] Wire up voice config import/export (JSON backup/restore)
 - [x] Get `npx tsc --noEmit` passing (install missing types, narrow errors)
 - [ ] Increase test coverage to 85%+
-- [ ] Fix failing unit and E2E tests
+- [ ] Expand Playwright coverage beyond mocked happy-path flows
 - [ ] Security audit (API key handling, input sanitization)
 - [ ] Browser compatibility testing (Safari, Firefox, Edge)
 - [ ] Performance monitoring and analytics
@@ -613,11 +615,11 @@ Contributions are welcome! Please see [ROADMAP.md](ROADMAP.md) for planned featu
 **Phase 1 Progress**: 65% complete (13/20 items)
 
 Areas where contributions would be especially helpful:
-1. Increasing test coverage (currently ~72%, target 85%+)
-2. Browser compatibility testing
-3. Security review and input sanitization
-4. Documentation improvements
-5. Bug fixes and performance optimizations
+1. Increasing unit coverage (currently ~72%, target 85%+)
+2. Expanding Playwright scenarios beyond mocked happy-path flows
+3. Browser compatibility testing
+4. Security review and input sanitization
+5. Documentation improvements and bug fixes
 
 ## Support
 

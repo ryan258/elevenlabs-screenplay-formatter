@@ -21,7 +21,7 @@ Transform the ElevenLabs Screenplay Formatter from a functional prototype into a
 - **Subtitles**: SRT and VTT subtitle generation with timestamps
 - **Voice Cloning**: Upload custom voice samples via ElevenLabs API
 - **Quality of Life**: Keyboard shortcuts (Ctrl+Enter, Ctrl+Z, Ctrl+Y), cost estimator, script templates, drag & drop
-- **Developer Experience**: TypeScript strict-mode clean, 70%+ unit coverage (Vitest), E2E tests (Playwright) pending refresh
+- **Developer Experience**: TypeScript strict-mode clean, ~72% unit coverage (Vitest), Playwright baseline suite with mocked APIs
 - **DevOps**: GitHub Actions CI/CD pipeline, client-side error boundary logging
 - **UI/UX**: Responsive dark theme, statistics panel, history panel, voice library browser with preview
 
@@ -79,7 +79,7 @@ Transform the ElevenLabs Screenplay Formatter from a functional prototype into a
 
 ### 1.3 Quality Assurance
 - [ ] **Test Coverage**: Increase unit test coverage to 85%+ (Currently ~72%)
-- [ ] **E2E Test Expansion**: Fix E2E test syntax errors and add comprehensive Playwright tests
+- [ ] **E2E Test Expansion**: Grow Playwright coverage beyond mocked happy-path flows
 - [x] **Accessibility Audit**: Added ARIA labels, semantic HTML, and screen reader support to key components Γ£à
 - [ ] **Security Review**: Audit API key handling, sanitize user inputs, add CSP headers
 - [ ] **Performance Monitoring**: Add timing metrics and user analytics (consider PostHog or Plausible)
