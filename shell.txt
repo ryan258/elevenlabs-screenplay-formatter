@@ -1,0 +1,8 @@
+# Before doing anything else, run the commands in `shell.txt` to confirm we’re in Git Bash, and show me the output. Then continue with the task. Because shell.txt already lives in the repo root, that prompt tells me to source the file (or just execute its commands) and report back. As long as that sentence leads off your message, I’ll run the check and you won’t have to touch PowerShell—or run the snippet yourself.       
+
+
+# Use this snippet to confirm we are in Git Bash, not PowerShell.
+echo "Current shell: $SHELL"
+echo "Invoker: $0"
+ps -p "$$" -o pid,comm,cmd
+# Expect to see bash in the second/third lines. If you see pwsh/powershell, we are in PowerShell.

@@ -509,6 +509,8 @@ The app includes automatic rate limiting (500ms delay between requests) to avoid
 4. **Sequential Processing**: Files generated one at a time to respect API rate limits (parallel generation would hit rate limits)
 5. **LocalStorage Only**: Multi-user support is basic and doesn't sync across devices
 6. **Test Coverage**: Currently ~30%, target is 70%+
+7. **Voice Config Import/Export**: UI controls exist but export/import handlers are still pending
+8. **TypeScript Strict Mode**: `npx tsc --noEmit` currently fails (missing type declarations, unsafe error handling)
 
 ## Completed Features ✅
 
@@ -516,7 +518,6 @@ These features have been fully implemented:
 
 - ✅ **Save/Load Projects** - Auto-save with localStorage persistence
 - ✅ **Preview Audio** - Live voice preview before assignment
-- ✅ **Character Voice Presets** - Import/export voice configurations as JSON
 - ✅ **Progress Persistence** - Resume after browser crash or refresh
 - ✅ **Undo/Redo** - Full history with keyboard shortcuts
 - ✅ **Voice Search & Filter** - Advanced filtering by gender, accent, age
@@ -528,6 +529,8 @@ These features have been fully implemented:
 ## Planned Enhancements
 
 **Phase 1.3 - Quality Assurance** (In Progress):
+- [ ] Wire up voice config import/export (JSON backup/restore)
+- [ ] Get `npx tsc --noEmit` passing (install missing types, narrow errors)
 - [ ] Increase test coverage to 70%+
 - [ ] Fix failing unit and E2E tests
 - [ ] Security audit (API key handling, input sanitization)
@@ -605,14 +608,16 @@ Make your workflow faster with these keyboard shortcuts:
 
 Contributions are welcome! Please see [ROADMAP.md](ROADMAP.md) for planned features and current progress.
 
-**Phase 1 Progress**: 61% complete (11/18 items)
+**Phase 1 Progress**: 55% complete (11/20 items)
 
 Areas where contributions would be especially helpful:
-1. Increasing test coverage (currently ~30%, target 70%+)
-2. Browser compatibility testing
-3. Security review and input sanitization
-4. Documentation improvements
-5. Bug fixes and performance optimizations
+1. Resolving TypeScript strict-mode errors (missing declarations, safer error handling)
+2. Implementing character voice config import/export handlers
+3. Increasing test coverage (currently ~30%, target 70%+)
+4. Browser compatibility testing
+5. Security review and input sanitization
+6. Documentation improvements
+7. Bug fixes and performance optimizations
 
 ## Support
 
