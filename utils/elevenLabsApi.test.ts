@@ -68,12 +68,10 @@ describe('elevenLabsApi', () => {
       const signal = new AbortController().signal;
 
       const promise = generateAudioFile(chunk, config, apiKey, modelId, outputFormat, undefined, 0, 1, signal);
+      const rejection = expect(promise).rejects.toThrow('Failed after 3 retries: Network error');
 
       await vi.runAllTimersAsync();
-
-      await expect(promise).rejects.toThrow(
-        'Failed after 3 retries: Network error'
-      );
+      await rejection;
 
       vi.useRealTimers();
     });

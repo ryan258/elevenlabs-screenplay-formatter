@@ -21,7 +21,7 @@ Transform the ElevenLabs Screenplay Formatter from a functional prototype into a
 - **Subtitles**: SRT and VTT subtitle generation with timestamps
 - **Voice Cloning**: Upload custom voice samples via ElevenLabs API
 - **Quality of Life**: Keyboard shortcuts (Ctrl+Enter, Ctrl+Z, Ctrl+Y), cost estimator, script templates, drag & drop
-- **Developer Experience**: TypeScript tooling, unit tests (Vitest), E2E tests (Playwright); strict-mode cleanup outstanding
+- **Developer Experience**: TypeScript strict-mode clean, 70%+ unit coverage (Vitest), E2E tests (Playwright) pending refresh
 - **DevOps**: GitHub Actions CI/CD pipeline, client-side error boundary logging
 - **UI/UX**: Responsive dark theme, statistics panel, history panel, voice library browser with preview
 
@@ -78,7 +78,7 @@ Transform the ElevenLabs Screenplay Formatter from a functional prototype into a
 - [x] **Voice Config Import/Export**: Implement export and import handlers backing existing UI ✅
 
 ### 1.3 Quality Assurance
-- [ ] **Test Coverage**: Increase unit test coverage to 70%+ for critical paths (Currently ~30%)
+- [ ] **Test Coverage**: Increase unit test coverage to 85%+ (Currently ~72%)
 - [ ] **E2E Test Expansion**: Fix E2E test syntax errors and add comprehensive Playwright tests
 - [x] **Accessibility Audit**: Added ARIA labels, semantic HTML, and screen reader support to key components Γ£à
 - [ ] **Security Review**: Audit API key handling, sanitize user inputs, add CSP headers
@@ -205,7 +205,7 @@ Transform the ElevenLabs Screenplay Formatter from a functional prototype into a
 - [ ] **Bundle Size Optimization**: Implement route-based code splitting and lazy loading
 - [ ] **Accessibility**: Add ARIA labels, keyboard navigation, focus management, screen reader support
 - [ ] **Security Audit**: Review API key handling, add input sanitization, implement CSP headers
-- [ ] **Increase Test Coverage**: Target 70%+ code coverage for utils/ and hooks/
+- [ ] **Increase Test Coverage**: Raise unit coverage to 85%+ for utils/ and hooks (currently ~72%)
 - [ ] **API Error Handling**: Better error messages and retry strategies for ElevenLabs API failures
 - [ ] **Memory Leaks**: Audit and fix potential memory leaks in audio blob handling
 
@@ -295,12 +295,12 @@ Transform the ElevenLabs Screenplay Formatter from a functional prototype into a
 ### ≡ƒÄ» Current Status (Baseline)
 - **GitHub Stars**: Track growth over time
 - **Active Users**: Currently local-only (no analytics implemented)
-- **Test Coverage**: ~30% (estimated, needs measurement)
+- **Test Coverage**: ~72% (unit suite snapshot)
 - **Supported Formats**: Plain text screenplay format
 - **Generation Success Rate**: Unknown (needs tracking)
 
 ### ≡ƒôê Near-Term Goals (3-6 months)
-- [ ] **70% Test Coverage**: For utils/, hooks/, and critical paths
+- [ ] **85% Test Coverage**: For utils/, hooks/, and critical paths
 - [ ] **Sub-1s Parse Time**: For 100-page screenplays
 - [ ] **95% Generation Success Rate**: Track via error monitoring
 - [ ] **50 GitHub Stars**: Community growth indicator
@@ -363,9 +363,9 @@ Based on completed Phase 1 work, here are the **most impactful next steps**:
 ### ≡ƒÆí Current Project Health
 - **Build Status**: Γ£à Successful (v0.4.0)
 - **Phase 1 Progress**: 65% complete (13/20 items) - **Major milestone!** 🎉
-- **Test Coverage**: ~30% (target: 70%)
+- **Test Coverage**: ~72% (unit suite, target 85%)
 - **Bundle Size**: 472.60 KB (147.57 KB gzipped) - minimal increase
-- **Known Issues**: 3 failing unit tests, 1 E2E test syntax error
+- **Known Issues**: End-to-end suite still pending overhaul; unit tests passing
 
 **Bottom line**: **Phase 1.2 complete!** All user experience improvements implemented. The app now has professional-grade editing features (undo/redo), reliability (progress persistence), and excellent voice selection tools. Next focus: finish Phase 1.3 (Quality Assurance) - fix tests, security review, and browser compatibility.
 

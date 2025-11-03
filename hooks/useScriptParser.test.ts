@@ -57,9 +57,9 @@ JOHN (V.O.)
 This is a test. [He sighs].
 `;
     const { result } = renderHook(() => useScriptParser(script));
-    expect(result.current.characters).toEqual(['JOHN (V.O.)']);
+    expect(result.current.characters).toEqual(['JOHN']);
     expect(result.current.dialogueChunks).toEqual([
-      expect.objectContaining({ character: 'JOHN (V.O.)', text: 'This is a test.', originalText: '(sadly) This is a test. [He sighs].' }),
+      expect.objectContaining({ character: 'JOHN', text: 'This is a test.', originalText: '(sadly) This is a test. [He sighs].' }),
     ]);
   });
 

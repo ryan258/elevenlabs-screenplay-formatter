@@ -6,3 +6,6 @@ echo "Current shell: $SHELL"
 echo "Invoker: $0"
 ps -p "$$" -o pid,comm,cmd
 # Expect to see bash in the second/third lines. If you see pwsh/powershell, we are in PowerShell.
+
+# Scan for "Phase 1 Progress" in our code/docs only.
+grep -R "Phase 1 Progress" -n --exclude-dir=node_modules --exclude-dir=server/node_modules

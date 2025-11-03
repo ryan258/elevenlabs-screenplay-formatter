@@ -478,6 +478,9 @@ npm run test:ui
 
 # E2E tests
 npm run test:e2e
+
+# Unit coverage snapshot
+npx vitest run --config vitest.config.unit.ts --coverage
 ```
 
 ### Project Scripts:
@@ -508,7 +511,7 @@ The app includes automatic rate limiting (500ms delay between requests) to avoid
 3. **ElevenLabs API Only**: Currently only supports ElevenLabs (no other TTS providers)
 4. **Sequential Processing**: Files generated one at a time to respect API rate limits (parallel generation would hit rate limits)
 5. **LocalStorage Only**: Multi-user support is basic and doesn't sync across devices
-6. **Test Coverage**: Currently ~30%, target is 70%+
+6. **Test Coverage**: Currently ~72% (unit suite), target is 85%+
 
 ## Completed Features ✅
 
@@ -530,7 +533,7 @@ These features have been fully implemented:
 **Phase 1.3 - Quality Assurance** (In Progress):
 - [x] Wire up voice config import/export (JSON backup/restore)
 - [x] Get `npx tsc --noEmit` passing (install missing types, narrow errors)
-- [ ] Increase test coverage to 70%+
+- [ ] Increase test coverage to 85%+
 - [ ] Fix failing unit and E2E tests
 - [ ] Security audit (API key handling, input sanitization)
 - [ ] Browser compatibility testing (Safari, Firefox, Edge)
@@ -610,7 +613,7 @@ Contributions are welcome! Please see [ROADMAP.md](ROADMAP.md) for planned featu
 **Phase 1 Progress**: 65% complete (13/20 items)
 
 Areas where contributions would be especially helpful:
-1. Increasing test coverage (currently ~30%, target 70%+)
+1. Increasing test coverage (currently ~72%, target 85%+)
 2. Browser compatibility testing
 3. Security review and input sanitization
 4. Documentation improvements

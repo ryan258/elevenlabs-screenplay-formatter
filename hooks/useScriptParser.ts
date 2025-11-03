@@ -8,11 +8,15 @@ interface DefinedCharacter {
 
 const cleanDialogue = (text: string) => {
     // Remove parentheticals like (To himself) or stage directions in brackets like [Almost inaudible]
-    // Then clean up whitespace.
-    return text.replace(/\([^)]+\)/g, '').replace(/\[[^\]]+\]/g, '').replace(/\s+/g, ' ').trim();
+    // Then clean up whitespace and stray punctuation spacing.
+    return text
+        .replace(/\([^)]+\)/g, '')
+        .replace(/\[[^\]]+\]/g, '')
+        .replace(/\s+/g, ' ')
+        .replace(/\s([.,!?;:])/g, '$1')
+        .replace(/([.!?]){2,}/g, '$1')
+        .trim();
 };
-
-const emotionTagRegex = /\[(.*?)\]/g; // Regex to find [EMOTION] tags
 
 export const useScriptParser = (scriptText: string): { characters: string[], dialogueChunks: DialogueChunk[] } => {
     return useMemo(() => {
@@ -61,10 +65,10 @@ export const useScriptParser = (scriptText: string): { characters: string[], dia
                 let text = originalText;
                 let emotion: string | undefined;
 
-                const emotionMatch = text.match(emotionTagRegex);
+                const emotionMatch = text.match(/\[(.*?)\]/);
                 if (emotionMatch) {
                     emotion = emotionMatch[1]; // Capture the content inside the brackets
-                    text = text.replace(emotionTagRegex, '').trim(); // Remove the tag from the text
+                    text = text.replace(/\[(.*?)\]/g, '').trim(); // Remove the tag from the text
                 }
 
                 if (text) {
