@@ -174,9 +174,9 @@ const CharacterConfigPanel: React.FC<CharacterConfigPanelProps> = ({ characters,
                       type="text"
                       value={config.voiceId}
                       onChange={(e) => handleConfigChange(char, 'voiceId', e.target.value)}
+                      onBlur={(e) => handleConfigChange(char, 'voiceId', e.target.value.trim())}
                       placeholder="Enter Voice ID"
                       className="w-full p-2 bg-secondary border border-accent rounded-md focus:outline-none focus:ring-2 focus:ring-highlight"
-                      readOnly
                     />
                   </div>
                   <button

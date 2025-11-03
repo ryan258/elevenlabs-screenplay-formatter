@@ -205,7 +205,13 @@ export const getAvailableVoices = async (apiKey: string): Promise<any> => {
 /**
  * Validates the API key by making a test request
  */
-export const validateApiKey = async (apiKey: string): Promise<boolean> => {
+export interface ApiKeyValidationResult {
+  valid: boolean;
+  status?: number | null;
+  error?: string;
+}
+
+export const validateApiKey = async (apiKey: string): Promise<ApiKeyValidationResult> => {
   try {
     const url = 'https://api.elevenlabs.io/v1/user/subscription';
     const response = await fetch(url, {
@@ -214,10 +220,44 @@ export const validateApiKey = async (apiKey: string): Promise<boolean> => {
         'xi-api-key': apiKey
       }
     });
-    return response.ok;
+
+    if (response.ok) {
+      return { valid: true, status: response.status };
+    }
+
+    let errorMessage: string | undefined;
+    try {
+      const data = await response.clone().json();
+      if (typeof data === 'string') {
+        errorMessage = data;
+      } else if (data && typeof data === 'object') {
+        if ('detail' in data && typeof data.detail === 'string') {
+          errorMessage = data.detail;
+        } else {
+          errorMessage = JSON.stringify(data);
+        }
+      }
+    } catch {
+      try {
+        errorMessage = await response.text();
+      } catch {
+        errorMessage = undefined;
+      }
+    }
+
+    return {
+      valid: false,
+      status: response.status,
+      error: errorMessage,
+    };
   } catch (error) {
     console.error('API key validation failed:', error);
-    return false;
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      valid: false,
+      status: null,
+      error: message,
+    };
   }
 };
 

@@ -279,12 +279,26 @@ function App() {
 
     try {
       // Validate API Key
-      const isApiKeyValid = await validateApiKey(apiKey);
-      if (!isApiKeyValid) {
-        toast.update(generationToastId, { render: '❌ Invalid API Key. Please check your API key and try again.', type: 'error', autoClose: 5000, closeButton: true });
-        setIsLoading(false);
-        setAbortController(null);
-        return;
+      const apiKeyValidation = await validateApiKey(apiKey);
+      if (!apiKeyValidation.valid) {
+        if (apiKeyValidation.status === 401) {
+          toast.update(generationToastId, { render: '❌ Invalid API Key. Please check your API key and try again.', type: 'error', autoClose: 5000, closeButton: true });
+          setIsLoading(false);
+          setAbortController(null);
+          return;
+        }
+
+        const validationErrorMessage = apiKeyValidation.error || `Status: ${apiKeyValidation.status ?? 'Unknown'}`;
+        const friendlyValidationMessage = formatErrorForToast(validationErrorMessage, 'API Key Validation');
+        toast.update(
+          generationToastId,
+          {
+            render: `⚠️ Unable to confirm API key.\n\n${friendlyValidationMessage}\n\nContinuing anyway - generation may still fail if the key lacks required permissions.`,
+            type: 'warning',
+            autoClose: 10000,
+            closeButton: true
+          }
+        );
       }
 
       // Validate configuration

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { ProjectSettings } from '../types';
 
 interface ProjectSettingsPanelProps {
@@ -6,11 +6,23 @@ interface ProjectSettingsPanelProps {
   setSettings: (settings: ProjectSettings) => void;
 }
 
+const MODEL_OPTIONS = [
+  { value: 'eleven_multilingual_v2', label: 'Eleven Multilingual v2 (High quality, multilingual)' },
+  { value: 'eleven_monolingual_v1', label: 'Eleven Monolingual v1 (High quality, English only)' },
+  { value: 'eleven_multilingual_v1', label: 'Eleven Multilingual v1 (Legacy multilingual)' },
+  { value: 'eleven_turbo_v2', label: 'Eleven Turbo v2 (Faster responses, multilingual)' },
+];
+
 // Implemented ProjectSettingsPanel to provide UI for project-level configurations.
 const ProjectSettingsPanel: React.FC<ProjectSettingsPanelProps> = ({ settings, setSettings }) => {
   const handleSettingChange = (field: keyof ProjectSettings, value: string | boolean | number | undefined) => {
     setSettings({ ...settings, [field]: value });
   };
+
+  const isCustomModel = useMemo(
+    () => !MODEL_OPTIONS.some(option => option.value === settings.model),
+    [settings.model]
+  );
 
   return (
     <div className="bg-secondary p-4 rounded-lg shadow-lg">
@@ -22,13 +34,34 @@ const ProjectSettingsPanel: React.FC<ProjectSettingsPanelProps> = ({ settings, s
           </label>
           <select
             id="model"
-            value={settings.model}
-            onChange={(e) => handleSettingChange('model', e.target.value)}
-            className="w-full p-2 bg-primary border border-accent rounded-md focus:outline-none focus:ring-2 focus:ring-highlight"
+            value={isCustomModel ? 'custom' : settings.model}
+            onChange={(e) => {
+              const next = e.target.value;
+              if (next !== 'custom') {
+                handleSettingChange('model', next);
+              }
+            }}
+            className="w-full p-2 bg-primary border border-accent rounded-md focus:outline-none focus:ring-2 focus:ring-highlight mb-2"
           >
-            <option value="eleven_multilingual_v2">Eleven Multilingual v2</option>
-            <option value="eleven_monolingual_v1">Eleven Monolingual v1</option>
+            {MODEL_OPTIONS.map(option => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+            <option value="custom">Custom model ID…</option>
           </select>
+          {isCustomModel && (
+            <input
+              type="text"
+              value={settings.model}
+              onChange={(e) => handleSettingChange('model', e.target.value)}
+              placeholder="Enter ElevenLabs model id (e.g., eleven_flash_v2_5)"
+              className="w-full p-2 bg-primary border border-accent rounded-md focus:outline-none focus:ring-2 focus:ring-highlight"
+            />
+          )}
+          <p className="text-xs text-text-secondary mt-1">
+            Don’t see your model? Choose “Custom” and paste the model id from the ElevenLabs docs or API.
+          </p>
         </div>
         <div>
           <label htmlFor="output-format" className="block text-sm font-medium text-text-secondary mb-1">

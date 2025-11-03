@@ -221,8 +221,11 @@ The backend server (`server/index.js`) provides a REST API endpoint:
 
 - **Model**:
 
-  - `eleven_multilingual_v2` - Supports 29+ languages (default)
-  - `eleven_monolingual_v1` - English-only, faster
+  - `eleven_multilingual_v2` — High quality, multilingual (default)
+  - `eleven_monolingual_v1` — High quality, English-only
+  - `eleven_multilingual_v1` — Legacy multilingual model
+  - `eleven_turbo_v2` — Faster generation with slightly lower fidelity
+  - **Custom** — Pick “Custom” in the dropdown and paste any supported model id (e.g. `eleven_flash_v2_5`)
 
 - **Output Format**:
 

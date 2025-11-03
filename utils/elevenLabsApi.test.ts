@@ -78,20 +78,38 @@ describe('elevenLabsApi', () => {
   });
 
   describe('validateApiKey', () => {
-    it('should return true for a valid API key', async () => {
+    it('should report valid for a working API key', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
+        status: 200,
       });
-      const isValid = await validateApiKey('valid-key');
-      expect(isValid).toBe(true);
+      const result = await validateApiKey('valid-key');
+      expect(result.valid).toBe(true);
+      expect(result.status).toBe(200);
+      expect(result.error).toBeUndefined();
     });
 
-    it('should return false for an invalid API key', async () => {
+    it('should return status and message for an invalid API key', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
+        status: 401,
+        text: () => Promise.resolve('Unauthorized'),
+        clone: () => ({
+          json: () => Promise.reject(new Error('no json')),
+        }),
       });
-      const isValid = await validateApiKey('invalid-key');
-      expect(isValid).toBe(false);
+      const result = await validateApiKey('invalid-key');
+      expect(result.valid).toBe(false);
+      expect(result.status).toBe(401);
+      expect(result.error).toBe('Unauthorized');
+    });
+
+    it('should surface network errors', async () => {
+      mockFetch.mockRejectedValueOnce(new Error('Network down'));
+      const result = await validateApiKey('any-key');
+      expect(result.valid).toBe(false);
+      expect(result.status).toBeNull();
+      expect(result.error).toBe('Network down');
     });
   });
 
