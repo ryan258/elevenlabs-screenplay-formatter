@@ -69,6 +69,7 @@ See EXAMPLE_SCREENPLAY.md for detailed formatting guide.`;
         value={scriptText}
         onChange={(e) => setScriptText(e.target.value)}
         placeholder={placeholderText}
+        aria-label="Screenplay input"
         className="flex-grow w-full p-3 bg-primary border border-accent rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-highlight text-text-primary custom-scrollbar"
         style={{ scrollbarWidth: 'thin', scrollbarColor: '#e94560 #1a1a2e' }}
       />

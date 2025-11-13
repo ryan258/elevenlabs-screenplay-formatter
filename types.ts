@@ -24,3 +24,10 @@ export interface ProjectSettings {
   outputFormat: string;
   concatenate: boolean;
 }
+
+export interface AppStateSnapshot {
+  apiKey?: string;
+  projectSettings: ProjectSettings;
+  characterConfigs: CharacterConfigs;
+  scriptText?: string;
+}

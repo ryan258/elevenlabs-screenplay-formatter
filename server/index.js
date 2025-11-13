@@ -2,18 +2,22 @@ import express from 'express';
 import cors from 'cors';
 import multer from 'multer';
 import ffmpeg from 'fluent-ffmpeg';
-import { promises as fs } from 'fs';
+import { promises as fs, createReadStream } from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import { pipeline } from 'stream/promises';
 
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT ? Number(process.env.PORT) : 3001;
+const allowedOrigins = process.env.ALLOWED_ORIGIN
+  ? process.env.ALLOWED_ORIGIN.split(',').map(origin => origin.trim()).filter(Boolean)
+  : null;
 
-// Enable CORS for frontend communication
-app.use(cors());
+// Enable CORS for frontend communication, allowing overrides in production
+if (allowedOrigins && allowedOrigins.length > 0 && !allowedOrigins.includes('*')) {
+  app.use(cors({ origin: allowedOrigins }));
+} else {
+  app.use(cors());
+}
 app.use(express.json());
 
 // Configure multer for file uploads
@@ -22,8 +26,21 @@ const upload = multer({
   limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit per file
 });
 
-// Ensure upload directory exists
-await fs.mkdir('uploads', { recursive: true });
+// Ensure upload directory exists with error visibility
+const ensureUploadsDir = async () => {
+  try {
+    await fs.mkdir('uploads', { recursive: true });
+  } catch (error) {
+    console.error('Failed to initialize uploads directory:', error);
+    throw error;
+  }
+};
+
+try {
+  await ensureUploadsDir();
+} catch {
+  process.exit(1);
+}
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -52,8 +69,9 @@ app.post('/concatenate', upload.array('audioFiles'), async (req, res) => {
     return;
   }
 
-  const outputPath = path.join('uploads', `output_${Date.now()}.mp3`);
-  const fileListPath = path.join('uploads', `filelist_${Date.now()}.txt`);
+  const uniqueSuffix = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const outputPath = path.join('uploads', `output_${uniqueSuffix}.mp3`);
+  const fileListPath = path.join('uploads', `filelist_${uniqueSuffix}.txt`);
 
   try {
     // Create file list for ffmpeg concat
@@ -89,10 +107,9 @@ app.post('/concatenate', upload.array('audioFiles'), async (req, res) => {
     });
 
     // Send concatenated file
-    const concatenatedFile = await fs.readFile(outputPath);
     res.setHeader('Content-Type', 'audio/mpeg');
     res.setHeader('Content-Disposition', 'attachment; filename="concatenated_audio.mp3"');
-    res.send(concatenatedFile);
+    await pipeline(createReadStream(outputPath), res);
 
     // Cleanup files
     await Promise.all([

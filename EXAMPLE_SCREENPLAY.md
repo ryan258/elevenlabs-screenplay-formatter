@@ -90,6 +90,27 @@ Maria, please. We don't have a choice.
 
 ---
 
+### Alias & Parenthetical Handling
+
+```
+Characters:
+- DETECTIVE SARAH MILLER
+- HACKER "ACE"
+
+DETECTIVE MILLER: We found the drive. Start decrypting.
+SARAH: Give me five minutes.
+SARAH (V.O.): We might not have five minutes.
+DETECTIVE MILLER: Stay focused, Sarah.
+HACKER "ACE"
+One firewall at a time...
+```
+
+**Key Points:**
+- A single entry such as `DETECTIVE SARAH MILLER` will also match `SARAH`, `SARAH MILLER`, and `DETECTIVE MILLER`.
+- Parentheticals like `(V.O.)`, `(O.S.)`, or `(CONT'D)` are ignored when matching characters.
+
+---
+
 ## Complete Working Example
 
 Copy and paste this into the app to test:

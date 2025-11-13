@@ -48,7 +48,7 @@ A React-based web application that converts screenplay dialogue into AI-generate
    cp .env.example .env
    ```
 
-   Populate `ELEVENLABS_API_KEY` if you want the React app to prefill the key field.
+   Populate `ELEVENLABS_API_KEY` if you want the React app to prefill the key field, and set `VITE_CONCAT_SERVER_URL` if your concatenation server isn’t running at the default `http://localhost:3001/concatenate`.
 
 3. **(Optional) Install backend dependencies for concatenation:**
    ```bash
@@ -102,7 +102,7 @@ A React-based web application that converts screenplay dialogue into AI-generate
    ```
 
 3. **Generate concatenated audio:**
-   - Open `http://localhost:5173`
+   - Open `http://localhost:3000`
    - Enter your ElevenLabs API key
    - Paste your screenplay
    - Configure character voices
@@ -186,6 +186,16 @@ The backend server (`server/index.js`) provides a REST API endpoint:
 
 ## Configuration
 
+### Environment Variables
+
+- `ELEVENLABS_API_KEY` – optional convenience to prefill the API key input in the frontend.
+- `VITE_CONCAT_SERVER_URL` – override the default `http://localhost:3001/concatenate` endpoint if your backend runs elsewhere.
+- `server/.env` (copy from `server/.env.example`):
+  - `PORT` – change the concatenation server port (defaults to `3001`).
+  - `ALLOWED_ORIGIN` – comma-separated list of allowed origins; leave unset locally.
+- Local storage: the browser caches your script, voice settings, and API key for convenience; clear site data to reset.
+- API key handling: your key stays in the browser and is only sent to ElevenLabs (or written to the offline bash script you export); it never goes through the optional concatenation server.
+
 ### Project Settings
 
 - **Model**:
@@ -212,6 +222,12 @@ Each character can have custom voice settings:
 - **Similarity Boost** (0.0-1.0): Enhances similarity to original voice
 - **Style** (0.0-1.0): Adds expressiveness
 - **Speed** (0.25-4.0): Playback speed multiplier
+
+## Advanced Usage & Limitations
+
+- **Rate limiting**: ElevenLabs enforces request quotas, so the app inserts a 500ms delay between chunks. Increase the delay in `utils/elevenLabsApi.ts` if you see throttling.
+- **Browser vs. bash workflows**: The browser path streams audio directly to Downloads, while the generated bash script saves files locally and is better for CI/offline workflows. Use the bash script for extremely long screenplays or when you need resumable retries.
+- **Parsing scope**: The parser matches the documented formats (character list, inline dialogue, alias handling). Scripts that omit the `Characters:` section or mix lowercase names are intentionally ignored to prevent misattribution.
 
 ## Screenplay Format
 

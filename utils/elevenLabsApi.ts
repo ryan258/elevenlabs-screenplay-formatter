@@ -1,5 +1,15 @@
 import { DialogueChunk, CharacterConfig } from '../types';
 
+const OUTPUT_FORMAT_DETAILS: Record<string, { extension: string; accept: string }> = {
+  mp3_44100_128: { extension: 'mp3', accept: 'audio/mpeg' },
+  mp3_44100_192: { extension: 'mp3', accept: 'audio/mpeg' },
+  pcm_24000: { extension: 'wav', accept: 'audio/wav' }
+};
+
+const getFormatDetails = (format: string) => {
+  return OUTPUT_FORMAT_DETAILS[format] || OUTPUT_FORMAT_DETAILS['mp3_44100_128'];
+};
+
 export interface GenerationProgress {
   current: number;
   total: number;
@@ -20,6 +30,8 @@ export const generateAudioFile = async (
 ): Promise<Blob> => {
   const url = `https://api.elevenlabs.io/v1/text-to-speech/${config.voiceId}`;
 
+  const { accept } = getFormatDetails(outputFormat);
+
   if (onProgress) {
     onProgress({
       current: index + 1,
@@ -33,13 +45,14 @@ export const generateAudioFile = async (
   const response = await fetch(url, {
     method: 'POST',
     headers: {
-      'Accept': 'audio/mpeg',
+      'Accept': accept,
       'Content-Type': 'application/json',
       'xi-api-key': apiKey
     },
     body: JSON.stringify({
       text: chunk.text,
       model_id: modelId,
+      output_format: outputFormat,
       voice_settings: {
         stability: config.voiceSettings.stability,
         similarity_boost: config.voiceSettings.similarity_boost,
@@ -79,11 +92,13 @@ export const downloadBlob = (blob: Blob, filename: string) => {
   URL.revokeObjectURL(url);
 };
 
+const CONCAT_SERVER_URL = import.meta.env?.VITE_CONCAT_SERVER_URL || 'http://localhost:3001/concatenate';
+
 const concatenateAudioFiles = async (
   blobs: { blob: Blob; filename: string }[],
   onProgress?: (progress: GenerationProgress, current: number, total: number) => void
 ): Promise<Blob> => {
-  const serverUrl = 'http://localhost:3001/concatenate';
+  const serverUrl = CONCAT_SERVER_URL;
 
   if (onProgress) {
     onProgress({
@@ -132,10 +147,11 @@ const concatenateAudioFiles = async (
         total: blobs.length,
         currentCharacter: 'All',
         status: 'error',
-        message: `✗ Concatenation failed: ${error.message}`
+        message: `✗ Concatenation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       }, blobs.length, blobs.length);
     }
-    throw new Error(`Failed to concatenate audio: ${error.message}`);
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    throw new Error(`Failed to concatenate audio: ${message}`);
   }
 };
 
@@ -149,6 +165,7 @@ export const generateAllAudio = async (
   onProgress?: (progress: GenerationProgress, current: number, total: number) => void
 ): Promise<void> => {
   const total = dialogueChunks.length;
+  const { extension } = getFormatDetails(outputFormat);
   const generatedBlobs: { blob: Blob; filename: string }[] = [];
 
   // Generate all audio files
@@ -172,7 +189,7 @@ export const generateAllAudio = async (
         total
       );
 
-      const filename = `${String(i).padStart(4, '0')}_${chunk.character.replace(/\s+/g, '_')}.mp3`;
+      const filename = `${String(i).padStart(4, '0')}_${chunk.character.replace(/\s+/g, '_')}.${extension}`;
 
       if (concatenate) {
         // Store blob for later concatenation
@@ -203,7 +220,7 @@ export const generateAllAudio = async (
           total,
           currentCharacter: chunk.character,
           status: 'error',
-          message: `✗ Failed: ${error.message}`
+          message: `✗ Failed: ${error instanceof Error ? error.message : 'Unknown error'}`
         }, i + 1, total);
       }
       throw error;

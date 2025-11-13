@@ -37,6 +37,11 @@ npm start
 
 The server will start on `http://localhost:3001`
 
+## Configuration
+
+- `PORT`: Change the listen port (defaults to `3001`).
+- `ALLOWED_ORIGIN`: Optional comma-separated list of origins allowed to call the API. Leave unset for local development to allow all origins.
+
 ## API Endpoints
 
 ### `GET /health`

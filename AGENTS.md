@@ -5,7 +5,7 @@ The Vite/React frontend lives at the repo root: `App.tsx` wires the panels in `c
 
 ## Build, Test, and Development Commands
 - `npm install` – install frontend dependencies after cloning.
-- `npm run dev` – start Vite at `http://localhost:5173` with fast refresh.
+- `npm run dev` – start Vite at `http://localhost:3000` with fast refresh.
 - `npm run build` – emit the production bundle in `dist/`; fails on TS or Vite errors.
 - `npm run preview` – serve the built assets for a production-accurate check.
 - `cd server && npm install && npm start` – boot the concatenation service on `:3001` when the “Concatenate Audio” toggle is enabled.

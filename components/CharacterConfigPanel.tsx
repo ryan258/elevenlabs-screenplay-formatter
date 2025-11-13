@@ -8,9 +8,12 @@ interface CharacterConfigPanelProps {
   setConfigs: (configs: CharacterConfigs) => void;
 }
 
+const makeId = (character: string, prefix: string) =>
+  `${prefix}-${character.replace(/[^a-zA-Z0-9]+/g, '-').toLowerCase()}`;
+
 const CharacterConfigPanel: React.FC<CharacterConfigPanelProps> = ({ characters, configs, setConfigs }) => {
 
-  const handleConfigChange = (character: string, field: keyof CharacterConfig, value: any) => {
+  const handleConfigChange = <K extends keyof CharacterConfig>(character: string, field: K, value: CharacterConfig[K]) => {
     const newConfig: CharacterConfig = {
       ...(configs[character] || { 
           voiceId: '', 
@@ -49,15 +52,20 @@ const CharacterConfigPanel: React.FC<CharacterConfigPanelProps> = ({ characters,
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-1 gap-4">
           {characters.map((char) => {
             const config = configs[char] || { voiceId: '', voiceSettings: { stability: 0.5, similarity_boost: 0.75, style: 0.1, speed: 1.0 } };
+            const voiceId = makeId(char, 'voice-id');
+            const stabilityId = makeId(char, 'stability');
+            const similarityId = makeId(char, 'similarity');
+            const styleId = makeId(char, 'style');
+            const speedId = makeId(char, 'speed');
             return (
               <div key={char} className="p-3 border bg-primary border-accent rounded-md flex flex-col space-y-3">
                 <h3 className="font-semibold text-text-primary text-center truncate">{char}</h3>
                 <div>
-                  <label htmlFor={`voice-id-${char}`} className="block text-sm font-medium text-text-secondary mb-1">
+                  <label htmlFor={voiceId} className="block text-sm font-medium text-text-secondary mb-1">
                     Voice ID
                   </label>
                   <input
-                    id={`voice-id-${char}`}
+                    id={voiceId}
                     type="text"
                     value={config.voiceId}
                     onChange={(e) => handleConfigChange(char, 'voiceId', e.target.value)}
@@ -66,10 +74,10 @@ const CharacterConfigPanel: React.FC<CharacterConfigPanelProps> = ({ characters,
                   />
                 </div>
                 <div className="space-y-2">
-                    <Slider id={`stability-${char}`} label="Stability" value={config.voiceSettings.stability} min={0} max={1} step={0.01} onChange={(e) => handleSliderChange(char, 'stability', e.target.value)} />
-                    <Slider id={`similarity-${char}`} label="Similarity Boost" value={config.voiceSettings.similarity_boost} min={0} max={1} step={0.01} onChange={(e) => handleSliderChange(char, 'similarity_boost', e.target.value)} />
-                    <Slider id={`style-${char}`} label="Style Exaggeration" value={config.voiceSettings.style} min={0} max={1} step={0.01} onChange={(e) => handleSliderChange(char, 'style', e.target.value)} />
-                    <Slider id={`speed-${char}`} label="Speed" value={config.voiceSettings.speed} min={0.5} max={2} step={0.05} onChange={(e) => handleSliderChange(char, 'speed', e.target.value)} />
+                    <Slider id={stabilityId} label="Stability" value={config.voiceSettings.stability} min={0} max={1} step={0.01} onChange={(e) => handleSliderChange(char, 'stability', e.target.value)} />
+                    <Slider id={similarityId} label="Similarity Boost" value={config.voiceSettings.similarity_boost} min={0} max={1} step={0.01} onChange={(e) => handleSliderChange(char, 'similarity_boost', e.target.value)} />
+                    <Slider id={styleId} label="Style Exaggeration" value={config.voiceSettings.style} min={0} max={1} step={0.01} onChange={(e) => handleSliderChange(char, 'style', e.target.value)} />
+                    <Slider id={speedId} label="Speed" value={config.voiceSettings.speed} min={0.5} max={2} step={0.05} onChange={(e) => handleSliderChange(char, 'speed', e.target.value)} />
                 </div>
               </div>
             );

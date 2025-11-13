@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 import { CloseIcon } from './icons';
 
 interface ModalProps {
@@ -9,6 +9,8 @@ interface ModalProps {
 }
 
 const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
+  const headingId = useId();
+
   if (!isOpen) {
     return null;
   }
@@ -19,13 +21,14 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
         onClick={onClose}
         aria-modal="true"
         role="dialog"
+        aria-labelledby={headingId}
     >
       <div 
         className="bg-secondary rounded-lg shadow-2xl w-full max-w-4xl h-[90vh] flex flex-col"
         onClick={e => e.stopPropagation()}
       >
         <header className="flex items-center justify-between p-4 border-b border-accent">
-          <h2 className="text-xl font-bold text-highlight">{title}</h2>
+          <h2 id={headingId} className="text-xl font-bold text-highlight">{title}</h2>
           <button
             onClick={onClose}
             className="p-1.5 bg-accent hover:bg-highlight rounded-md transition-colors"

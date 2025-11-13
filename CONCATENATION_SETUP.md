@@ -56,6 +56,10 @@ npm install
 
 You need to run **both** the frontend and backend:
 
+### Configure URLs (optional)
+- Frontend: set `VITE_CONCAT_SERVER_URL` in `.env` if your concatenation server is not at the default `http://localhost:3001/concatenate`.
+- Backend: set `PORT` to move the server off `3001`, and `ALLOWED_ORIGIN` (comma-separated list) to restrict which origins can call the server. Leave both unset for local development.
+
 ### Terminal 1 - Backend Server (Port 3001)
 ```bash
 cd server
@@ -68,7 +72,7 @@ You should see:
 📋 Health check: http://localhost:3001/health
 ```
 
-### Terminal 2 - Frontend (Port 5173)
+### Terminal 2 - Frontend (Port 3000)
 ```bash
 npm run dev
 ```
@@ -76,7 +80,7 @@ npm run dev
 ## Usage
 
 1. Start both servers (backend and frontend)
-2. Open the app in your browser (usually http://localhost:5173)
+2. Open the app in your browser (http://localhost:3000)
 3. Configure your screenplay and voice settings
 4. **Enable or disable** the "Concatenate Audio" toggle in Project Settings
    - **Enabled**: Generates one `concatenated_audio.mp3` file

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import ScriptInput from './components/ScriptInput';
 import ApiKeyPanel from './components/ApiKeyPanel';
 import CharacterConfigPanel from './components/CharacterConfigPanel';
@@ -7,9 +7,12 @@ import GeneratePanel from './components/GeneratePanel';
 import OutputDisplay from './components/OutputDisplay';
 import Modal from './components/Modal';
 import { useScriptParser } from './hooks/useScriptParser';
-import { CharacterConfigs, ProjectSettings } from './types';
+import { AppStateSnapshot, CharacterConfigs, ProjectSettings } from './types';
 import { validateConfiguration } from './utils/scriptGenerator';
 import { generateAllAudio, GenerationProgress } from './utils/elevenLabsApi';
+
+const STORAGE_KEY = 'elevenlabs_formatter_state';
+const MAX_PROGRESS_MESSAGES = 200;
 
 // Implemented the main App component to structure the application and manage state.
 function App() {
@@ -26,14 +29,72 @@ function App() {
   const [generatedOutput, setGeneratedOutput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [progressMessages, setProgressMessages] = useState<string[]>([]);
+  const [isStateHydrated, setIsStateHydrated] = useState(false);
+
+  const setProgressMessagesLimited = (updater: string[] | ((prev: string[]) => string[])) => {
+    setProgressMessages(prev => {
+      const next = typeof updater === 'function' ? (updater as (prev: string[]) => string[])(prev) : updater;
+      return next.length > MAX_PROGRESS_MESSAGES ? next.slice(-MAX_PROGRESS_MESSAGES) : next;
+    });
+  };
 
   const handleExpand = () => setIsModalOpen(true);
   const handleCloseModal = () => setIsModalOpen(false);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      setIsStateHydrated(true);
+      return;
+    }
+
+    try {
+      const stored = window.localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const parsed: AppStateSnapshot = JSON.parse(stored);
+
+        if (parsed.scriptText) {
+          setScriptText(parsed.scriptText);
+        }
+        if (parsed.apiKey) {
+          setApiKey(parsed.apiKey);
+        }
+        if (parsed.projectSettings) {
+          setProjectSettings(prev => ({ ...prev, ...parsed.projectSettings }));
+        }
+        if (parsed.characterConfigs) {
+          setCharacterConfigs(parsed.characterConfigs);
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to hydrate saved state:', error);
+    } finally {
+      setIsStateHydrated(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isStateHydrated || typeof window === 'undefined') {
+      return;
+    }
+
+    const snapshot: AppStateSnapshot = {
+      apiKey,
+      projectSettings,
+      characterConfigs,
+      scriptText,
+    };
+
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
+    } catch (error) {
+      console.warn('Failed to persist state:', error);
+    }
+  }, [apiKey, projectSettings, characterConfigs, scriptText, isStateHydrated]);
+
   const handleGenerate = async () => {
     setIsLoading(true);
     setGeneratedOutput('');
-    setProgressMessages([]);
+    setProgressMessagesLimited([]);
 
     try {
       // Validate configuration
@@ -46,7 +107,7 @@ function App() {
       }
 
       const startMessage = `🚀 Starting audio generation...\n\nTotal dialogue chunks: ${dialogueChunks.length}\nCharacters: ${Object.keys(characterConfigs).join(', ')}\nModel: ${projectSettings.model}\nConcatenate: ${projectSettings.concatenate ? 'Yes' : 'No'}\n\n`;
-      setProgressMessages([startMessage]);
+      setProgressMessagesLimited([startMessage]);
 
       // Generate all audio files
       await generateAllAudio(
@@ -57,7 +118,7 @@ function App() {
         projectSettings.outputFormat,
         projectSettings.concatenate,
         (progress: GenerationProgress, current: number, total: number) => {
-          setProgressMessages(prev => [...prev, `[${current}/${total}] ${progress.message}`]);
+          setProgressMessagesLimited(prev => [...prev, `[${current}/${total}] ${progress.message}`]);
         }
       );
 
@@ -65,14 +126,14 @@ function App() {
       const successMessage = projectSettings.concatenate
         ? `\n✅ Generation Complete!\n\nAll ${dialogueChunks.length} audio files have been generated and concatenated into a single file.\nCheck your Downloads folder for "concatenated_audio.mp3".`
         : `\n✅ Generation Complete!\n\nAll ${dialogueChunks.length} audio files have been generated and downloaded.\nCheck your Downloads folder for the audio files.`;
-      setProgressMessages(prev => [...prev, successMessage]);
+      setProgressMessagesLimited(prev => [...prev, successMessage]);
       setGeneratedOutput(successMessage);
       setIsLoading(false);
 
     } catch (error) {
       console.error('Generation error:', error);
       const errorMessage = `❌ Error during generation:\n\n${error instanceof Error ? error.message : 'Unknown error occurred'}`;
-      setProgressMessages(prev => [...prev, errorMessage]);
+      setProgressMessagesLimited(prev => [...prev, errorMessage]);
       setGeneratedOutput(errorMessage);
       setIsLoading(false);
     }

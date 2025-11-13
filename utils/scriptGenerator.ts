@@ -1,9 +1,30 @@
-import { DialogueChunk, CharacterConfigs, ProjectSettings } from '../types';
+import { DialogueChunk, CharacterConfigs, ProjectSettings, VoiceSettings } from '../types';
+
+interface ElevenLabsPayload {
+  index: number;
+  character: string;
+  text: string;
+  voice_id: string;
+  model_id: string;
+  voice_settings: VoiceSettings & { use_speaker_boost: boolean };
+  output_format: string;
+}
 
 interface GeneratedOutput {
-  jsonPayload: any[];
+  jsonPayload: ElevenLabsPayload[];
   bashScript: string;
 }
+
+const OUTPUT_FORMAT_DETAILS: Record<string, { extension: string; accept: string }> = {
+  mp3_44100_128: { extension: 'mp3', accept: 'audio/mpeg' },
+  mp3_44100_192: { extension: 'mp3', accept: 'audio/mpeg' },
+  pcm_24000: { extension: 'wav', accept: 'audio/wav' }
+};
+
+const getOutputFormatDetails = (format: string) => OUTPUT_FORMAT_DETAILS[format] || OUTPUT_FORMAT_DETAILS.mp3_44100_128;
+// Sequence to safely embed a single quote inside a single-quoted bash string.
+const SINGLE_QUOTE_ESCAPE = `'"'"'`;
+const escapeSingleQuotes = (value: string) => value.replace(/'/g, SINGLE_QUOTE_ESCAPE);
 
 export const generateElevenLabsScript = (
   dialogueChunks: DialogueChunk[],
@@ -11,7 +32,7 @@ export const generateElevenLabsScript = (
   projectSettings: ProjectSettings,
   apiKey: string
 ): GeneratedOutput => {
-  const jsonPayload = dialogueChunks.map((chunk, index) => {
+  const jsonPayload = dialogueChunks.map((chunk, index): ElevenLabsPayload | null => {
     const config = characterConfigs[chunk.character];
 
     if (!config || !config.voiceId) {
@@ -25,22 +46,22 @@ export const generateElevenLabsScript = (
       voice_id: config.voiceId,
       model_id: projectSettings.model,
       voice_settings: {
-        stability: config.voiceSettings.stability,
-        similarity_boost: config.voiceSettings.similarity_boost,
+        ...config.voiceSettings,
         style: config.voiceSettings.style || 0,
         use_speaker_boost: true
       },
       output_format: projectSettings.outputFormat
     };
-  }).filter(Boolean);
+  }).filter((item): item is ElevenLabsPayload => Boolean(item));
 
   // Generate bash script
-  const bashScript = generateBashScript(jsonPayload, apiKey, projectSettings.concatenate);
+  const bashScript = generateBashScript(jsonPayload, apiKey, projectSettings.concatenate, projectSettings.outputFormat);
 
   return { jsonPayload, bashScript };
 };
 
-const generateBashScript = (payload: any[], apiKey: string, concatenate: boolean): string => {
+const generateBashScript = (payload: ElevenLabsPayload[], apiKey: string, concatenate: boolean, outputFormat: string): string => {
+  const formatDetails = getOutputFormatDetails(outputFormat);
   let script = `#!/bin/bash
 
 # ElevenLabs Text-to-Speech Generation Script
@@ -62,19 +83,21 @@ echo ""
 
   // Generate curl commands for each dialogue chunk
   payload.forEach((item) => {
-    const filename = `${String(item.index).padStart(4, '0')}_${item.character.replace(/\s+/g, '_')}.mp3`;
+    const filename = `${String(item.index).padStart(4, '0')}_${item.character.replace(/\s+/g, '_')}.${formatDetails.extension}`;
+    const payloadJson = JSON.stringify({
+      text: item.text,
+      model_id: item.model_id,
+      voice_settings: item.voice_settings,
+      output_format: item.output_format
+    });
 
     script += `# Chunk ${item.index}: ${item.character}\n`;
     script += `echo "Generating: ${item.character} (${item.index + 1}/${payload.length})..."\n`;
     script += `curl -X POST "https://api.elevenlabs.io/v1/text-to-speech/${item.voice_id}" \\\n`;
-    script += `  -H "Accept: audio/mpeg" \\\n`;
+    script += `  -H "Accept: ${formatDetails.accept}" \\\n`;
     script += `  -H "Content-Type: application/json" \\\n`;
     script += `  -H "xi-api-key: $API_KEY" \\\n`;
-    script += `  -d '${ JSON.stringify({
-      text: item.text,
-      model_id: item.model_id,
-      voice_settings: item.voice_settings
-    })}' \\\n`;
+    script += `  -d '${escapeSingleQuotes(payloadJson)}' \\\n`;
     script += `  --output "$OUTPUT_DIR/${filename}"\n\n`;
 
     script += `if [ $? -eq 0 ]; then\n`;
