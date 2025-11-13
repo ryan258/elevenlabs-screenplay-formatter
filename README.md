@@ -32,7 +32,7 @@ A React-based web application that converts screenplay dialogue into AI-generate
 1. **Clone the repository:**
 
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/ryan258/elevenlabs-screenplay-formatter.git
    cd elevenlabs-screenplay-formatter
    ```
 
@@ -41,6 +41,14 @@ A React-based web application that converts screenplay dialogue into AI-generate
    ```bash
    npm install
    ```
+
+3. **Configure environment variables (optional):**
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   Populate `ELEVENLABS_API_KEY` if you want the React app to prefill the key field.
 
 3. **(Optional) Install backend dependencies for concatenation:**
    ```bash
@@ -61,7 +69,7 @@ A React-based web application that converts screenplay dialogue into AI-generate
 
 2. **Open your browser:**
 
-   - Navigate to `http://localhost:5173`
+   - Navigate to `http://localhost:3000`
 
 3. **Configure and generate:**
    - Enter your ElevenLabs API key
@@ -136,6 +144,10 @@ elevenlabs-screenplay-formatter/
 ├── package.json            # Frontend dependencies
 └── vite.config.ts          # Vite build configuration
 ```
+
+## Contributor Guide
+
+For coding standards, testing expectations, and pull request conventions, see [AGENTS.md](./AGENTS.md).
 
 ## How It Works
 

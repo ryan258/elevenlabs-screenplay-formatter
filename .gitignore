@@ -1,4 +1,5 @@
 plays/*.md
+.env
 
 # Logs
 logs
