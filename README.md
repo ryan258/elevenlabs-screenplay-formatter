@@ -9,7 +9,9 @@ A React-based web application that converts screenplay dialogue into AI-generate
 - **Fine-Tuned Voice Control** - Adjust stability, similarity boost, style, and speed per character
 - **Audio Concatenation** - Option to merge all dialogue into a single audio file (requires backend server)
 - **Real-Time Progress Tracking** - Live progress bar, character previews, and copyable logs
+- **Fountain-Style Support** - Paste Fountain scripts (no `Characters:` list required) and let the parser auto-detect speakers
 - **Resumable Generation** - Inline error surfaces, automatic retries, and a one-click “Resume from failed chunk” flow
+- **Parser Diagnostics Panel** - See detected characters, parsed lines, and any lines the parser skipped
 - **Batch Generation** - Processes entire screenplays automatically with rate limiting
 - **Concatenation Health Check** - Built-in status card to ping the backend server and show connectivity
 - **Multiple Model Support** - Choose between multilingual and monolingual ElevenLabs models
@@ -119,6 +121,12 @@ A React-based web application that converts screenplay dialogue into AI-generate
 - If a chunk fails (bad API key, rate limit, network blip), the UI surfaces the exact line and enables a **Resume** button that continues from that chunk without reprocessing earlier ones.
 - ElevenLabs calls auto-retry up to three times with exponential backoff before surfacing an error.
 - Logs remain copyable for debugging, and the status banner reminds you that keys never leave the browser except for ElevenLabs requests.
+
+## Parser Diagnostics
+
+- Toggle the **Parser Diagnostics** card (below the output panel) to see a character-by-character breakdown of detected lines.
+- The same panel highlights the first few lines that failed to parse so you can adjust formatting quickly.
+- Use this view alongside `EXAMPLE_SCREENPLAY.md` or `EXAMPLE_FOUNTAIN.md` to compare expected vs. actual parsing behavior.
 
 ## Project Structure
 
@@ -232,6 +240,7 @@ Each character can have custom voice settings:
 - **Similarity Boost** (0.0-1.0): Enhances similarity to original voice
 - **Style** (0.0-1.0): Adds expressiveness
 - **Speed** (0.25-4.0): Playback speed multiplier
+- **Speak Parentheticals** (toggle) – When enabled, inline parentheticals such as `(V.O.)` or `(CONT'D)` remain in the spoken text; otherwise they’re stripped out.
 
 ## Advanced Usage & Limitations
 
@@ -279,6 +288,7 @@ More dialogue with stage direction.
 - Scene headings: `INT.`, `EXT.`, or `I/E.`
 - Parentheticals: `(whispering)` - automatically removed from audio
 - Inline format: `CHARACTER: dialogue here`
+- Fountain-style scripts (no character list) are also supported—see `EXAMPLE_FOUNTAIN.md` for a ready-to-paste sample.
 
 ### Working Example
 

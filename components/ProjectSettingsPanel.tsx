@@ -59,6 +59,20 @@ const ProjectSettingsPanel: React.FC<ProjectSettingsPanelProps> = ({ settings, s
             <span className="w-11 h-6 bg-primary peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-highlight rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-highlight" aria-hidden="true"></span>
           </span>
         </label>
+        <label htmlFor="speak-parentheticals" className="flex items-center justify-between cursor-pointer">
+          <span className="text-sm font-medium text-text-secondary">Speak Parentheticals</span>
+          <span className="relative inline-flex items-center">
+            <input 
+              type="checkbox" 
+              id="speak-parentheticals"
+              checked={settings.speakParentheticals}
+              onChange={(e) => handleSettingChange('speakParentheticals', e.target.checked)}
+              className="sr-only peer" 
+              aria-checked={settings.speakParentheticals}
+            />
+            <span className="w-11 h-6 bg-primary peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-highlight rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-highlight" aria-hidden="true"></span>
+          </span>
+        </label>
       </div>
     </div>
   );

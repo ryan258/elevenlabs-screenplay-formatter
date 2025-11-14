@@ -6,6 +6,8 @@
 - Environment-driven output formats and concatenation URL support, plus ESLint/Vitest tooling and parser unit tests.
 - Backend security knobs (configurable port/origin) and docs for advanced usage, API key handling, and contributor onboarding.
 - Concatenation health-check card, resumable generation flow with progress bar/snippet previews, and optional “remember API key” toggle for transparency.
+- Fountain-style screenplay parsing (uppercase lines auto-create characters), support for `V.O./O.S./CONT'D`, optional spoken parentheticals, and a new Fountain example script.
+- Parser Diagnostics card with unmatched-line reporting, monospaced editor tweaks, fullscreen save shortcut, and Voice Config search/apply-to-all utilities.
 
 ### Changed
 - Output format now propagates to ElevenLabs requests, downloads, and bash scripts; bash scripts escape payloads safely.

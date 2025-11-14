@@ -1,6 +1,7 @@
 export interface DialogueChunk {
   character: string;
   text: string;
+  originalText?: string;
 }
 
 export interface VoiceSettings {
@@ -23,6 +24,7 @@ export interface ProjectSettings {
   model: string;
   outputFormat: string;
   concatenate: boolean;
+  speakParentheticals: boolean;
 }
 
 export interface AppStateSnapshot {
@@ -41,4 +43,8 @@ export interface GeneratedBlob {
 export interface ResumeInfo {
   index: number;
   character: string;
+}
+
+export interface ParserDiagnostics {
+  unmatchedLines: Array<{ lineNumber: number; content: string }>;
 }

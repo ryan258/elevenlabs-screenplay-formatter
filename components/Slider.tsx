@@ -25,6 +25,10 @@ const Slider: React.FC<SliderProps> = ({ label, value, min, max, step, onChange,
       value={value}
       onChange={onChange}
       className="w-full h-2 bg-primary rounded-lg appearance-none cursor-pointer range-lg accent-highlight"
+      aria-valuemin={min}
+      aria-valuemax={max}
+      aria-valuenow={value}
+      aria-label={label}
     />
   </div>
 );

@@ -29,20 +29,20 @@ See EXAMPLE_SCREENPLAY.md for detailed formatting guide.`;
       <div className="flex justify-between items-center mb-2">
         <h2 className="text-xl font-bold text-highlight">Screenplay Input</h2>
         <div className="flex items-center space-x-2">
-            <button
-                onClick={onExpand}
-                className="text-sm px-3 py-1 bg-accent hover:bg-highlight rounded-md transition-colors flex items-center space-x-1.5"
-                aria-label="Expand editor"
-            >
-                <ExpandIcon className="w-4 h-4" />
-                <span>Expand</span>
-            </button>
-            <button
-              onClick={() => setScriptText('')}
-              className="text-sm px-3 py-1 bg-accent hover:bg-highlight rounded-md transition-colors"
-            >
-              Clear
-            </button>
+          <button
+            onClick={onExpand}
+            className="text-sm px-3 py-1 bg-accent hover:bg-highlight rounded-md transition-colors flex items-center space-x-1.5"
+            aria-label="Expand editor"
+          >
+            <ExpandIcon className="w-4 h-4" />
+            <span>Expand</span>
+          </button>
+          <button
+            onClick={() => setScriptText('')}
+            className="text-sm px-3 py-1 bg-accent hover:bg-highlight rounded-md transition-colors"
+          >
+            Clear
+          </button>
         </div>
       </div>
       <div className="mb-2 text-xs text-text-secondary">
@@ -64,13 +64,14 @@ See EXAMPLE_SCREENPLAY.md for detailed formatting guide.`;
         >
           example
         </a>
+        {' '}— or try the Fountain sample in <code>EXAMPLE_FOUNTAIN.md</code>. Use <strong>Ctrl/Cmd + Enter</strong> to save when editing full-screen.
       </div>
       <textarea
         value={scriptText}
         onChange={(e) => setScriptText(e.target.value)}
         placeholder={placeholderText}
         aria-label="Screenplay input"
-        className="flex-grow w-full p-3 bg-primary border border-accent rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-highlight text-text-primary custom-scrollbar"
+        className="flex-grow w-full p-3 bg-primary border border-accent rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-highlight text-text-primary custom-scrollbar font-mono min-h-[320px]"
         style={{ scrollbarWidth: 'thin', scrollbarColor: '#e94560 #1a1a2e' }}
       />
     </div>

@@ -1,200 +1,229 @@
 import { useMemo } from 'react';
-import { DialogueChunk } from '../types';
+import { DialogueChunk, ParserDiagnostics } from '../types';
 
 interface DefinedCharacter {
-    fullName: string;
-    primaryToken: string;
-    aliases: Set<string>;
+  fullName: string;
+  aliases: Set<string>;
 }
 
 const cleanDialogue = (text: string) => {
-    // Remove parentheticals like (To himself) or stage directions in brackets like [Almost inaudible]
-    // Then clean up whitespace.
-    return text.replace(/\([^)]+\)/g, '').replace(/\[[^\]]+\]/g, '').replace(/\s+/g, ' ').trim();
+  return text.replace(/\([^)]+\)/g, '').replace(/\[[^\]]+\]/g, '').replace(/\s+/g, ' ').trim();
 };
 
 const normalizeCharacterName = (value: string) => {
-    return value
-        .replace(/\([^)]*\)/g, '') // remove parentheticals like (V.O.)
-        .replace(/\bCONT'D\b/gi, '') // drop screenplay CONT'D markers
-        .replace(/[^A-Z0-9\s'-]/gi, ' ') // remove punctuation except spaces/hyphen/apostrophe
-        .replace(/\s+/g, ' ')
-        .trim()
-        .toUpperCase();
+  return value
+    .replace(/\([^)]*\)/g, '')
+    .replace(/\bCONT'D\b/gi, '')
+    .replace(/[^A-Z0-9\s'"-]/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toUpperCase();
 };
 
 const generateAliases = (fullName: string) => {
-    const aliases = new Set<string>();
-    const tokens = fullName.split(' ').filter(Boolean);
+  const aliases = new Set<string>();
+  const tokens = fullName.split(' ').filter(Boolean);
 
-    if (tokens.length === 0) {
-        return aliases;
-    }
-
-    const addAlias = (parts: string[]) => {
-        if (parts.length) {
-            aliases.add(parts.join(' '));
-        }
-    };
-
-    addAlias(tokens); // full name
-
-    tokens.forEach(token => addAlias([token]));
-
-    for (let start = 0; start < tokens.length; start++) {
-        for (let end = start + 1; end < tokens.length; end++) {
-            addAlias(tokens.slice(start, end + 1));
-        }
-    }
-
-    if (tokens.length >= 2) {
-        addAlias([tokens[0], tokens[tokens.length - 1]]);
-    }
-
+  if (!tokens.length) {
     return aliases;
+  }
+
+  const addAlias = (parts: string[]) => {
+    if (parts.length) {
+      aliases.add(parts.join(' '));
+    }
+  };
+
+  addAlias(tokens);
+  tokens.forEach(token => addAlias([token]));
+
+  for (let start = 0; start < tokens.length; start++) {
+    for (let end = start + 1; end < tokens.length; end++) {
+      addAlias(tokens.slice(start, end + 1));
+    }
+  }
+
+  if (tokens.length >= 2) {
+    addAlias([tokens[0], tokens[tokens.length - 1]]);
+  }
+
+  return aliases;
 };
 
-export const parseScript = (scriptText: string): { characters: string[]; dialogueChunks: DialogueChunk[] } => {
-    if (!scriptText) {
-        return { characters: [], dialogueChunks: [] };
+export interface ParsedScript {
+  characters: string[];
+  dialogueChunks: DialogueChunk[];
+  diagnostics: ParserDiagnostics;
+}
+
+export const parseScript = (scriptText: string): ParsedScript => {
+  if (!scriptText) {
+    return { characters: [], dialogueChunks: [], diagnostics: { unmatchedLines: [] } };
+  }
+
+  const lines = scriptText.split('\n');
+  const chunks: DialogueChunk[] = [];
+  const definedCharacters: DefinedCharacter[] = [];
+  const unmatchedLines: ParserDiagnostics['unmatchedLines'] = [];
+
+  const sceneHeadingRegex = /^(INT\.?|EXT\.?|I\/E\.?|SCENE \d+|EST\.|INT\/EXT\.?|\.)/i;
+  const transitionRegex = /(CUT TO:|FADE (IN|OUT)|SMASH CUT|MATCH CUT|DISSOLVE TO:|IRIS OUT|WIPE TO:)/i;
+  const sameLineDialogueRegex = /^([A-Z0-9\s()."'-]+):\s*(.*)/;
+  const uppercaseCharacterRegex = /^[A-Z][A-Z0-9\s.'"()-]*$/;
+
+  const findCharacter = (name: string) => {
+    const normalized = normalizeCharacterName(name);
+    if (!normalized) {
+      return undefined;
+    }
+    return definedCharacters.find(c => c.aliases.has(normalized));
+  };
+
+  const registerCharacter = (rawName: string): DefinedCharacter | undefined => {
+    const fullName = normalizeCharacterName(rawName);
+    if (!fullName) {
+      return undefined;
+    }
+    const existing = definedCharacters.find(c => c.fullName === fullName);
+    if (existing) {
+      return existing;
+    }
+    const newCharacter: DefinedCharacter = {
+      fullName,
+      aliases: generateAliases(fullName)
+    };
+    definedCharacters.push(newCharacter);
+    return newCharacter;
+  };
+
+  let currentCharacterFullName: string | null = null;
+  let currentDialogue: string[] = [];
+
+  const flushDialogue = () => {
+    if (currentCharacterFullName && currentDialogue.length > 0) {
+      const raw = currentDialogue.join(' ').trim();
+      const text = cleanDialogue(raw);
+      if (text) {
+        chunks.push({ character: currentCharacterFullName, text, originalText: raw });
+      }
+    }
+    currentDialogue = [];
+  };
+
+  type ParsingMode = 'metadata' | 'characterList' | 'scriptBody';
+  let mode: ParsingMode = 'metadata';
+
+  const recordUnmatched = (lineNumber: number, content: string) => {
+    if (content.trim()) {
+      unmatchedLines.push({ lineNumber, content });
+    }
+  };
+
+  const parseScriptBodyLine = (trimmedLine: string, lineNumber: number) => {
+    if (!trimmedLine) {
+      flushDialogue();
+      currentCharacterFullName = null;
+      return;
     }
 
-    const lines = scriptText.split('\n');
-    const chunks: DialogueChunk[] = [];
-    const definedCharacters: DefinedCharacter[] = [];
-    
-    let currentCharacterFullName: string | null = null;
-    let currentDialogue: string[] = [];
-    
-    type ParsingMode = 'metadata' | 'characterList' | 'scriptBody';
-    let mode: ParsingMode = 'metadata';
-
-    // Regexes
-    const sceneHeadingRegex = /^(INT\.?|EXT\.?|I\/E\.?|SCENE \d+)|^\./i;
-        const sameLineDialogueRegex = /^([A-Z0-9\s()."'-]+):\s*(.*)/;
-
-    const findCharacter = (name: string): DefinedCharacter | undefined => {
-        const normalized = normalizeCharacterName(name);
-        if (!normalized) {
-            return undefined;
-        }
-        return definedCharacters.find(c => c.aliases.has(normalized));
-    };
-
-    const flushDialogue = () => {
-        if (currentCharacterFullName && currentDialogue.length > 0) {
-            const text = cleanDialogue(currentDialogue.join(' '));
-            if (text) {
-                chunks.push({ character: currentCharacterFullName, text });
-            }
-        }
-        currentDialogue = [];
-    };
-    
-    const parseScriptBodyLine = (trimmedLine: string) => {
-         // Logic for handling lines within the script body
-        if (!trimmedLine) {
-            flushDialogue();
-            currentCharacterFullName = null;
-            return;
-        }
-
-        if (sceneHeadingRegex.test(trimmedLine)) {
-            flushDialogue();
-            currentCharacterFullName = null;
-            return;
-        }
-
-        const sameLineMatch = trimmedLine.match(sameLineDialogueRegex);
-        if (sameLineMatch) {
-            const potentialCharacterName = sameLineMatch[1].trim();
-            const dialoguePart = sameLineMatch[2];
-            const foundCharacter = findCharacter(potentialCharacterName);
-
-            if (foundCharacter) {
-                flushDialogue();
-                
-                const text = cleanDialogue(dialoguePart);
-                if (text) {
-                    chunks.push({ character: foundCharacter.fullName, text });
-                }
-                currentCharacterFullName = null; // This was a one-liner
-                return;
-            }
-        }
-        
-        // Check for multi-line dialogue character name
-        const foundCharacterForMultiLine = findCharacter(trimmedLine);
-        if (foundCharacterForMultiLine) {
-             flushDialogue();
-             currentCharacterFullName = foundCharacterForMultiLine.fullName;
-        } else if (currentCharacterFullName) {
-            // This line is part of the ongoing dialogue
-            currentDialogue.push(trimmedLine);
-        } else {
-            // Not a character name and not part of any dialogue, so flush just in case
-            flushDialogue();
-            currentCharacterFullName = null;
-        }
-    };
-
-    for (const line of lines) {
-        const trimmedLine = line.trim();
-
-        if (mode === 'metadata') {
-            if (trimmedLine.toLowerCase().startsWith('characters:')) {
-                mode = 'characterList';
-                continue;
-            }
-            if (sceneHeadingRegex.test(trimmedLine) || sameLineDialogueRegex.test(trimmedLine)) {
-                mode = 'scriptBody';
-                // Fall through to parse this line
-            } else {
-                continue; // Skip metadata lines like title, author, etc.
-            }
-        }
-        
-        if (mode === 'characterList') {
-            if (trimmedLine.startsWith('-')) {
-                const characterDef = trimmedLine.substring(1).trim();
-                
-                // Ignore decorative lines like '- --' or just '-' by ensuring there's an actual name.
-                if (!/[a-zA-Z]/.test(characterDef)) {
-                    continue;
-                }
-
-                const openParenIndex = characterDef.indexOf('(');
-                const rawName = openParenIndex !== -1 ? characterDef.substring(0, openParenIndex) : characterDef;
-                const fullName = normalizeCharacterName(rawName);
-                if (fullName) {
-                    definedCharacters.push({
-                        fullName,
-                        primaryToken: fullName.split(' ')[0],
-                        aliases: generateAliases(fullName)
-                    });
-                }
-                continue;
-            } else if (trimmedLine !== '' && !trimmedLine.startsWith('-')) {
-                 // This line is not a character def and not empty, so the list is over
-                mode = 'scriptBody';
-                // Fall through to parse this line
-            } else {
-                continue; // It's a blank line, stay in characterList mode
-            }
-        }
-
-        if (mode === 'scriptBody') {
-            parseScriptBodyLine(trimmedLine);
-        }
+    if (sceneHeadingRegex.test(trimmedLine) || transitionRegex.test(trimmedLine)) {
+      flushDialogue();
+      currentCharacterFullName = null;
+      return;
     }
 
-    flushDialogue();
-    
-    const characterNames = definedCharacters.map(c => c.fullName).sort();
+    const sameLineMatch = trimmedLine.match(sameLineDialogueRegex);
+    if (sameLineMatch) {
+      const potentialCharacterName = sameLineMatch[1].trim();
+      const dialoguePart = sameLineMatch[2];
+      let foundCharacter = findCharacter(potentialCharacterName);
+      if (!foundCharacter && uppercaseCharacterRegex.test(potentialCharacterName)) {
+        foundCharacter = registerCharacter(potentialCharacterName);
+      }
 
-    return { characters: characterNames, dialogueChunks: chunks };
+      if (foundCharacter) {
+        flushDialogue();
+        const rawLine = dialoguePart.trim();
+        const text = cleanDialogue(rawLine);
+        if (text) {
+          chunks.push({ character: foundCharacter.fullName, text, originalText: rawLine });
+        }
+        currentCharacterFullName = null;
+        return;
+      }
+    }
+
+    let foundCharacterForMultiLine = findCharacter(trimmedLine);
+    if (!foundCharacterForMultiLine && uppercaseCharacterRegex.test(trimmedLine)) {
+      foundCharacterForMultiLine = registerCharacter(trimmedLine);
+    }
+    if (foundCharacterForMultiLine) {
+      flushDialogue();
+      currentCharacterFullName = foundCharacterForMultiLine.fullName;
+    } else if (currentCharacterFullName) {
+      currentDialogue.push(trimmedLine);
+    } else {
+      flushDialogue();
+      currentCharacterFullName = null;
+      recordUnmatched(lineNumber, trimmedLine);
+    }
+  };
+
+  for (let index = 0; index < lines.length; index++) {
+    const lineNumber = index + 1;
+    const line = lines[index];
+    const trimmedLine = line.trim();
+
+    if (mode === 'metadata') {
+      if (trimmedLine.toLowerCase().startsWith('characters:')) {
+        mode = 'characterList';
+        continue;
+      }
+      if (sceneHeadingRegex.test(trimmedLine) || sameLineDialogueRegex.test(trimmedLine)) {
+        mode = 'scriptBody';
+      } else {
+        continue;
+      }
+    }
+
+    if (mode === 'characterList') {
+      if (trimmedLine.startsWith('-')) {
+        const characterDef = trimmedLine.substring(1).trim();
+        if (!/[a-zA-Z]/.test(characterDef)) {
+          continue;
+        }
+        const openParenIndex = characterDef.indexOf('(');
+        const rawName = openParenIndex !== -1 ? characterDef.substring(0, openParenIndex) : characterDef;
+        const fullName = normalizeCharacterName(rawName);
+        if (fullName) {
+          definedCharacters.push({
+            fullName,
+            aliases: generateAliases(fullName)
+          });
+        }
+        continue;
+      } else if (trimmedLine !== '' && !trimmedLine.startsWith('-')) {
+        mode = 'scriptBody';
+      } else {
+        continue;
+      }
+    }
+
+    if (mode === 'scriptBody') {
+      parseScriptBodyLine(trimmedLine, lineNumber);
+    }
+  }
+
+  flushDialogue();
+  const characterNames = definedCharacters.map(c => c.fullName).sort();
+
+  return {
+    characters: characterNames,
+    dialogueChunks: chunks,
+    diagnostics: { unmatchedLines }
+  };
 };
 
-export const useScriptParser = (scriptText: string): { characters: string[]; dialogueChunks: DialogueChunk[] } => {
-    return useMemo(() => parseScript(scriptText), [scriptText]);
+export const useScriptParser = (scriptText: string): ParsedScript => {
+  return useMemo(() => parseScript(scriptText), [scriptText]);
 };

@@ -5,6 +5,7 @@ import CharacterConfigPanel from './components/CharacterConfigPanel';
 import ProjectSettingsPanel from './components/ProjectSettingsPanel';
 import GeneratePanel from './components/GeneratePanel';
 import OutputDisplay from './components/OutputDisplay';
+import ParserDiagnosticsPanel from './components/ParserDiagnosticsPanel';
 import Modal from './components/Modal';
 import { useScriptParser } from './hooks/useScriptParser';
 import { AppStateSnapshot, CharacterConfigs, GeneratedBlob, ProjectSettings, ResumeInfo } from './types';
@@ -20,13 +21,14 @@ const CONCATENATION_ENDPOINT = import.meta.env?.VITE_CONCAT_SERVER_URL || 'http:
 function App() {
   const [scriptText, setScriptText] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const { characters, dialogueChunks } = useScriptParser(scriptText);
+  const { characters, dialogueChunks, diagnostics } = useScriptParser(scriptText);
   const [apiKey, setApiKey] = useState(process.env.ELEVENLABS_API_KEY || '');
   const [characterConfigs, setCharacterConfigs] = useState<CharacterConfigs>({});
   const [projectSettings, setProjectSettings] = useState<ProjectSettings>({
     model: 'eleven_multilingual_v2',
     outputFormat: 'mp3_44100_128',
     concatenate: true,
+    speakParentheticals: false
   });
   const [generatedOutput, setGeneratedOutput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -53,6 +55,12 @@ function App() {
 
   const handleExpand = () => setIsModalOpen(true);
   const handleCloseModal = () => setIsModalOpen(false);
+  const handleModalKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+      event.preventDefault();
+      handleCloseModal();
+    }
+  };
   const healthUrl = useMemo(() => getConcatenationHealthUrl(), []);
 
   useEffect(() => {
@@ -160,9 +168,14 @@ function App() {
         : `🔁 Resuming generation from chunk ${startIndex + 1} (${dialogueChunks[startIndex]?.character || 'Unknown'})`;
       setProgressMessagesLimited(prev => startIndex === 0 ? [modeMessage] : [...prev, modeMessage]);
 
+      const preparedChunks = dialogueChunks.map(chunk => ({
+        ...chunk,
+        text: projectSettings.speakParentheticals && chunk.originalText ? chunk.originalText : chunk.text
+      }));
+
       // Generate all audio files
       await generateAllAudio(
-        dialogueChunks,
+        preparedChunks,
         characterConfigs,
         apiKey,
         projectSettings.model,
@@ -253,6 +266,10 @@ function App() {
             onResume={resumeInfo ? handleResume : undefined}
             resumeInfo={resumeInfo}
           />
+          <ParserDiagnosticsPanel
+            chunks={dialogueChunks}
+            unmatchedLines={diagnostics.unmatchedLines}
+          />
         </div>
 
         <aside className="xl:col-span-1 flex flex-col gap-8">
@@ -288,6 +305,7 @@ function App() {
           value={scriptText}
           onChange={(e) => setScriptText(e.target.value)}
           placeholder="Paste your screenplay here..."
+          onKeyDown={handleModalKeyDown}
           className="w-full h-full p-3 bg-primary border border-accent rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-highlight text-text-primary custom-scrollbar"
           style={{ scrollbarWidth: 'thin', scrollbarColor: '#e94560 #1a1a2e' }}
         />

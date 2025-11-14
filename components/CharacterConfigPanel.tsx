@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { CharacterConfigs, CharacterConfig, VoiceSettings } from '../types';
 import Slider from './Slider';
 
@@ -12,6 +12,20 @@ const makeId = (character: string, prefix: string) =>
   `${prefix}-${character.replace(/[^a-zA-Z0-9]+/g, '-').toLowerCase()}`;
 
 const CharacterConfigPanel: React.FC<CharacterConfigPanelProps> = ({ characters, configs, setConfigs }) => {
+  const [search, setSearch] = useState('');
+  const [presetCharacter, setPresetCharacter] = useState('');
+
+  const filteredCharacters = useMemo(() => {
+    if (!search.trim()) {
+      return characters;
+    }
+    return characters.filter(char => char.toLowerCase().includes(search.trim().toLowerCase()));
+  }, [characters, search]);
+
+  const availablePresets = useMemo(
+    () => characters.filter(char => configs[char]?.voiceId),
+    [characters, configs]
+  );
 
   const handleConfigChange = <K extends keyof CharacterConfig>(character: string, field: K, value: CharacterConfig[K]) => {
     const newConfig: CharacterConfig = {
@@ -48,9 +62,59 @@ const CharacterConfigPanel: React.FC<CharacterConfigPanelProps> = ({ characters,
   return (
     <div className="bg-secondary p-4 rounded-lg shadow-lg h-full flex flex-col">
       <h2 className="text-xl font-bold text-highlight mb-4">Step 3: Character Voices</h2>
+      <div className="flex flex-col gap-2 mb-4">
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search characters..."
+          className="w-full p-2 bg-primary border border-accent rounded-md focus:outline-none focus:ring-2 focus:ring-highlight text-sm"
+        />
+        <div className="flex flex-col md:flex-row md:items-center md:space-x-3 text-xs text-text-secondary">
+          <div className="flex-1 flex items-center space-x-2">
+            <label htmlFor="preset-character" className="whitespace-nowrap">Apply preset from:</label>
+            <select
+              id="preset-character"
+              value={presetCharacter}
+              onChange={(e) => setPresetCharacter(e.target.value)}
+              className="flex-1 p-2 bg-primary border border-accent rounded-md focus:outline-none focus:ring-2 focus:ring-highlight text-sm"
+            >
+              <option value="">Select a character</option>
+              {availablePresets.map(char => (
+                <option key={char} value={char}>{char}</option>
+              ))}
+            </select>
+          </div>
+          <button
+            onClick={() => {
+              const source = presetCharacter && configs[presetCharacter];
+              if (!source) {
+                return;
+              }
+              const nextConfigs: CharacterConfigs = {};
+              characters.forEach(char => {
+                nextConfigs[char] = {
+                  voiceId: source.voiceId,
+                  voiceSettings: { ...source.voiceSettings }
+                };
+              });
+              setConfigs(nextConfigs);
+            }}
+            disabled={!presetCharacter || !configs[presetCharacter]}
+            className="mt-2 md:mt-0 px-3 py-1.5 bg-accent hover:bg-highlight rounded-md font-semibold text-white disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-highlight"
+          >
+            Apply to all
+          </button>
+        </div>
+      </div>
       <div className="flex-grow overflow-y-auto custom-scrollbar pr-2">
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-1 gap-4">
-          {characters.map((char) => {
+          {filteredCharacters.length === 0 && (
+            <div className="p-3 border bg-primary border-accent rounded-md text-center text-text-secondary">
+              No characters match “{search}”.
+            </div>
+          )}
+          {filteredCharacters.map((char) => {
             const config = configs[char] || { voiceId: '', voiceSettings: { stability: 0.5, similarity_boost: 0.75, style: 0.1, speed: 1.0 } };
             const voiceId = makeId(char, 'voice-id');
             const stabilityId = makeId(char, 'stability');
@@ -59,7 +123,12 @@ const CharacterConfigPanel: React.FC<CharacterConfigPanelProps> = ({ characters,
             const speedId = makeId(char, 'speed');
             return (
               <div key={char} className="p-3 border bg-primary border-accent rounded-md flex flex-col space-y-3">
-                <h3 className="font-semibold text-text-primary text-center truncate">{char}</h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-text-primary truncate">{char}</h3>
+                  {!config.voiceId && (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-red-600 text-white">No Voice ID</span>
+                  )}
+                </div>
                 <div>
                   <label htmlFor={voiceId} className="block text-sm font-medium text-text-secondary mb-1">
                     Voice ID

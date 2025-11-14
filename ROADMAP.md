@@ -65,14 +65,14 @@ A React-based tool for turning screenplay dialogue into ElevenLabs audio, with o
 
 ### 0.2.0 — Screenplay Parsing Improvements
 
-- [ ] **Robust character and dialogue detection**
-  - [ ] Add support for common screenplay patterns: `V.O.`, `O.S.`, `CONT'D`.
-  - [ ] Ignore scene headings and transitions (`INT.`, `EXT.`, `CUT TO:`, etc.) when extracting dialogue.
-  - [ ] Handle parentheticals gracefully and ensure they are either removed or spoken based on a setting.
+- [x] **Robust character and dialogue detection**
+  - [x] Add support for common screenplay patterns: `V.O.`, `O.S.`, `CONT'D`.
+  - [x] Ignore scene headings and transitions (`INT.`, `EXT.`, `CUT TO:`, etc.) when extracting dialogue.
+  - [x] Handle parentheticals gracefully and ensure they are either removed or spoken based on a setting.
 
-- [ ] **Format flexibility**
-  - [ ] Support simple Fountain-style text (at least headings + character + dialogue).
-  - [ ] Provide one or two additional example screenplay files (short, realistic samples).
+- [x] **Format flexibility**
+  - [x] Support simple Fountain-style text (at least headings + character + dialogue).
+  - [x] Provide one or two additional example screenplay files (short, realistic samples).
 
 - [ ] **Parser diagnostics mode**
   - [ ] Optional “show parsed view” mode that lists detected characters and their lines.
@@ -80,20 +80,20 @@ A React-based tool for turning screenplay dialogue into ElevenLabs audio, with o
 
 ### 0.2.1 — UI/UX Refinements
 
-- [ ] **Script editing experience**
-  - [ ] Improve the script input area: monospaced font, higher default height.
-  - [ ] Add a full-screen editor modal (if not already fully wired) with keyboard shortcuts (e.g. `Ctrl+Enter` to save).
-  - [ ] Clearly label expected format (inline hints from README’s “Screenplay Format” section). :contentReference[oaicite:3]{index=3}  
+- [x] **Script editing experience**
+  - [x] Improve the script input area: monospaced font, higher default height.
+  - [x] Add a full-screen editor modal (if not already fully wired) with keyboard shortcuts (e.g. `Ctrl+Enter` to save).
+  - [x] Clearly label expected format (inline hints from README’s “Screenplay Format” section). :contentReference[oaicite:3]{index=3}  
 
-- [ ] **Character configuration ergonomics**
-  - [ ] Allow searching/filtering within character list for long scripts.
-  - [ ] Add “Apply these settings to all characters” option (voice, stability, style) as a quick-start.
-  - [ ] Indicator if a character has no voice assigned yet.
+- [x] **Character configuration ergonomics**
+  - [x] Allow searching/filtering within character list for long scripts.
+  - [x] Add “Apply these settings to all characters” option (voice, stability, style) as a quick-start.
+  - [x] Indicator if a character has no voice assigned yet.
 
-- [ ] **Accessibility**
-  - [ ] Ensure all interactive controls are reachable via keyboard.
-  - [ ] Add ARIA labels to sliders and buttons.
-  - [ ] Check color contrast and adjust for readability.
+- [x] **Accessibility**
+  - [x] Ensure all interactive controls are reachable via keyboard.
+  - [x] Add ARIA labels to sliders and buttons.
+  - [x] Check color contrast and adjust for readability.
 
 ---
 

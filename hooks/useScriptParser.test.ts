@@ -22,11 +22,13 @@ SARAH: Inline reply handled here.
     expect(result.dialogueChunks).toHaveLength(2);
     expect(result.dialogueChunks[0]).toEqual({
       character: 'JOHN SMITH',
-      text: 'This is line one. And this is line two.'
+      text: 'This is line one. And this is line two.',
+      originalText: 'This is line one. And this is line two.'
     });
     expect(result.dialogueChunks[1]).toEqual({
       character: 'SARAH',
-      text: 'Inline reply handled here.'
+      text: 'Inline reply handled here.',
+      originalText: 'Inline reply handled here.'
     });
   });
 
