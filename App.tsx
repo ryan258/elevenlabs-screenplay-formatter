@@ -11,7 +11,7 @@ import GenerationProfilesPanel from './components/GenerationProfilesPanel';
 import ExportPanel from './components/ExportPanel';
 import Modal from './components/Modal';
 import { useScriptParser } from './hooks/useScriptParser';
-import { CharacterConfigs, GeneratedBlob, ManifestEntry, ProjectConfig, ProjectSettings, ResumeInfo, VoicePresets } from './types';
+import { CharacterConfigs, GeneratedBlob, ManifestEntry, ProjectConfig, ProjectSettings, ResumeInfo, VoicePresets, VoiceSettings } from './types';
 import { validateConfiguration } from './utils/scriptGenerator';
 import { generateAllAudio, generateAudioFile, GenerationError, GenerationProgress, getConcatenationHealthUrl } from './utils/elevenLabsApi';
 import { buildManifestEntries, manifestToCsv, manifestToSrt, manifestToVtt } from './utils/manifest';
@@ -22,12 +22,19 @@ import { demoProject } from './samples/demoProject';
 import ProjectManagerPanel from './components/ProjectManagerPanel';
 import VoicePresetsPanel from './components/VoicePresetsPanel';
 import AudioProductionPanel from './components/AudioProductionPanel';
+import VoiceSuggestionsPanel from './components/VoiceSuggestionsPanel';
 import ToastContainer from './components/ToastContainer';
 import useAppStore from './store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { deserializeGeneratedBlobs, serializeGeneratedBlobs } from './utils/blobSerialization';
 
 const CONCATENATION_ENDPOINT = import.meta.env?.VITE_CONCAT_SERVER_URL || 'http://localhost:3001/concatenate';
+const DEFAULT_VOICE_SETTINGS = {
+  stability: 0.5,
+  similarity_boost: 0.75,
+  style: 0.1,
+  speed: 1
+};
 const slugify = (value: string) => value.replace(/[^\w]+/g, '_').replace(/^_+|_+$/g, '').toLowerCase();
 const downloadFile = (blob: Blob, filename: string) => {
   const url = URL.createObjectURL(blob);
@@ -182,6 +189,12 @@ function App() {
       setApiKey(process.env.ELEVENLABS_API_KEY);
     }
   }, [hasHydrated, apiKey, setApiKey]);
+
+  useEffect(() => {
+    if (projectSettings.languageCode && projectSettings.languageCode !== 'en' && projectSettings.model !== 'eleven_multilingual_v2') {
+      setProjectSettings(prev => ({ ...prev, model: 'eleven_multilingual_v2' }));
+    }
+  }, [projectSettings.languageCode, projectSettings.model, setProjectSettings]);
 
   useEffect(() => {
     if (!hasHydrated || typeof window === 'undefined') {
@@ -400,6 +413,21 @@ function App() {
       profileId,
       requestDelayMs: profile.requestDelayMs
     }));
+  };
+
+  const handleApplyVoiceSuggestion = (character: string, suggestion: { voiceId: string; voiceSettings?: VoiceSettings; name?: string }) => {
+    if (!character) {
+      return;
+    }
+    const desiredSettings = suggestion.voiceSettings || DEFAULT_VOICE_SETTINGS;
+    setCharacterConfigs(prev => ({
+      ...prev,
+      [character]: {
+        voiceId: suggestion.voiceId,
+        voiceSettings: { ...(prev[character]?.voiceSettings || DEFAULT_VOICE_SETTINGS), ...desiredSettings }
+      }
+    }));
+    addToast(`Applied ${suggestion.name || 'voice'} to ${character}`, 'success');
   };
 
   const handlePreviewLine = async (index: number) => {
@@ -680,6 +708,11 @@ function App() {
               voicePresets={voicePresets}
               onSavePreset={handleSaveVoicePreset}
               onDeletePreset={handleDeletePreset}
+            />
+            <VoiceSuggestionsPanel
+              languageCode={projectSettings.languageCode}
+              characters={characters}
+              onApplySuggestion={handleApplyVoiceSuggestion}
             />
             <ExportPanel
               manifestEntries={manifestEntries}

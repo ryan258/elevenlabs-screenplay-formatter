@@ -233,8 +233,12 @@ This section documents major features from the experimental `v2` branch that can
 
 Things that might be worth exploring after the core is solid:
 
-- [ ] **Role-based voice suggestions**
-  - [ ] Provide recommended voices or settings based on tags like “Narrator”, “Villain”, “Child”, etc.
+- [x] **Multi-language support UI**
+  - [x] Simple language selector tied to the ElevenLabs multilingual model.
+  - [x] Preset voices per language.
+
+- [x] **Role-based voice suggestions**
+  - [x] Provide recommended voices or settings based on tags like “Narrator”, “Villain”, “Child”, etc.
 
 - [ ] **Integrations**
   - [ ] Export formats tailored for Reaper track templates.

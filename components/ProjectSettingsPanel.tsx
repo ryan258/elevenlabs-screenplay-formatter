@@ -1,5 +1,6 @@
 import React from 'react';
 import { ProjectSettings } from '../types';
+import { LANGUAGE_OPTIONS } from '../config/voiceSuggestions';
 
 interface ProjectSettingsPanelProps {
   settings: ProjectSettings;
@@ -44,6 +45,24 @@ const ProjectSettingsPanel: React.FC<ProjectSettingsPanelProps> = ({ settings, s
             <option value="mp3_44100_192">MP3 192kbps</option>
             <option value="pcm_24000">PCM 24kHz</option>
           </select>
+        </div>
+        <div>
+          <label htmlFor="language-select" className="block text-sm font-medium text-text-secondary mb-1">
+            Dialogue Language
+          </label>
+          <select
+            id="language-select"
+            value={settings.languageCode || 'en'}
+            onChange={(e) => handleSettingChange('languageCode', e.target.value)}
+            className="w-full p-2 bg-primary border border-accent rounded-md focus:outline-none focus:ring-2 focus:ring-highlight"
+          >
+            {LANGUAGE_OPTIONS.map(option => (
+              <option key={option.code} value={option.code}>{option.label}</option>
+            ))}
+          </select>
+          {settings.languageCode && settings.languageCode !== 'en' && settings.model !== 'eleven_multilingual_v2' && (
+            <p className="text-xs text-yellow-300 mt-1">Tip: Non-English voices require Eleven Multilingual v2.</p>
+          )}
         </div>
         <label htmlFor="concatenate" className="flex items-center justify-between cursor-pointer">
           <span className="text-sm font-medium text-text-secondary">Concatenate Audio</span>

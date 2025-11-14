@@ -37,6 +37,7 @@ export interface ProjectSettings {
   profileId?: string;
   requestDelayMs?: number;
   versionLabel?: string;
+  languageCode?: string;
 }
 
 export interface AppStateSnapshot {

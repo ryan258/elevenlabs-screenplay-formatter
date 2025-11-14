@@ -5,6 +5,7 @@ The Vite/React frontend lives at the repo root: `App.tsx` wires the panels in `c
 
 Key UI panels include:
 - `AudioProductionPanel` for background-music/SFX uploads and timing controls
+- `VoiceSuggestionsPanel` for role-based recommendations tied to the selected language
 - `ExportPanel` for JSON/CSV/ZIP/SRT/VTT downloads
 - `ProjectManagerPanel` handling shareable links + demo loading
 - `ToastContainer` for global success/error/info notifications
@@ -24,7 +25,7 @@ The project uses React hooks with TypeScript options defined in `tsconfig.json`.
 Use `npm run test` for parser unit tests and `npm run lint` / `npm run check` before commits. For manual QA:
 - Load `EXAMPLE_SCREENPLAY.md`, `EXAMPLE_FOUNTAIN.md`, or files in `plays/` to confirm parsing, diagnostics, and per-character settings.
 - Exercise both output modes: run just `npm run dev` for individual MP3 downloads, then repeat with the backend running to ensure `/concatenate` succeeds, audio production assets mix correctly, and a single file lands in `Downloads`.
-- Verify subtitle exports (`srt`, `vtt`) line up with timeline previews when editing the alignment or manifest code.
+- Verify subtitle exports (`srt`, `vtt`) line up with timeline previews when editing the alignment or manifest code, and spot-check non-English runs (e.g., Spanish) to ensure the language selector + voice suggestions behave.
 - When editing `utils/elevenLabsApi.ts`, monitor retry/resume behavior, adaptive rate-limiting, toasted status messages, and ensure the Output/Diagnostics panels still stream updates.
 
 ## Commit & Pull Request Guidelines

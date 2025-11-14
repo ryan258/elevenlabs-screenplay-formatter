@@ -12,7 +12,8 @@ const defaultProjectSettings: ProjectSettings = {
   speakParentheticals: false,
   profileId: undefined,
   requestDelayMs: 500,
-  versionLabel: ''
+  versionLabel: '',
+  languageCode: 'en'
 };
 
 const defaultProgress = { current: 0, total: 0, character: '', snippet: '' };

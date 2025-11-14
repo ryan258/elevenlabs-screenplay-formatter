@@ -18,6 +18,7 @@ A React-based web application that converts screenplay dialogue into AI-generate
 - **Concatenation Health Check** - Built-in status card to ping the backend server and show connectivity
 - **Multiple Model Support** - Choose between multilingual and monolingual ElevenLabs models
 - **Format Options** - Select output format (MP3 128kbps, 192kbps, or PCM 24kHz)
+- **Language Selector & Voice Suggestions** - Pick the dialogue language and apply curated role-based voice recommendations per locale.
 - **Subtitle & Timing Exports** - Generate manifests plus SRT/VTT subtitle files backed by ElevenLabs word-alignment timestamps.
 - **Audio Production Mixing** - Attach a looping background track and timed sound effects that are mixed alongside dialogue during concatenation.
 - **Shareable Project Links** - Copy a single URL that encodes your script, settings, and presets for collaborators.
@@ -138,6 +139,10 @@ After a successful generation, the **Exports** card lets you download:
 - `subtitles.srt` / `subtitles.vtt` – caption files built from ElevenLabs alignment data (falls back to estimated timing when alignment is unavailable)
 
 These exports pick up the current timing data (including resume runs), so you can feed them directly into video editors or localization pipelines.
+
+## Language & Voice Suggestions
+
+Use the **Dialogue Language** dropdown in Project Settings to indicate the script's primary language. Non-English languages automatically switch to Eleven Multilingual v2 and unlock curated recommendations in the **Voice Suggestions** panel. Each role (Narrator, Hero, Villain, etc.) lists hand-picked voices per language—select a target character, then click **Apply** to assign that voice ID and starter settings instantly.
 
 ## Sharing Projects
 
