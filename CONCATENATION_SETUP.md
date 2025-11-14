@@ -85,8 +85,13 @@ npm run dev
 4. **Enable or disable** the "Concatenate Audio" toggle in Project Settings
    - **Enabled**: Generates one `concatenated_audio.mp3` file
    - **Disabled**: Generates individual files (e.g., `0000_CHARACTER.mp3`)
-5. Click "Generate Audio"
-6. Use the **Concatenation Status** card in the UI to run on-demand health checks if you suspect the backend is unreachable.
+5. (Optional) Open the **Audio Production** panel to upload:
+   - A looping background music track (stored locally and sent only when concatenation is enabled)
+   - Timecoded sound effects (`mm:ss` start, volume, audio file) that are layered on top of the master track
+6. Click "Generate Audio"
+7. Use the **Concatenation Status** card in the UI to run on-demand health checks if you suspect the backend is unreachable.
+
+The server now mixes all uploaded assets (dialogue, background music, and per-effect audio) using FFmpeg filters before returning the final `concatenated_audio.mp3`. When audio production assets are omitted the server simply concatenates the dialogue files.
 
 ## Troubleshooting
 
@@ -136,6 +141,8 @@ Frontend: Send all audio blobs to backend server
 Backend: Save files temporarily to disk
     ↓
 Backend: Use ffmpeg to concatenate files
+    ↓ (optional)
+Backend: Mix background music + SFX with dialogue streams
     ↓
 Backend: Return concatenated file
     ↓
@@ -165,3 +172,4 @@ npm run dev
 - Files are sent from browser memory to the server (no disk writes on frontend)
 - If the server is unavailable, the app gracefully falls back to individual downloads
 - Maximum file size: 50MB per audio file (configurable in `server/index.js:16`)
+- Background and SFX uploads live only in-memory on the client; reattach them if you refresh the app or share a project URL.

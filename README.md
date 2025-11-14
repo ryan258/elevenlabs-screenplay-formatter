@@ -129,6 +129,16 @@ The **Audio Production** panel lets you attach:
 
 When concatenation is enabled, these assets are uploaded with the dialogue clips and mixed server-side via FFmpeg. You can stack multiple sound effects, and each will be delayed according to its start time before being merged with the master track.
 
+## Subtitle & Manifest Exports
+
+After a successful generation, the **Exports** card lets you download:
+
+- `manifest.json` / `manifest.csv` – dialogue metadata including start/end timings
+- `elevenlabs_export_<timestamp>.zip` – audio + manifest bundle
+- `subtitles.srt` / `subtitles.vtt` – caption files built from ElevenLabs alignment data (falls back to estimated timing when alignment is unavailable)
+
+These exports pick up the current timing data (including resume runs), so you can feed them directly into video editors or localization pipelines.
+
 ## Sharing Projects
 
 Use **Copy Share Link** inside the Project Manager card to encode your entire configuration (script, presets, production settings) into the current URL. Send that link to a teammate and the app will automatically load the shared project after it hydrates. The link stores only metadata—audio assets such as SFX/background files still need to be reattached locally.

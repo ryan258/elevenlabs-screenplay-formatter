@@ -171,29 +171,29 @@ A React-based tool for turning screenplay dialogue into ElevenLabs audio, with o
 
 This section documents major features from the experimental `v2` branch that can be integrated into `main`.
 
-- [ ] **Word-Level Timestamps & Subtitle Generation**
-  - [ ] Integrate with ElevenLabs alignment API to get word-level timestamps.
-  - [ ] Store `startTime` and `endTime` on each dialogue chunk.
-  - [ ] Add export options to generate and download subtitle files (SRT and VTT).
+- [x] **Word-Level Timestamps & Subtitle Generation**
+  - [x] Integrate with ElevenLabs alignment API to get word-level timestamps.
+  - [x] Store `startTime` and `endTime` on each dialogue chunk.
+  - [x] Add export options to generate and download subtitle files (SRT and VTT).
 
-- [ ] **Advanced Audio Production**
-  - [ ] Add a UI for defining and placing Sound Effects (SFX) in the script.
-  - [ ] Allow specifying a background music track (URL or upload).
-  - [ ] Update the backend concatenation service to mix dialogue, SFX, and background music using FFmpeg filters.
+- [x] **Advanced Audio Production**
+  - [x] Add a UI for defining and placing Sound Effects (SFX) in the script.
+  - [x] Allow specifying a background music track (URL or upload).
+  - [x] Update the backend concatenation service to mix dialogue, SFX, and background music using FFmpeg filters.
 
-- [ ] **Enhanced Robustness & UX**
-  - [ ] Implement a user-friendly error system that translates technical API errors (rate limits, invalid keys) into actionable advice.
-  - [ ] Persist the full generation state to `localStorage` to allow for cross-session resumption after a browser crash or refresh.
-  - [ ] Implement dynamic rate-limiting by inspecting API response headers (`x-rate-limit-remaining`) to adjust request delays automatically.
-  - [ ] Add a non-blocking toast notification system for feedback (e.g., "Project Saved").
+- [x] **Enhanced Robustness & UX**
+  - [x] Implement a user-friendly error system that translates technical API errors (rate limits, invalid keys) into actionable advice.
+  - [x] Persist the full generation state to `localStorage` to allow for cross-session resumption after a browser crash or refresh.
+  - [x] Implement dynamic rate-limiting by inspecting API response headers (`x-rate-limit-remaining`) to adjust request delays automatically.
+  - [x] Add a non-blocking toast notification system for feedback (e.g., "Project Saved").
 
-- [ ] **Project Sharing**
-  - [ ] Add a "Share Project" feature that serializes the entire project config into a shareable URL.
-  - [ ] Allow loading a project directly from this URL.
+- [x] **Project Sharing**
+  - [x] Add a "Share Project" feature that serializes the entire project config into a shareable URL.
+  - [x] Allow loading a project directly from this URL.
 
-- [ ] **State Management & Tooling**
-  - [ ] Refactor state management to use a dedicated library like Zustand for improved scalability.
-  - [ ] Consolidate build and test configurations.
+- [x] **State Management & Tooling**
+  - [x] Refactor state management to use a dedicated library like Zustand for improved scalability.
+  - [x] Consolidate build and test configurations.
 
 ---
 
@@ -228,19 +228,13 @@ This section documents major features from the experimental `v2` branch that can
 
 ---
 
+
 ## Backlog / Nice-to-Have Ideas
 
 Things that might be worth exploring after the core is solid:
 
-- [ ] **Multi-language support UI**
-  - [ ] Simple language selector tied to the ElevenLabs multilingual model.
-  - [ ] Preset voices per language.
-
 - [ ] **Role-based voice suggestions**
   - [ ] Provide recommended voices or settings based on tags like “Narrator”, “Villain”, “Child”, etc.
 
-- [ ] **Cloud-ish storage (opt-in)**
-  - [ ] If ever moved behind an authenticated backend, support user accounts and server-side project storage.
-
 - [ ] **Integrations**
-  - [ ] Export formats tailored for specific tools (e.g., Reaper track templates, Adobe Audition session helpers).
+  - [ ] Export formats tailored for Reaper track templates.
