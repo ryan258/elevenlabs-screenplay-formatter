@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import { AudioProductionSettings, CharacterConfigs, ManifestEntry, ProjectSettings, ResumeInfo, VoicePresets } from '../types';
+import { AudioProductionSettings, CharacterConfigs, ElevenLabsVoice, ManifestEntry, ProjectSettings, ResumeInfo, VoicePresets } from '../types';
 import { SerializedGeneratedBlob } from '../utils/blobSerialization';
 
 const STORAGE_KEY = 'elevenlabs_formatter_state_v2';
@@ -76,6 +76,10 @@ interface AppStoreState {
   toasts: Array<{ id: string; message: string; tone: 'info' | 'success' | 'error' }>;
   addToast: (message: string, tone?: 'info' | 'success' | 'error') => void;
   removeToast: (id: string) => void;
+  availableVoices: ElevenLabsVoice[];
+  setAvailableVoices: (voices: ElevenLabsVoice[]) => void;
+  voicesStatus: 'idle' | 'loading' | 'ready' | 'error';
+  setVoicesStatus: (status: 'idle' | 'loading' | 'ready' | 'error') => void;
 }
 
 const limitMessages = (messages: string[]) => {
@@ -173,7 +177,12 @@ export const useAppStore = create<AppStoreState>()(
           set(state => ({ toasts: state.toasts.filter(toast => toast.id !== id) }));
         }, 4000);
       },
-      removeToast: (id) => set(state => ({ toasts: state.toasts.filter(toast => toast.id !== id) }))
+      removeToast: (id) => set(state => ({ toasts: state.toasts.filter(toast => toast.id !== id) })),
+
+      availableVoices: [],
+      voicesStatus: 'idle',
+      setAvailableVoices: (voices) => set({ availableVoices: voices }),
+      setVoicesStatus: (status) => set({ voicesStatus: status })
     }),
     {
       name: STORAGE_KEY,

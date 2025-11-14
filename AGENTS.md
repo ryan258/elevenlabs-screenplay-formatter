@@ -25,7 +25,8 @@ The project uses React hooks with TypeScript options defined in `tsconfig.json`.
 Use `npm run test` for parser unit tests and `npm run lint` / `npm run check` before commits. For manual QA:
 - Load `EXAMPLE_SCREENPLAY.md`, `EXAMPLE_FOUNTAIN.md`, or files in `plays/` to confirm parsing, diagnostics, and per-character settings.
 - Exercise both output modes: run just `npm run dev` for individual MP3 downloads, then repeat with the backend running to ensure `/concatenate` succeeds, audio production assets mix correctly, and a single file lands in `Downloads`.
-- Verify subtitle exports (`srt`, `vtt`) line up with timeline previews when editing the alignment or manifest code, and spot-check non-English runs (e.g., Spanish) to ensure the language selector + voice suggestions behave.
+- Verify subtitle exports (`srt`, `vtt`) line up with timeline previews when editing the alignment or manifest code, and spot-check non-English runs (e.g., Spanish) to ensure the language selector + curated suggestions behave.
+- When touching the ElevenLabs API integration, confirm custom voices load (after entering a real API key) and can be applied from the suggestions panel without regression.
 - When editing `utils/elevenLabsApi.ts`, monitor retry/resume behavior, adaptive rate-limiting, toasted status messages, and ensure the Output/Diagnostics panels still stream updates.
 
 ## Commit & Pull Request Guidelines

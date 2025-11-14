@@ -15,6 +15,7 @@ import { CharacterConfigs, GeneratedBlob, ManifestEntry, ProjectConfig, ProjectS
 import { validateConfiguration } from './utils/scriptGenerator';
 import { generateAllAudio, generateAudioFile, GenerationError, GenerationProgress, getConcatenationHealthUrl } from './utils/elevenLabsApi';
 import { buildManifestEntries, manifestToCsv, manifestToSrt, manifestToVtt } from './utils/manifest';
+import { fetchElevenLabsVoices } from './utils/elevenLabsClient';
 import { GENERATION_PROFILES } from './config/generationProfiles';
 import JSZip from 'jszip';
 import ConcatenationStatus from './components/ConcatenationStatus';
@@ -112,7 +113,11 @@ function App() {
     setConcatStatus,
     hasHydrated,
     setHasHydrated,
-    addToast
+    addToast,
+    availableVoices,
+    setAvailableVoices,
+    voicesStatus,
+    setVoicesStatus
   } = useAppStore(useShallow(state => ({
     scriptText: state.scriptText,
     setScriptText: state.setScriptText,
@@ -151,7 +156,11 @@ function App() {
     setConcatStatus: state.setConcatStatus,
     hasHydrated: state.hasHydrated,
     setHasHydrated: state.setHasHydrated,
-    addToast: state.addToast
+    addToast: state.addToast,
+    availableVoices: state.availableVoices,
+    setAvailableVoices: state.setAvailableVoices,
+    voicesStatus: state.voicesStatus,
+    setVoicesStatus: state.setVoicesStatus
   })));
   const { characters, dialogueChunks, diagnostics } = useScriptParser(scriptText);
   const [timelinePreviews, setTimelinePreviews] = useState<Record<number, { loading?: boolean; url?: string; error?: string }>>({});
@@ -237,6 +246,32 @@ function App() {
       window.history.replaceState({}, document.title, newUrl);
     }
   }, [hasHydrated, handleLoadProjectConfig, addToast]);
+
+  useEffect(() => {
+    if (!apiKey) {
+      setAvailableVoices([]);
+      setVoicesStatus('idle');
+      return;
+    }
+    const controller = new AbortController();
+    setVoicesStatus('loading');
+    fetchElevenLabsVoices(apiKey, controller.signal)
+      .then(voices => {
+        setAvailableVoices(voices);
+        setVoicesStatus('ready');
+      })
+      .catch(error => {
+        if (controller.signal.aborted) {
+          return;
+        }
+        console.warn('Failed to fetch ElevenLabs voices:', error);
+        setVoicesStatus('error');
+        addToast('Unable to load ElevenLabs voices.', 'error');
+      });
+    return () => {
+      controller.abort();
+    };
+  }, [apiKey, setAvailableVoices, setVoicesStatus, addToast]);
 
   const handleExpand = () => setIsModalOpen(true);
   const handleCloseModal = () => setIsModalOpen(false);
@@ -442,6 +477,20 @@ function App() {
       }
     }));
     addToast(`Applied ${suggestion.name || 'voice'} to ${character}`, 'success');
+  };
+
+  const handleApplyCustomVoice = (character: string, voice: { voiceId: string; name?: string }) => {
+    if (!character || !voice.voiceId) {
+      return;
+    }
+    setCharacterConfigs(prev => ({
+      ...prev,
+      [character]: {
+        voiceId: voice.voiceId,
+        voiceSettings: prev[character]?.voiceSettings || { ...DEFAULT_VOICE_SETTINGS }
+      }
+    }));
+    addToast(`Applied ${voice.name || 'custom voice'} to ${character}`, 'success');
   };
 
   const handlePreviewLine = async (index: number) => {
@@ -727,6 +776,9 @@ function App() {
               languageCode={projectSettings.languageCode}
               characters={characters}
               onApplySuggestion={handleApplyVoiceSuggestion}
+              customVoices={availableVoices}
+              voicesStatus={voicesStatus}
+              onApplyCustomVoice={handleApplyCustomVoice}
             />
             <ExportPanel
               manifestEntries={manifestEntries}

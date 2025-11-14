@@ -144,6 +144,8 @@ These exports pick up the current timing data (including resume runs), so you ca
 
 Use the **Dialogue Language** dropdown in Project Settings to indicate the script's primary language. Non-English languages automatically switch to Eleven Multilingual v2 and unlock curated recommendations in the **Voice Suggestions** panel. Each role (Narrator, Hero, Villain, etc.) lists hand-picked voices per language—select a target character, then click **Apply** to assign that voice ID and starter settings instantly.
 
+If you've added custom voices to your ElevenLabs account, the panel also fetches them (once you enter a valid API key) so you can search, preview, and apply your own creations without juggling IDs manually.
+
 ## Sharing Projects
 
 Use **Copy Share Link** inside the Project Manager card to encode your entire configuration (script, presets, production settings) into the current URL. Send that link to a teammate and the app will automatically load the shared project after it hydrates. The link stores only metadata—audio assets such as SFX/background files still need to be reattached locally.

@@ -106,6 +106,15 @@ export interface PersistedAudioProductionSettings {
   soundEffects: Array<Omit<SoundEffectSettings, 'file'>>;
 }
 
+export interface ElevenLabsVoice {
+  voice_id: string;
+  name: string;
+  category?: string;
+  description?: string;
+  labels?: Record<string, string>;
+  preview_url?: string;
+}
+
 export interface ManifestEntry {
   index: number;
   character: string;
