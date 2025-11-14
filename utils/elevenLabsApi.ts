@@ -201,6 +201,8 @@ const concatenateAudioFiles = async (
 interface GenerateAllAudioOptions {
   startIndex?: number;
   existingBlobs?: GeneratedBlob[];
+  delayMs?: number;
+  filenamePrefix?: string;
 }
 
 export const generateAllAudio = async (
@@ -216,9 +218,8 @@ export const generateAllAudio = async (
   const total = dialogueChunks.length;
   const { extension } = getFormatDetails(outputFormat);
   const startIndex = options.startIndex ?? 0;
-  const generatedBlobs: GeneratedBlob[] = concatenate
-    ? [...(options.existingBlobs ?? [])]
-    : [];
+  const generatedBlobs: GeneratedBlob[] = [...(options.existingBlobs ?? [])];
+  const delayMs = options.delayMs ?? 500;
 
   // Generate all audio files
   for (let i = startIndex; i < dialogueChunks.length; i++) {
@@ -247,15 +248,10 @@ export const generateAllAudio = async (
         total
       );
 
-      const filename = `${String(i).padStart(4, '0')}_${chunk.character.replace(/\s+/g, '_')}.${extension}`;
+      const baseFilename = `${String(i).padStart(4, '0')}_${chunk.character.replace(/\s+/g, '_')}.${extension}`;
+      const filename = options.filenamePrefix ? `${options.filenamePrefix}_${baseFilename}` : baseFilename;
 
-      if (concatenate) {
-        // Store blob for later concatenation
-        generatedBlobs.push({ blob, filename });
-      } else {
-        // Download immediately if not concatenating
-        downloadBlob(blob, filename);
-      }
+      generatedBlobs.push({ blob, filename });
 
       onProgress?.({
         current: i + 1,
@@ -267,8 +263,8 @@ export const generateAllAudio = async (
       }, i + 1, total);
 
       // Small delay between requests to avoid rate limiting
-      if (i < dialogueChunks.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 500));
+      if (i < dialogueChunks.length - 1 && delayMs > 0) {
+        await new Promise(resolve => setTimeout(resolve, delayMs));
       }
     } catch (error) {
       onProgress?.({
@@ -313,6 +309,10 @@ export const generateAllAudio = async (
 
       throw error;
     }
+  } else {
+    generatedBlobs.forEach(({ blob, filename }) => {
+      downloadBlob(blob, filename);
+    });
   }
 
   return generatedBlobs;

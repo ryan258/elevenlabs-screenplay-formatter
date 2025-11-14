@@ -8,6 +8,7 @@ interface ProjectManagerPanelProps {
     characters: number;
     dialogueChunks: number;
     unmatched: number;
+    versionLabel?: string;
   };
 }
 
@@ -35,9 +36,10 @@ const ProjectManagerPanel: React.FC<ProjectManagerPanelProps> = ({
           {metadata.characters} chars · {metadata.dialogueChunks} lines
         </span>
       </div>
-      <p className="text-xs text-text-secondary mb-3">
-        Unparsed lines: {metadata.unmatched}
-      </p>
+      <p className="text-xs text-text-secondary mb-1">Unparsed lines: {metadata.unmatched}</p>
+      {metadata.versionLabel && (
+        <p className="text-xs text-text-secondary mb-3">Version label: {metadata.versionLabel}</p>
+      )}
       <div className="space-y-2">
         <button
           onClick={onDownloadProject}

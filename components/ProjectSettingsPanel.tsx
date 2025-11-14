@@ -73,6 +73,19 @@ const ProjectSettingsPanel: React.FC<ProjectSettingsPanelProps> = ({ settings, s
             <span className="w-11 h-6 bg-primary peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-highlight rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-highlight" aria-hidden="true"></span>
           </span>
         </label>
+        <div>
+          <label htmlFor="version-label" className="block text-sm font-medium text-text-secondary mb-1">
+            Version Label
+          </label>
+          <input
+            id="version-label"
+            type="text"
+            value={settings.versionLabel || ''}
+            onChange={(e) => handleSettingChange('versionLabel', e.target.value)}
+            placeholder="e.g. script_v3"
+            className="w-full p-2 bg-primary border border-accent rounded-md focus:outline-none focus:ring-2 focus:ring-highlight text-sm"
+          />
+        </div>
       </div>
     </div>
   );

@@ -25,6 +25,9 @@ export interface ProjectSettings {
   outputFormat: string;
   concatenate: boolean;
   speakParentheticals: boolean;
+  profileId?: string;
+  requestDelayMs?: number;
+  versionLabel?: string;
 }
 
 export interface AppStateSnapshot {
@@ -63,3 +66,11 @@ export interface ProjectConfig {
 }
 
 export type VoicePresets = Record<string, CharacterConfig>;
+
+export interface ManifestEntry {
+  index: number;
+  character: string;
+  filename: string;
+  text: string;
+  estimatedDurationMs: number;
+}

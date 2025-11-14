@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ScriptInput from './components/ScriptInput';
 import ApiKeyPanel from './components/ApiKeyPanel';
 import CharacterConfigPanel from './components/CharacterConfigPanel';
@@ -6,11 +6,17 @@ import ProjectSettingsPanel from './components/ProjectSettingsPanel';
 import GeneratePanel from './components/GeneratePanel';
 import OutputDisplay from './components/OutputDisplay';
 import ParserDiagnosticsPanel from './components/ParserDiagnosticsPanel';
+import TimelinePanel from './components/TimelinePanel';
+import GenerationProfilesPanel from './components/GenerationProfilesPanel';
+import ExportPanel from './components/ExportPanel';
 import Modal from './components/Modal';
 import { useScriptParser } from './hooks/useScriptParser';
-import { AppStateSnapshot, CharacterConfigs, GeneratedBlob, ProjectConfig, ProjectSettings, ResumeInfo, VoicePresets } from './types';
+import { AppStateSnapshot, CharacterConfigs, GeneratedBlob, ManifestEntry, ProjectConfig, ProjectSettings, ResumeInfo, VoicePresets } from './types';
 import { validateConfiguration } from './utils/scriptGenerator';
-import { generateAllAudio, GenerationError, GenerationProgress, getConcatenationHealthUrl } from './utils/elevenLabsApi';
+import { generateAllAudio, generateAudioFile, GenerationError, GenerationProgress, getConcatenationHealthUrl } from './utils/elevenLabsApi';
+import { buildManifestEntries, manifestToCsv } from './utils/manifest';
+import { GENERATION_PROFILES } from './config/generationProfiles';
+import JSZip from 'jszip';
 import ConcatenationStatus from './components/ConcatenationStatus';
 import { demoProject } from './samples/demoProject';
 import ProjectManagerPanel from './components/ProjectManagerPanel';
@@ -19,6 +25,15 @@ import VoicePresetsPanel from './components/VoicePresetsPanel';
 const STORAGE_KEY = 'elevenlabs_formatter_state';
 const MAX_PROGRESS_MESSAGES = 200;
 const CONCATENATION_ENDPOINT = import.meta.env?.VITE_CONCAT_SERVER_URL || 'http://localhost:3001/concatenate';
+const slugify = (value: string) => value.replace(/[^\w]+/g, '_').replace(/^_+|_+$/g, '').toLowerCase();
+const downloadFile = (blob: Blob, filename: string) => {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+};
 
 // Implemented the main App component to structure the application and manage state.
 function App() {
@@ -31,7 +46,10 @@ function App() {
     model: 'eleven_multilingual_v2',
     outputFormat: 'mp3_44100_128',
     concatenate: true,
-    speakParentheticals: false
+    speakParentheticals: false,
+    profileId: undefined,
+    requestDelayMs: 500,
+    versionLabel: ''
   });
   const [generatedOutput, setGeneratedOutput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -41,6 +59,9 @@ function App() {
   const [resumeInfo, setResumeInfo] = useState<ResumeInfo | null>(null);
   const [voicePresets, setVoicePresets] = useState<VoicePresets>({});
   const [pendingBlobs, setPendingBlobs] = useState<GeneratedBlob[]>([]);
+  const [manifestEntries, setManifestEntries] = useState<ManifestEntry[]>([]);
+  const [lastGeneratedBlobs, setLastGeneratedBlobs] = useState<GeneratedBlob[]>([]);
+  const [timelinePreviews, setTimelinePreviews] = useState<Record<number, { loading?: boolean; url?: string; error?: string }>>({});
   const [currentProgress, setCurrentProgress] = useState<{ current: number; total: number; character: string; snippet: string }>({
     current: 0,
     total: 0,
@@ -49,6 +70,7 @@ function App() {
   });
   const [errorInfo, setErrorInfo] = useState<string | null>(null);
   const [concatStatus, setConcatStatus] = useState<'unknown' | 'checking' | 'online' | 'offline'>('unknown');
+  const previewUrlsRef = useRef<string[]>([]);
 
   const setProgressMessagesLimited = (updater: string[] | ((prev: string[]) => string[])) => {
     setProgressMessages(prev => {
@@ -151,6 +173,19 @@ function App() {
       setConcatStatus('offline');
     });
   }, [checkConcatenationHealth]);
+
+  useEffect(() => {
+    const urlsRef = previewUrlsRef.current;
+    return () => {
+      urlsRef.forEach(url => URL.revokeObjectURL(url));
+    };
+  }, []);
+
+  useEffect(() => {
+    setTimelinePreviews({});
+    setManifestEntries([]);
+    setLastGeneratedBlobs([]);
+  }, [scriptText]);
 
   const buildProjectConfig = (): ProjectConfig => ({
     version: '0.3.0',
@@ -256,6 +291,97 @@ function App() {
     setCharacterConfigs(nextConfigs);
   };
 
+  const handleSelectProfile = (profileId: string) => {
+    const profile = GENERATION_PROFILES.find(p => p.id === profileId);
+    if (!profile) {
+      return;
+    }
+    setProjectSettings(prev => ({
+      ...prev,
+      ...profile.settings,
+      profileId,
+      requestDelayMs: profile.requestDelayMs
+    }));
+  };
+
+  const handlePreviewLine = async (index: number) => {
+    const chunk = dialogueChunks[index];
+    if (!chunk || !apiKey) {
+      return;
+    }
+    const config = characterConfigs[chunk.character];
+    if (!config || !config.voiceId) {
+      setTimelinePreviews(prev => ({
+        ...prev,
+        [index]: { loading: false, url: prev[index]?.url, error: 'Missing voice ID' }
+      }));
+      return;
+    }
+
+    setTimelinePreviews(prev => ({
+      ...prev,
+      [index]: { ...prev[index], loading: true, error: undefined }
+    }));
+
+    try {
+      const text = projectSettings.speakParentheticals && chunk.originalText ? chunk.originalText : chunk.text;
+      const blob = await generateAudioFile(
+        { ...chunk, text },
+        config,
+        apiKey,
+        projectSettings.model,
+        projectSettings.outputFormat
+      );
+      const url = URL.createObjectURL(blob);
+      previewUrlsRef.current.push(url);
+      setTimelinePreviews(prev => {
+        const previousUrl = prev[index]?.url;
+        if (previousUrl) {
+          URL.revokeObjectURL(previousUrl);
+        }
+        return {
+          ...prev,
+          [index]: { loading: false, url }
+        };
+      });
+    } catch (error) {
+      setTimelinePreviews(prev => ({
+        ...prev,
+        [index]: {
+          loading: false,
+          url: prev[index]?.url,
+          error: error instanceof Error ? error.message : 'Preview failed'
+        }
+      }));
+    }
+  };
+
+  const handleDownloadManifestJson = () => {
+    if (!manifestEntries.length) return;
+    const blob = new Blob([JSON.stringify(manifestEntries, null, 2)], { type: 'application/json' });
+    downloadFile(blob, 'manifest.json');
+  };
+
+  const handleDownloadManifestCsv = () => {
+    if (!manifestEntries.length) return;
+    const csv = manifestToCsv(manifestEntries);
+    const blob = new Blob([csv], { type: 'text/csv' });
+    downloadFile(blob, 'manifest.csv');
+  };
+
+  const handleDownloadZip = async () => {
+    if (!manifestEntries.length || !lastGeneratedBlobs.length) return;
+    const zip = new JSZip();
+    lastGeneratedBlobs.forEach(({ blob, filename }) => {
+      zip.file(filename, blob);
+    });
+    zip.file('manifest.json', JSON.stringify(manifestEntries, null, 2));
+    const csv = manifestToCsv(manifestEntries);
+    zip.file('manifest.csv', csv);
+    const zippedBlob = await zip.generateAsync({ type: 'blob' });
+    downloadFile(zippedBlob, `elevenlabs_export_${Date.now()}.zip`);
+  };
+
   const runGeneration = async (startIndex = 0, existingBlobs: GeneratedBlob[] = []) => {
     setIsLoading(true);
     if (startIndex === 0) {
@@ -286,7 +412,8 @@ function App() {
       }));
 
       // Generate all audio files
-      await generateAllAudio(
+      const versionSlug = projectSettings.versionLabel ? slugify(projectSettings.versionLabel) : undefined;
+      const blobs = await generateAllAudio(
         preparedChunks,
         characterConfigs,
         apiKey,
@@ -304,9 +431,14 @@ function App() {
         },
         {
           startIndex,
-          existingBlobs
+          existingBlobs,
+          delayMs: projectSettings.requestDelayMs,
+          filenamePrefix: versionSlug
         }
       );
+      const filenames = blobs.map(b => b.filename);
+      setManifestEntries(buildManifestEntries(preparedChunks, filenames));
+      setLastGeneratedBlobs(blobs);
 
       // Success message
       const successMessage = projectSettings.concatenate
@@ -322,6 +454,7 @@ function App() {
 
     } catch (error) {
       console.error('Generation error:', error);
+      setManifestEntries([]);
       if (error instanceof GenerationError) {
         const resumeMessage = `❌ Error on chunk ${error.failedIndex + 1} (${error.failedCharacter}). Fix the issue and press Resume to continue from this point.`;
         setProgressMessagesLimited(prev => [...prev, resumeMessage]);
@@ -382,6 +515,11 @@ function App() {
             chunks={dialogueChunks}
             unmatchedLines={diagnostics.unmatchedLines}
           />
+          <TimelinePanel
+            chunks={dialogueChunks}
+            previewStates={timelinePreviews}
+            onPreview={handlePreviewLine}
+          />
         </div>
 
         <aside className="xl:col-span-1 flex flex-col gap-8">
@@ -395,6 +533,10 @@ function App() {
               settings={projectSettings}
               setSettings={setProjectSettings}
             />
+            <GenerationProfilesPanel
+              selectedProfileId={projectSettings.profileId}
+              onSelectProfile={handleSelectProfile}
+            />
             <ProjectManagerPanel
               onDownloadProject={() => handleDownloadProject()}
               onLoadProjectFile={(file) => handleLoadProjectFromFile(file)}
@@ -402,7 +544,8 @@ function App() {
               metadata={{
                 characters: characters.length,
                 dialogueChunks: dialogueChunks.length,
-                unmatched: diagnostics.unmatchedLines.length
+                unmatched: diagnostics.unmatchedLines.length,
+                versionLabel: projectSettings.versionLabel
               }}
             />
             <VoicePresetsPanel
@@ -411,6 +554,12 @@ function App() {
               voicePresets={voicePresets}
               onSavePreset={handleSaveVoicePreset}
               onDeletePreset={handleDeletePreset}
+            />
+            <ExportPanel
+              manifestEntries={manifestEntries}
+              onDownloadJson={handleDownloadManifestJson}
+              onDownloadCsv={handleDownloadManifestCsv}
+              onDownloadZip={handleDownloadZip}
             />
             <ConcatenationStatus
               status={concatStatus}

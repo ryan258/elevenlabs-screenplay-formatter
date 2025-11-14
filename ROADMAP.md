@@ -137,33 +137,33 @@ A React-based tool for turning screenplay dialogue into ElevenLabs audio, with o
 
 ### 0.4.0 — Advanced Editing & Monitoring
 
-- [ ] **Per-line preview**
-  - [ ] Add a “Preview line” button next to each dialogue block to generate and audition just that line.
-  - [ ] Optionally keep previews cached so they don’t re-hit the API unless settings change.
+- [x] **Per-line preview**
+  - [x] Add a “Preview line” button next to each dialogue block to generate and audition just that line.
+  - [x] Optionally keep previews cached so they don’t re-hit the API unless settings change.
 
-- [ ] **Timeline-ish view**
-  - [ ] Represent the script as an ordered list of blocks (character + line length + estimated duration).
-  - [ ] Show estimated total runtime of the generated audio.
+- [x] **Timeline-ish view**
+  - [x] Represent the script as an ordered list of blocks (character + line length + estimated duration).
+  - [x] Show estimated total runtime of the generated audio.
 
-- [ ] **Generation profiles**
-  - [ ] Allow saving “render profiles” (e.g. “Fast draft”, “High quality”, “Concatenated episode”).
-  - [ ] Profiles pre-configure model, bitrate, concat, etc.
+- [x] **Generation profiles**
+  - [x] Allow saving “render profiles” (e.g. “Fast draft”, “High quality”, “Concatenated episode”).
+  - [x] Profiles pre-configure model, bitrate, concat, etc.
 
 ### 0.4.1 — DAW-Friendly Exports & Integrations
 
-- [ ] **Export manifests**
-  - [ ] Generate a JSON or CSV manifest mapping each file to:
-    - [ ] Character
-    - [ ] Line index
-    - [ ] Original text
-  - [ ] Optionally include estimated timestamps and durations.
+- [x] **Export manifests**
+  - [x] Generate a JSON or CSV manifest mapping each file to:
+    - [x] Character
+    - [x] Line index
+    - [x] Original text
+  - [x] Optionally include estimated timestamps and durations.
 
-- [ ] **Zip packaging**
-  - [ ] After generation, bundle all audio files + manifest into a `.zip` for easy import into DAWs.
+- [x] **Zip packaging**
+  - [x] After generation, bundle all audio files + manifest into a `.zip` for easy import into DAWs.
 
-- [ ] **Script versioning hints**
-  - [ ] Provide a lightweight “version label” field on the project (e.g. `script_v3`).
-  - [ ] Include that label in filenames and manifests.
+- [x] **Script versioning hints**
+  - [x] Provide a lightweight “version label” field on the project (e.g. `script_v3`).
+  - [x] Include that label in filenames and manifests.
 
 ---
 
@@ -171,18 +171,18 @@ A React-based tool for turning screenplay dialogue into ElevenLabs audio, with o
 
 **Goal:** Make it easy for future-you (or collaborators) to understand and extend the project.
 
-- [ ] **Developer setup guide**
-  - [ ] Expand README with a dedicated “Developer Setup” section:
-    - [ ] Node version, package manager notes.
-    - [ ] Frontend + backend start commands.
-    - [ ] Where to configure CORS/backends if needed.
+- [x] **Developer setup guide**
+  - [x] Expand README with a dedicated “Developer Setup” section:
+    - [x] Node version, package manager notes.
+    - [x] Frontend + backend start commands.
+    - [x] Where to configure CORS/backends if needed.
 
-- [ ] **Architecture overview**
-  - [ ] Add a short `ARCHITECTURE.md` describing:
-    - [ ] React components layout (panels, modals, sliders). :contentReference[oaicite:4]{index=4}  
-    - [ ] Hook(s) for parsing and state management.
-    - [ ] Backend responsibilities and endpoints.
-    - [ ] Data flow: “screenplay → parsed blocks → ElevenLabs API → files → optional concat”.
+- [x] **Architecture overview**
+  - [x] Add a short `ARCHITECTURE.md` describing:
+    - [x] React components layout (panels, modals, sliders). :contentReference[oaicite:4]{index=4}  
+    - [x] Hook(s) for parsing and state management.
+    - [x] Backend responsibilities and endpoints.
+    - [x] Data flow: “screenplay → parsed blocks → ElevenLabs API → files → optional concat”.
 
 - [ ] **Testing**
   - [ ] Unit tests for the screenplay parser (various real-world edge cases).

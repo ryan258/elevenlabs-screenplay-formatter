@@ -11,6 +11,8 @@ A React-based web application that converts screenplay dialogue into AI-generate
 - **Real-Time Progress Tracking** - Live progress bar, character previews, and copyable logs
 - **Fountain-Style Support** - Paste Fountain scripts (no `Characters:` list required) and let the parser auto-detect speakers
 - **Resumable Generation** - Inline error surfaces, automatic retries, and a one-click “Resume from failed chunk” flow
+- **Timeline Preview** - Per-line preview buttons, cached audio snippets, and estimated runtimes
+- **Generation Profiles & Exports** - One-click profiles, manifest/zip exports, and CLI automation for batch workflows
 - **Parser Diagnostics Panel** - See detected characters, parsed lines, and any lines the parser skipped
 - **Batch Generation** - Processes entire screenplays automatically with rate limiting
 - **Concatenation Health Check** - Built-in status card to ping the backend server and show connectivity
@@ -122,11 +124,48 @@ A React-based web application that converts screenplay dialogue into AI-generate
 - ElevenLabs calls auto-retry up to three times with exponential backoff before surfacing an error.
 - Logs remain copyable for debugging, and the status banner reminds you that keys never leave the browser except for ElevenLabs requests.
 
+## Timeline & Per-Line Preview
+
+- The **Timeline** card lists every parsed dialogue block, its estimated duration (based on words-per-minute), and a preview button.
+- Preview audio plays inline and is cached locally to avoid re-hitting ElevenLabs unless the line or settings change.
+- Use this view to audition critical lines before committing to a full render.
+
+## Generation Profiles & Project Versions
+
+- Use the **Generation Profiles** card to apply ready-made configurations (Fast Draft, High Quality, Concatenated Episode) with one click. Each profile sets model, bitrate, concatenation, and request delay.
+- Set a `Version Label` in Project Settings to tag file names and manifest entries (e.g., `script_v3_0001_CHARACTER.mp3`).
+- Save/load complete project JSONs (script, voices, presets) from the **Projects & Templates** panel or load the included demo config.
+
+## Exports & Manifests
+
+- After generation, use the **Exports** card to download:
+  - `manifest.json`
+  - `manifest.csv`
+  - A `.zip` containing all audio files plus both manifests (handy for DAWs).
+- Progress data feeds the manifest so every entry includes character, filename, text, and estimated duration.
+
 ## Parser Diagnostics
 
 - Toggle the **Parser Diagnostics** card (below the output panel) to see a character-by-character breakdown of detected lines.
 - The same panel highlights the first few lines that failed to parse so you can adjust formatting quickly.
 - Use this view alongside `EXAMPLE_SCREENPLAY.md` or `EXAMPLE_FOUNTAIN.md` to compare expected vs. actual parsing behavior.
+
+## CLI Automation
+
+- Export a project config from the UI, then run:
+
+  ```bash
+  npm run cli -- \
+    --script scripts/episode1.txt \
+    --script scripts/episode2.txt \
+    --config my_project.json \
+    --out ./cli_output \
+    --delay 600 \
+    --concat \
+    --api-key $ELEVENLABS_API_KEY
+  ```
+
+- See [CLI.md](./CLI.md) for the full flag reference.
 
 ## Project Structure
 
@@ -162,6 +201,17 @@ elevenlabs-screenplay-formatter/
 ├── package.json            # Frontend dependencies
 └── vite.config.ts          # Vite build configuration
 ```
+
+## Developer Setup
+
+- **Requirements**: Node.js v18+ (use `nvm use` or install from [nodejs.org](https://nodejs.org/)).
+- **Install deps**: `npm install` in the repo root. For concatenation, also run `cd server && npm install` once.
+- **Run frontend**: `npm run dev` (Vite at `http://localhost:3000`).
+- **Run backend**: `cd server && npm start` (Express on `http://localhost:3001`). Configure ports/CORS via `server/.env`.
+- **Environment**: copy `.env.example` → `.env` and set `ELEVENLABS_API_KEY` plus optional `VITE_CONCAT_SERVER_URL`.
+- **Tooling**: `npm run lint`, `npm run check`, `npm test`, and `npm run cli` cover linting, type-checking, unit tests, and automation.
+
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for a component/hook map, backend notes, and CLI flow.
 
 ## Contributor Guide
 
