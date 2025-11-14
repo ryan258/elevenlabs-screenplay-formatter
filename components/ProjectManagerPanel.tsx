@@ -4,6 +4,7 @@ interface ProjectManagerPanelProps {
   onDownloadProject: () => void;
   onLoadProjectFile: (file: File) => void;
   onLoadDemo: () => void;
+  onCopyShareLink: () => void;
   metadata: {
     characters: number;
     dialogueChunks: number;
@@ -16,6 +17,7 @@ const ProjectManagerPanel: React.FC<ProjectManagerPanelProps> = ({
   onDownloadProject,
   onLoadProjectFile,
   onLoadDemo,
+  onCopyShareLink,
   metadata
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -58,6 +60,12 @@ const ProjectManagerPanel: React.FC<ProjectManagerPanelProps> = ({
           className="w-full py-2 bg-accent hover:bg-highlight rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-highlight"
         >
           Load Demo Project
+        </button>
+        <button
+          onClick={onCopyShareLink}
+          className="w-full py-2 bg-accent hover:bg-highlight rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-highlight"
+        >
+          Copy Share Link
         </button>
       </div>
       <input

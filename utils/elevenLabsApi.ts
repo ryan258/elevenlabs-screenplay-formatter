@@ -1,4 +1,4 @@
-import { DialogueChunk, CharacterConfig, GeneratedBlob } from '../types';
+import { AudioProductionSettings, DialogueChunk, CharacterConfig, GeneratedBlob, WordTimestamp } from '../types';
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -12,6 +12,51 @@ const getFormatDetails = (format: string) => {
   return OUTPUT_FORMAT_DETAILS[format] || OUTPUT_FORMAT_DETAILS['mp3_44100_128'];
 };
 
+const WORDS_PER_MINUTE = 150;
+
+const estimateDurationMs = (text: string) => {
+  const words = text.split(/\s+/).filter(Boolean).length;
+  return Math.round((words / WORDS_PER_MINUTE) * 60 * 1000);
+};
+
+const translateApiError = (status: number, rawMessage: string) => {
+  if (status === 401) {
+    return 'ElevenLabs rejected the API key (401). Double-check the key in Step 1.';
+  }
+  if (status === 429) {
+    return 'ElevenLabs rate limit reached (429). Increase the request delay or pause briefly before retrying.';
+  }
+  if (rawMessage.toLowerCase().includes('insufficient_quota')) {
+    return 'Your ElevenLabs character quota is exhausted. Upgrade your plan or wait for the monthly reset.';
+  }
+  if (status >= 500) {
+    return 'ElevenLabs is experiencing issues (5xx). Try again in a few minutes.';
+  }
+  return `API Error ${status}: ${rawMessage || 'Unexpected response from ElevenLabs.'}`;
+};
+
+const parseRateLimitRemaining = (headers: Headers) => {
+  const header = headers.get('x-rate-limit-remaining') ?? headers.get('x-ratelimit-remaining');
+  if (!header) {
+    return undefined;
+  }
+  const value = Number(header);
+  return Number.isFinite(value) ? value : undefined;
+};
+
+const adjustDelayBasedOnRateLimit = (remaining: number | undefined, currentDelay: number, baseDelay: number) => {
+  if (remaining === undefined) {
+    return currentDelay;
+  }
+  if (remaining <= 2) {
+    return Math.min(currentDelay + 250, 2000);
+  }
+  if (remaining > 5 && currentDelay > baseDelay) {
+    return Math.max(baseDelay, currentDelay - 100);
+  }
+  return currentDelay;
+};
+
 export interface GenerationProgress {
   current: number;
   total: number;
@@ -19,6 +64,11 @@ export interface GenerationProgress {
   status: 'generating' | 'downloading' | 'complete' | 'error';
   message: string;
   snippet?: string;
+}
+
+interface AudioGenerationResult {
+  blob: Blob;
+  rateLimitRemaining?: number;
 }
 
 export class GenerationError extends Error {
@@ -42,7 +92,7 @@ export const generateAudioFile = async (
   index: number = 0,
   total: number = 1,
   maxRetries = 2
-): Promise<Blob> => {
+): Promise<AudioGenerationResult> => {
   const url = `https://api.elevenlabs.io/v1/text-to-speech/${config.voiceId}`;
 
   const { accept } = getFormatDetails(outputFormat);
@@ -84,7 +134,7 @@ export const generateAudioFile = async (
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`API Error for ${chunk.character}: ${response.status} - ${errorText}`);
+        throw new Error(translateApiError(response.status, errorText));
       }
 
       if (onProgress) {
@@ -97,8 +147,9 @@ export const generateAudioFile = async (
         }, index + 1, total);
       }
 
+      const rateLimitRemaining = parseRateLimitRemaining(response.headers);
       const blob = await response.blob();
-      return blob;
+      return { blob, rateLimitRemaining };
     } catch (error) {
       lastError = error;
       if (attempt >= maxRetries) {
@@ -123,6 +174,45 @@ export const downloadBlob = (blob: Blob, filename: string) => {
   URL.revokeObjectURL(url);
 };
 
+const fetchAlignmentData = async (
+  chunk: DialogueChunk,
+  config: CharacterConfig,
+  apiKey: string,
+  modelId: string
+): Promise<WordTimestamp[] | null> => {
+  const alignmentUrl = `https://api.elevenlabs.io/v1/text-to-speech/${config.voiceId}/alignment`;
+  try {
+    const response = await fetch(alignmentUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'xi-api-key': apiKey
+      },
+      body: JSON.stringify({
+        text: chunk.text,
+        model_id: modelId
+      })
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    const alignment = data?.alignment || data?.words || [];
+    return alignment
+      .map((entry: { word?: string; text?: string; start?: number; end?: number }) => ({
+        word: (entry.word || entry.text || '').trim(),
+        startMs: Math.round((entry.start ?? 0) * 1000),
+        endMs: Math.round((entry.end ?? 0) * 1000)
+      }))
+      .filter((item: WordTimestamp) => item.word.length > 0);
+  } catch (error) {
+    console.warn('Alignment fetch failed:', error);
+    return null;
+  }
+};
+
 const CONCAT_SERVER_URL = import.meta.env?.VITE_CONCAT_SERVER_URL || 'http://localhost:3001/concatenate';
 
 const getConcatenateServerBase = () => {
@@ -139,7 +229,8 @@ export const getConcatenationHealthUrl = () => `${getConcatenateServerBase()}/he
 
 const concatenateAudioFiles = async (
   blobs: { blob: Blob; filename: string }[],
-  onProgress?: (progress: GenerationProgress, current: number, total: number) => void
+  onProgress?: (progress: GenerationProgress, current: number, total: number) => void,
+  audioProduction?: AudioProductionSettings
 ): Promise<Blob> => {
   const serverUrl = CONCAT_SERVER_URL;
 
@@ -158,6 +249,38 @@ const concatenateAudioFiles = async (
   blobs.forEach(({ blob, filename }) => {
     formData.append('audioFiles', blob, filename);
   });
+  if (audioProduction) {
+    const mixPayload: {
+      background?: { ref: string; volume: number };
+      soundEffects: Array<{ ref: string; startTimeMs: number; volume: number; label: string }>;
+    } = {
+      soundEffects: []
+    };
+    if (audioProduction.backgroundTrack?.file) {
+      const fieldName = 'backgroundTrack';
+      formData.append(fieldName, audioProduction.backgroundTrack.file, audioProduction.backgroundTrack.file.name);
+      mixPayload.background = {
+        ref: fieldName,
+        volume: audioProduction.backgroundTrack.volume ?? 0.35
+      };
+    }
+    audioProduction.soundEffects.forEach(effect => {
+      if (!effect.file) {
+        return;
+      }
+      const fieldName = `soundEffect_${effect.id}`;
+      formData.append(fieldName, effect.file, effect.file.name);
+      mixPayload.soundEffects.push({
+        ref: fieldName,
+        startTimeMs: effect.startTimeMs,
+        volume: effect.volume ?? 1,
+        label: effect.label
+      });
+    });
+    if (mixPayload.background || mixPayload.soundEffects.length) {
+      formData.append('mixConfig', JSON.stringify(mixPayload));
+    }
+  }
 
   try {
     const response = await fetch(serverUrl, {
@@ -203,6 +326,7 @@ interface GenerateAllAudioOptions {
   existingBlobs?: GeneratedBlob[];
   delayMs?: number;
   filenamePrefix?: string;
+  audioProduction?: AudioProductionSettings;
 }
 
 export const generateAllAudio = async (
@@ -219,7 +343,32 @@ export const generateAllAudio = async (
   const { extension } = getFormatDetails(outputFormat);
   const startIndex = options.startIndex ?? 0;
   const generatedBlobs: GeneratedBlob[] = [...(options.existingBlobs ?? [])];
-  const delayMs = options.delayMs ?? 500;
+  const baseDelay = options.delayMs ?? 500;
+  let adaptiveDelay = baseDelay;
+
+  const computeInitialCursor = () => {
+    if (!generatedBlobs.length) {
+      return 0;
+    }
+    for (let i = generatedBlobs.length - 1; i >= 0; i--) {
+      const blob = generatedBlobs[i];
+      if (typeof blob.endTimeMs === 'number') {
+        return blob.endTimeMs;
+      }
+    }
+    let cursor = 0;
+    for (let i = 0; i < generatedBlobs.length; i++) {
+      const chunk = dialogueChunks[i];
+      if (chunk?.startTimeMs !== undefined && chunk.endTimeMs !== undefined) {
+        cursor = chunk.endTimeMs;
+      } else {
+        cursor += estimateDurationMs(chunk?.text ?? '');
+      }
+    }
+    return cursor;
+  };
+
+  let timelineCursor = computeInitialCursor();
 
   // Generate all audio files
   for (let i = startIndex; i < dialogueChunks.length; i++) {
@@ -231,7 +380,7 @@ export const generateAllAudio = async (
     }
 
     try {
-      const blob = await generateAudioFile(
+      const result = await generateAudioFile(
         chunk,
         config,
         apiKey,
@@ -248,10 +397,31 @@ export const generateAllAudio = async (
         total
       );
 
+      const alignment = await fetchAlignmentData(chunk, config, apiKey, modelId);
+      const offsetAlignment: WordTimestamp[] | undefined = alignment
+        ? alignment.map(word => ({
+            word: word.word,
+            startMs: word.startMs + timelineCursor,
+            endMs: word.endMs + timelineCursor
+          }))
+        : undefined;
+      const startTimeMs = offsetAlignment?.[0]?.startMs ?? timelineCursor;
+      const estimatedDuration = offsetAlignment?.length
+        ? (offsetAlignment[offsetAlignment.length - 1].endMs - (offsetAlignment[0]?.startMs ?? 0))
+        : estimateDurationMs(chunk.text);
+      const endTimeMs = offsetAlignment?.[offsetAlignment.length - 1]?.endMs ?? (startTimeMs + estimatedDuration);
+      timelineCursor = endTimeMs;
+
       const baseFilename = `${String(i).padStart(4, '0')}_${chunk.character.replace(/\s+/g, '_')}.${extension}`;
       const filename = options.filenamePrefix ? `${options.filenamePrefix}_${baseFilename}` : baseFilename;
 
-      generatedBlobs.push({ blob, filename });
+      generatedBlobs.push({
+        blob: result.blob,
+        filename,
+        alignment: offsetAlignment,
+        startTimeMs,
+        endTimeMs
+      });
 
       onProgress?.({
         current: i + 1,
@@ -262,9 +432,10 @@ export const generateAllAudio = async (
         snippet: chunk.text.slice(0, 80).trim()
       }, i + 1, total);
 
+      adaptiveDelay = adjustDelayBasedOnRateLimit(result.rateLimitRemaining, adaptiveDelay, baseDelay);
       // Small delay between requests to avoid rate limiting
-      if (i < dialogueChunks.length - 1 && delayMs > 0) {
-        await new Promise(resolve => setTimeout(resolve, delayMs));
+      if (i < dialogueChunks.length - 1 && adaptiveDelay > 0) {
+        await wait(adaptiveDelay);
       }
     } catch (error) {
       onProgress?.({
@@ -289,7 +460,7 @@ export const generateAllAudio = async (
   // If concatenation is enabled, send all files to the server
   if (concatenate && generatedBlobs.length > 0) {
     try {
-      const concatenatedBlob = await concatenateAudioFiles(generatedBlobs, onProgress);
+      const concatenatedBlob = await concatenateAudioFiles(generatedBlobs, onProgress, options.audioProduction);
       downloadBlob(concatenatedBlob, 'concatenated_audio.mp3');
     } catch (error) {
       // If concatenation fails, fallback to individual downloads

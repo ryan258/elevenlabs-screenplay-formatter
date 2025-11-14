@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { DialogueChunk } from '../types';
+import { DialogueChunk, ManifestEntry } from '../types';
 
 const WORDS_PER_MINUTE = 150;
 const estimateDurationMs = (text: string) => {
@@ -18,19 +18,25 @@ interface TimelinePanelProps {
   chunks: DialogueChunk[];
   previewStates: Record<number, { loading?: boolean; url?: string; error?: string }>;
   onPreview: (index: number) => void;
+  timings?: ManifestEntry[];
 }
 
-const TimelinePanel: React.FC<TimelinePanelProps> = ({ chunks, previewStates, onPreview }) => {
+const TimelinePanel: React.FC<TimelinePanelProps> = ({ chunks, previewStates, onPreview, timings }) => {
   const entries = useMemo(() => {
     return chunks.map((chunk, index) => {
-      const durationMs = estimateDurationMs(chunk.text);
+      const manifestEntry = timings?.[index];
+      const durationMs = manifestEntry && manifestEntry.startTimeMs !== undefined && manifestEntry.endTimeMs !== undefined
+        ? manifestEntry.endTimeMs - manifestEntry.startTimeMs
+        : chunk.endTimeMs && chunk.startTimeMs
+          ? chunk.endTimeMs - chunk.startTimeMs
+          : estimateDurationMs(chunk.text);
       return {
         index,
         chunk,
         durationMs
       };
     });
-  }, [chunks]);
+  }, [chunks, timings]);
 
   const totalDuration = entries.reduce((sum, entry) => sum + entry.durationMs, 0);
 

@@ -11,19 +11,22 @@ import GenerationProfilesPanel from './components/GenerationProfilesPanel';
 import ExportPanel from './components/ExportPanel';
 import Modal from './components/Modal';
 import { useScriptParser } from './hooks/useScriptParser';
-import { AppStateSnapshot, CharacterConfigs, GeneratedBlob, ManifestEntry, ProjectConfig, ProjectSettings, ResumeInfo, VoicePresets } from './types';
+import { CharacterConfigs, GeneratedBlob, ManifestEntry, ProjectConfig, ProjectSettings, ResumeInfo, VoicePresets } from './types';
 import { validateConfiguration } from './utils/scriptGenerator';
 import { generateAllAudio, generateAudioFile, GenerationError, GenerationProgress, getConcatenationHealthUrl } from './utils/elevenLabsApi';
-import { buildManifestEntries, manifestToCsv } from './utils/manifest';
+import { buildManifestEntries, manifestToCsv, manifestToSrt, manifestToVtt } from './utils/manifest';
 import { GENERATION_PROFILES } from './config/generationProfiles';
 import JSZip from 'jszip';
 import ConcatenationStatus from './components/ConcatenationStatus';
 import { demoProject } from './samples/demoProject';
 import ProjectManagerPanel from './components/ProjectManagerPanel';
 import VoicePresetsPanel from './components/VoicePresetsPanel';
+import AudioProductionPanel from './components/AudioProductionPanel';
+import ToastContainer from './components/ToastContainer';
+import useAppStore from './store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
+import { deserializeGeneratedBlobs, serializeGeneratedBlobs } from './utils/blobSerialization';
 
-const STORAGE_KEY = 'elevenlabs_formatter_state';
-const MAX_PROGRESS_MESSAGES = 200;
 const CONCATENATION_ENDPOINT = import.meta.env?.VITE_CONCAT_SERVER_URL || 'http://localhost:3001/concatenate';
 const slugify = (value: string) => value.replace(/[^\w]+/g, '_').replace(/^_+|_+$/g, '').toLowerCase();
 const downloadFile = (blob: Blob, filename: string) => {
@@ -35,49 +38,178 @@ const downloadFile = (blob: Blob, filename: string) => {
   URL.revokeObjectURL(url);
 };
 
+const encodeSharePayload = (value: string) => {
+  return typeof window !== 'undefined' && window.btoa
+    ? window.btoa(unescape(encodeURIComponent(value)))
+    : '';
+};
+
+const decodeSharePayload = (value: string) => {
+  return typeof window !== 'undefined' && window.atob
+    ? decodeURIComponent(escape(window.atob(value)))
+    : '';
+};
+
 // Implemented the main App component to structure the application and manage state.
 function App() {
-  const [scriptText, setScriptText] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const {
+    scriptText,
+    setScriptText,
+    apiKey,
+    setApiKey,
+    rememberApiKey,
+    setRememberApiKey,
+    projectSettings,
+    setProjectSettings,
+    characterConfigs,
+    setCharacterConfigs,
+    voicePresets,
+    setVoicePresets,
+    audioProduction,
+    setAudioProduction,
+    generatedOutput,
+    setGeneratedOutput,
+    isGenerating,
+    setIsGenerating,
+    progressMessages,
+    setProgressMessages,
+    appendProgressMessages,
+    resumeInfo,
+    setResumeInfo,
+    serializedPendingBlobs,
+    setPendingBlobsSerialized,
+    manifestEntries,
+    setManifestEntries,
+    serializedLastGeneratedBlobs,
+    setLastGeneratedBlobsSerialized,
+    currentProgress,
+    setCurrentProgress,
+    errorInfo,
+    setErrorInfo,
+    concatStatus,
+    setConcatStatus,
+    hasHydrated,
+    setHasHydrated,
+    addToast
+  } = useAppStore(useShallow(state => ({
+    scriptText: state.scriptText,
+    setScriptText: state.setScriptText,
+    apiKey: state.apiKey,
+    setApiKey: state.setApiKey,
+    rememberApiKey: state.rememberApiKey,
+    setRememberApiKey: state.setRememberApiKey,
+    projectSettings: state.projectSettings,
+    setProjectSettings: state.setProjectSettings,
+    characterConfigs: state.characterConfigs,
+    setCharacterConfigs: state.setCharacterConfigs,
+    voicePresets: state.voicePresets,
+    setVoicePresets: state.setVoicePresets,
+    audioProduction: state.audioProduction,
+    setAudioProduction: state.setAudioProduction,
+    generatedOutput: state.generatedOutput,
+    setGeneratedOutput: state.setGeneratedOutput,
+    isGenerating: state.isGenerating,
+    setIsGenerating: state.setIsGenerating,
+    progressMessages: state.progressMessages,
+    setProgressMessages: state.setProgressMessages,
+    appendProgressMessages: state.appendProgressMessages,
+    resumeInfo: state.resumeInfo,
+    setResumeInfo: state.setResumeInfo,
+    serializedPendingBlobs: state.serializedPendingBlobs,
+    setPendingBlobsSerialized: state.setPendingBlobsSerialized,
+    manifestEntries: state.manifestEntries,
+    setManifestEntries: state.setManifestEntries,
+    serializedLastGeneratedBlobs: state.serializedLastGeneratedBlobs,
+    setLastGeneratedBlobsSerialized: state.setLastGeneratedBlobsSerialized,
+    currentProgress: state.currentProgress,
+    setCurrentProgress: state.setCurrentProgress,
+    errorInfo: state.errorInfo,
+    setErrorInfo: state.setErrorInfo,
+    concatStatus: state.concatStatus,
+    setConcatStatus: state.setConcatStatus,
+    hasHydrated: state.hasHydrated,
+    setHasHydrated: state.setHasHydrated,
+    addToast: state.addToast
+  })));
   const { characters, dialogueChunks, diagnostics } = useScriptParser(scriptText);
-  const [apiKey, setApiKey] = useState(process.env.ELEVENLABS_API_KEY || '');
-  const [characterConfigs, setCharacterConfigs] = useState<CharacterConfigs>({});
-  const [projectSettings, setProjectSettings] = useState<ProjectSettings>({
-    model: 'eleven_multilingual_v2',
-    outputFormat: 'mp3_44100_128',
-    concatenate: true,
-    speakParentheticals: false,
-    profileId: undefined,
-    requestDelayMs: 500,
-    versionLabel: ''
-  });
-  const [generatedOutput, setGeneratedOutput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [progressMessages, setProgressMessages] = useState<string[]>([]);
-  const [isStateHydrated, setIsStateHydrated] = useState(false);
-  const [rememberApiKey, setRememberApiKey] = useState(true);
-  const [resumeInfo, setResumeInfo] = useState<ResumeInfo | null>(null);
-  const [voicePresets, setVoicePresets] = useState<VoicePresets>({});
-  const [pendingBlobs, setPendingBlobs] = useState<GeneratedBlob[]>([]);
-  const [manifestEntries, setManifestEntries] = useState<ManifestEntry[]>([]);
-  const [lastGeneratedBlobs, setLastGeneratedBlobs] = useState<GeneratedBlob[]>([]);
   const [timelinePreviews, setTimelinePreviews] = useState<Record<number, { loading?: boolean; url?: string; error?: string }>>({});
-  const [currentProgress, setCurrentProgress] = useState<{ current: number; total: number; character: string; snippet: string }>({
-    current: 0,
-    total: 0,
-    character: '',
-    snippet: ''
-  });
-  const [errorInfo, setErrorInfo] = useState<string | null>(null);
-  const [concatStatus, setConcatStatus] = useState<'unknown' | 'checking' | 'online' | 'offline'>('unknown');
   const previewUrlsRef = useRef<string[]>([]);
+  const pendingBlobs = useMemo(() => deserializeGeneratedBlobs(serializedPendingBlobs), [serializedPendingBlobs]);
+  const lastGeneratedBlobs = useMemo(() => deserializeGeneratedBlobs(serializedLastGeneratedBlobs), [serializedLastGeneratedBlobs]);
+  const handleLoadProjectConfig = useCallback((config: ProjectConfig) => {
+    if (config.scriptText !== undefined) {
+      setScriptText(config.scriptText);
+    }
+    if (config.characterConfigs) {
+      setCharacterConfigs(config.characterConfigs);
+    }
+    if (config.projectSettings) {
+      setProjectSettings(prev => ({ ...prev, ...config.projectSettings }));
+    }
+    if (config.voicePresets) {
+      setVoicePresets(config.voicePresets);
+    }
+    if (config.audioProduction) {
+      setAudioProduction({
+        backgroundTrack: config.audioProduction.backgroundTrack
+          ? {
+              volume: config.audioProduction.backgroundTrack.volume,
+              filename: config.audioProduction.backgroundTrack.filename,
+              file: undefined
+            }
+          : undefined,
+        soundEffects: config.audioProduction.soundEffects?.map(effect => ({
+          ...effect,
+          file: undefined
+        })) ?? []
+      });
+    } else {
+      setAudioProduction({ soundEffects: [] });
+    }
+  }, [setAudioProduction, setCharacterConfigs, setProjectSettings, setScriptText, setVoicePresets]);
+  useEffect(() => {
+    const persist = (useAppStore as typeof useAppStore & { persist?: { hasHydrated?: () => boolean } }).persist;
+    if (persist?.hasHydrated?.()) {
+      setHasHydrated(true);
+    }
+  }, [setHasHydrated]);
+  useEffect(() => {
+    if (!hasHydrated) {
+      return;
+    }
+    if (!apiKey && process.env.ELEVENLABS_API_KEY) {
+      setApiKey(process.env.ELEVENLABS_API_KEY);
+    }
+  }, [hasHydrated, apiKey, setApiKey]);
 
-  const setProgressMessagesLimited = (updater: string[] | ((prev: string[]) => string[])) => {
-    setProgressMessages(prev => {
-      const next = typeof updater === 'function' ? (updater as (prev: string[]) => string[])(prev) : updater;
-      return next.length > MAX_PROGRESS_MESSAGES ? next.slice(-MAX_PROGRESS_MESSAGES) : next;
-    });
-  };
+  useEffect(() => {
+    if (!hasHydrated || typeof window === 'undefined') {
+      return;
+    }
+    const params = new URLSearchParams(window.location.search);
+    const sharedProject = params.get('project');
+    if (!sharedProject) {
+      return;
+    }
+    try {
+      const decoded = decodeSharePayload(decodeURIComponent(sharedProject));
+      if (!decoded) {
+        throw new Error('Invalid payload');
+      }
+      const parsed = JSON.parse(decoded) as ProjectConfig;
+      handleLoadProjectConfig(parsed);
+      addToast('Shared project loaded', 'success');
+    } catch (error) {
+      console.error('Failed to load shared project:', error);
+      addToast('Failed to load shared project', 'error');
+    } finally {
+      params.delete('project');
+      const nextQuery = params.toString();
+      const newUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ''}`;
+      window.history.replaceState({}, document.title, newUrl);
+    }
+  }, [hasHydrated, handleLoadProjectConfig, addToast]);
 
   const handleExpand = () => setIsModalOpen(true);
   const handleCloseModal = () => setIsModalOpen(false);
@@ -88,67 +220,6 @@ function App() {
     }
   };
   const healthUrl = useMemo(() => getConcatenationHealthUrl(), []);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      setIsStateHydrated(true);
-      return;
-    }
-
-    try {
-      const stored = window.localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed: AppStateSnapshot = JSON.parse(stored);
-
-        if (parsed.scriptText) {
-          setScriptText(parsed.scriptText);
-        }
-        if (typeof parsed.rememberApiKey === 'boolean') {
-          setRememberApiKey(parsed.rememberApiKey);
-        }
-        if (parsed.apiKey) {
-          setApiKey(parsed.apiKey);
-        }
-        if (parsed.projectSettings) {
-          setProjectSettings(prev => ({ ...prev, ...parsed.projectSettings }));
-        }
-        if (parsed.characterConfigs) {
-          setCharacterConfigs(parsed.characterConfigs);
-        }
-        if (parsed.voicePresets) {
-          setVoicePresets(parsed.voicePresets);
-        }
-      }
-    } catch (error) {
-      console.warn('Failed to hydrate saved state:', error);
-    } finally {
-      setIsStateHydrated(true);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!isStateHydrated || typeof window === 'undefined') {
-      return;
-    }
-
-    const snapshot: AppStateSnapshot = {
-      projectSettings,
-      characterConfigs,
-      scriptText,
-      rememberApiKey,
-      voicePresets
-    };
-
-    if (rememberApiKey) {
-      snapshot.apiKey = apiKey;
-    }
-
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
-    } catch (error) {
-      console.warn('Failed to persist state:', error);
-    }
-  }, [apiKey, projectSettings, characterConfigs, scriptText, rememberApiKey, voicePresets, isStateHydrated]);
 
   const handleRememberToggle = (remember: boolean) => {
     setRememberApiKey(remember);
@@ -184,15 +255,30 @@ function App() {
   useEffect(() => {
     setTimelinePreviews({});
     setManifestEntries([]);
-    setLastGeneratedBlobs([]);
-  }, [scriptText]);
+    setLastGeneratedBlobsSerialized([]);
+  }, [scriptText, setManifestEntries, setLastGeneratedBlobsSerialized]);
 
   const buildProjectConfig = (): ProjectConfig => ({
     version: '0.3.0',
     scriptText,
     characterConfigs,
     projectSettings,
-    voicePresets
+    voicePresets,
+    audioProduction: {
+      backgroundTrack: audioProduction.backgroundTrack
+        ? {
+            volume: audioProduction.backgroundTrack.volume,
+            filename: audioProduction.backgroundTrack.filename
+          }
+        : undefined,
+      soundEffects: audioProduction.soundEffects.map(effect => ({
+        id: effect.id,
+        label: effect.label,
+        startTimeMs: effect.startTimeMs,
+        volume: effect.volume,
+        filename: effect.filename
+      }))
+    }
   });
 
   const downloadJson = (data: unknown, filename: string) => {
@@ -207,21 +293,31 @@ function App() {
 
   const handleDownloadProject = () => {
     downloadJson(buildProjectConfig(), 'elevenlabs_project.json');
+    addToast('Project file downloaded', 'success');
   };
 
-  const handleLoadProjectConfig = (config: ProjectConfig) => {
-    if (config.scriptText !== undefined) {
-      setScriptText(config.scriptText);
+  const handleCopyShareLink = async () => {
+    if (typeof window === 'undefined' || !navigator?.clipboard) {
+      addToast('Clipboard is unavailable in this environment', 'error');
+      return;
     }
-    if (config.characterConfigs) {
-      setCharacterConfigs(config.characterConfigs);
+    try {
+      const encoded = encodeSharePayload(JSON.stringify(buildProjectConfig()));
+      if (!encoded) {
+        throw new Error('Encoding failed');
+      }
+      const shareUrl = `${window.location.origin}${window.location.pathname}?project=${encodeURIComponent(encoded)}`;
+      await navigator.clipboard.writeText(shareUrl);
+      addToast('Shareable link copied to clipboard', 'success');
+    } catch (error) {
+      console.error('Failed to copy share link:', error);
+      addToast('Failed to copy share link', 'error');
     }
-    if (config.projectSettings) {
-      setProjectSettings(prev => ({ ...prev, ...config.projectSettings }));
-    }
-    if (config.voicePresets) {
-      setVoicePresets(config.voicePresets);
-    }
+  };
+
+  const handleLoadDemoProject = () => {
+    handleLoadProjectConfig(demoProject);
+    addToast('Demo project loaded', 'success');
   };
 
   const handleLoadProjectFromFile = async (file: File) => {
@@ -229,10 +325,12 @@ function App() {
       const text = await file.text();
       const parsed = JSON.parse(text) as ProjectConfig;
       handleLoadProjectConfig(parsed);
-      setProgressMessagesLimited(prev => [...prev, '📁 Project loaded from file.']);
+      appendProgressMessages('📁 Project loaded from file.');
+      addToast('Project loaded from file', 'success');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Invalid project file';
-      setProgressMessagesLimited(prev => [...prev, `❌ Failed to load project: ${message}`]);
+      appendProgressMessages(`❌ Failed to load project: ${message}`);
+      addToast('Failed to load project file', 'error');
     }
   };
 
@@ -325,7 +423,7 @@ function App() {
 
     try {
       const text = projectSettings.speakParentheticals && chunk.originalText ? chunk.originalText : chunk.text;
-      const blob = await generateAudioFile(
+      const { blob } = await generateAudioFile(
         { ...chunk, text },
         config,
         apiKey,
@@ -369,6 +467,20 @@ function App() {
     downloadFile(blob, 'manifest.csv');
   };
 
+  const handleDownloadSrt = () => {
+    if (!manifestEntries.length) return;
+    const srt = manifestToSrt(manifestEntries);
+    const blob = new Blob([srt], { type: 'text/plain' });
+    downloadFile(blob, 'subtitles.srt');
+  };
+
+  const handleDownloadVtt = () => {
+    if (!manifestEntries.length) return;
+    const vtt = manifestToVtt(manifestEntries);
+    const blob = new Blob([vtt], { type: 'text/vtt' });
+    downloadFile(blob, 'subtitles.vtt');
+  };
+
   const handleDownloadZip = async () => {
     if (!manifestEntries.length || !lastGeneratedBlobs.length) return;
     const zip = new JSZip();
@@ -383,9 +495,9 @@ function App() {
   };
 
   const runGeneration = async (startIndex = 0, existingBlobs: GeneratedBlob[] = []) => {
-    setIsLoading(true);
+    setIsGenerating(true);
     if (startIndex === 0) {
-      setProgressMessagesLimited([]);
+      setProgressMessages([]);
     }
     setGeneratedOutput('');
     setErrorInfo(null);
@@ -397,14 +509,18 @@ function App() {
 
       if (!validation.valid) {
         setGeneratedOutput(`❌ Configuration Errors:\n\n${validation.errors.join('\n')}\n\nPlease fix these issues and try again.`);
-        setIsLoading(false);
+        setIsGenerating(false);
         return;
       }
 
       const modeMessage = startIndex === 0
         ? `🚀 Starting audio generation...\n\nTotal dialogue chunks: ${dialogueChunks.length}\nCharacters: ${Object.keys(characterConfigs).join(', ')}\nModel: ${projectSettings.model}\nConcatenate: ${projectSettings.concatenate ? 'Yes' : 'No'}\n\n`
         : `🔁 Resuming generation from chunk ${startIndex + 1} (${dialogueChunks[startIndex]?.character || 'Unknown'})`;
-      setProgressMessagesLimited(prev => startIndex === 0 ? [modeMessage] : [...prev, modeMessage]);
+      if (startIndex === 0) {
+        setProgressMessages([modeMessage]);
+      } else {
+        appendProgressMessages(modeMessage);
+      }
 
       const preparedChunks = dialogueChunks.map(chunk => ({
         ...chunk,
@@ -421,7 +537,7 @@ function App() {
         projectSettings.outputFormat,
         projectSettings.concatenate,
         (progress: GenerationProgress, current: number, total: number) => {
-          setProgressMessagesLimited(prev => [...prev, `[${current}/${total}] ${progress.message}`]);
+          appendProgressMessages(`[${current}/${total}] ${progress.message}`);
           setCurrentProgress({
             current,
             total,
@@ -433,44 +549,48 @@ function App() {
           startIndex,
           existingBlobs,
           delayMs: projectSettings.requestDelayMs,
-          filenamePrefix: versionSlug
+          filenamePrefix: versionSlug,
+          audioProduction
         }
       );
-      const filenames = blobs.map(b => b.filename);
-      setManifestEntries(buildManifestEntries(preparedChunks, filenames));
-      setLastGeneratedBlobs(blobs);
+      setManifestEntries(buildManifestEntries(preparedChunks, blobs));
+      const serialized = await serializeGeneratedBlobs(blobs);
+      setLastGeneratedBlobsSerialized(serialized);
 
       // Success message
       const successMessage = projectSettings.concatenate
         ? `\n✅ Generation Complete!\n\nAll ${dialogueChunks.length} audio files have been generated and concatenated into a single file.\nCheck your Downloads folder for "concatenated_audio.mp3".`
         : `\n✅ Generation Complete!\n\nAll ${dialogueChunks.length} audio files have been generated and downloaded.\nCheck your Downloads folder for the audio files.`;
-      setProgressMessagesLimited(prev => [...prev, successMessage]);
+      appendProgressMessages(successMessage);
       setGeneratedOutput(successMessage);
-      setPendingBlobs([]);
+      setPendingBlobsSerialized([]);
       setResumeInfo(null);
       setErrorInfo(null);
       setCurrentProgress({ current: 0, total: 0, character: '', snippet: '' });
-      setIsLoading(false);
+      setIsGenerating(false);
+      addToast('Generation complete', 'success');
 
     } catch (error) {
       console.error('Generation error:', error);
       setManifestEntries([]);
       if (error instanceof GenerationError) {
         const resumeMessage = `❌ Error on chunk ${error.failedIndex + 1} (${error.failedCharacter}). Fix the issue and press Resume to continue from this point.`;
-        setProgressMessagesLimited(prev => [...prev, resumeMessage]);
+        appendProgressMessages(resumeMessage);
         setGeneratedOutput(resumeMessage);
         setResumeInfo({ index: error.failedIndex, character: error.failedCharacter });
         if (projectSettings.concatenate) {
-          setPendingBlobs(error.completedBlobs);
+          const serialized = await serializeGeneratedBlobs(error.completedBlobs);
+          setPendingBlobsSerialized(serialized);
         }
         setErrorInfo(resumeMessage);
       } else {
         const errorMessage = `❌ Error during generation:\n\n${error instanceof Error ? error.message : 'Unknown error occurred'}`;
-        setProgressMessagesLimited(prev => [...prev, errorMessage]);
+        appendProgressMessages(errorMessage);
         setGeneratedOutput(errorMessage);
         setErrorInfo(errorMessage);
       }
-      setIsLoading(false);
+      setIsGenerating(false);
+      addToast('Generation failed', 'error');
     }
   };
 
@@ -502,7 +622,7 @@ function App() {
           />
           <OutputDisplay
             generatedOutput={generatedOutput}
-            isLoading={isLoading}
+            isLoading={isGenerating}
             progressMessages={progressMessages}
             progressPercent={progressPercent}
             currentCharacter={currentProgress.character}
@@ -519,6 +639,7 @@ function App() {
             chunks={dialogueChunks}
             previewStates={timelinePreviews}
             onPreview={handlePreviewLine}
+            timings={manifestEntries}
           />
         </div>
 
@@ -533,6 +654,10 @@ function App() {
               settings={projectSettings}
               setSettings={setProjectSettings}
             />
+            <AudioProductionPanel
+              audioProduction={audioProduction}
+              onChange={(updater) => setAudioProduction(updater)}
+            />
             <GenerationProfilesPanel
               selectedProfileId={projectSettings.profileId}
               onSelectProfile={handleSelectProfile}
@@ -540,7 +665,8 @@ function App() {
             <ProjectManagerPanel
               onDownloadProject={() => handleDownloadProject()}
               onLoadProjectFile={(file) => handleLoadProjectFromFile(file)}
-              onLoadDemo={() => handleLoadProjectConfig(demoProject)}
+              onLoadDemo={handleLoadDemoProject}
+              onCopyShareLink={handleCopyShareLink}
               metadata={{
                 characters: characters.length,
                 dialogueChunks: dialogueChunks.length,
@@ -560,6 +686,8 @@ function App() {
               onDownloadJson={handleDownloadManifestJson}
               onDownloadCsv={handleDownloadManifestCsv}
               onDownloadZip={handleDownloadZip}
+              onDownloadSrt={handleDownloadSrt}
+              onDownloadVtt={handleDownloadVtt}
             />
             <ConcatenationStatus
               status={concatStatus}
@@ -577,7 +705,7 @@ function App() {
             />
             <GeneratePanel 
               onGenerate={handleGenerate}
-              isGenerating={isLoading}
+              isGenerating={isGenerating}
               canGenerate={canGenerate}
               onResume={resumeInfo ? handleResume : undefined}
               resumeInfo={resumeInfo}
@@ -599,6 +727,7 @@ function App() {
       <footer className="text-center p-4 text-text-secondary text-sm">
         <p>Powered by ElevenLabs. Created for demonstration purposes.</p>
       </footer>
+      <ToastContainer />
     </div>
   );
 }

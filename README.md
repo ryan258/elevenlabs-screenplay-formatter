@@ -18,6 +18,9 @@ A React-based web application that converts screenplay dialogue into AI-generate
 - **Concatenation Health Check** - Built-in status card to ping the backend server and show connectivity
 - **Multiple Model Support** - Choose between multilingual and monolingual ElevenLabs models
 - **Format Options** - Select output format (MP3 128kbps, 192kbps, or PCM 24kHz)
+- **Subtitle & Timing Exports** - Generate manifests plus SRT/VTT subtitle files backed by ElevenLabs word-alignment timestamps.
+- **Audio Production Mixing** - Attach a looping background track and timed sound effects that are mixed alongside dialogue during concatenation.
+- **Shareable Project Links** - Copy a single URL that encodes your script, settings, and presets for collaborators.
 
 ## Prerequisites
 
@@ -116,6 +119,19 @@ A React-based web application that converts screenplay dialogue into AI-generate
    - Use the **Concatenation Status** card to confirm the backend is reachable (click “Run Health Check” if unsure)
    - Click "Generate Audio"
    - A single `concatenated_audio.mp3` file will download
+
+## Audio Production Extras
+
+The **Audio Production** panel lets you attach:
+
+- A looping background music track (upload any audio file and set a mix volume)
+- A list of sound effects with labels, start times (`mm:ss`), individual volumes, and their own audio uploads
+
+When concatenation is enabled, these assets are uploaded with the dialogue clips and mixed server-side via FFmpeg. You can stack multiple sound effects, and each will be delayed according to its start time before being merged with the master track.
+
+## Sharing Projects
+
+Use **Copy Share Link** inside the Project Manager card to encode your entire configuration (script, presets, production settings) into the current URL. Send that link to a teammate and the app will automatically load the shared project after it hydrates. The link stores only metadata—audio assets such as SFX/background files still need to be reattached locally.
 
 ## Error Handling & Resume Flow
 

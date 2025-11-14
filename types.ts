@@ -1,7 +1,16 @@
+export interface WordTimestamp {
+  word: string;
+  startMs: number;
+  endMs: number;
+}
+
 export interface DialogueChunk {
   character: string;
   text: string;
   originalText?: string;
+  startTimeMs?: number;
+  endTimeMs?: number;
+  words?: WordTimestamp[];
 }
 
 export interface VoiceSettings {
@@ -42,6 +51,9 @@ export interface AppStateSnapshot {
 export interface GeneratedBlob {
   blob: Blob;
   filename: string;
+  startTimeMs?: number;
+  endTimeMs?: number;
+  alignment?: WordTimestamp[];
 }
 
 export interface ResumeInfo {
@@ -59,6 +71,7 @@ export interface ProjectConfig {
   characterConfigs: CharacterConfigs;
   projectSettings: ProjectSettings;
   voicePresets?: VoicePresets;
+  audioProduction?: PersistedAudioProductionSettings;
   metadata?: {
     name?: string;
     description?: string;
@@ -67,10 +80,38 @@ export interface ProjectConfig {
 
 export type VoicePresets = Record<string, CharacterConfig>;
 
+export interface BackgroundTrackSettings {
+  volume: number;
+  file?: File | null;
+  filename?: string;
+}
+
+export interface SoundEffectSettings {
+  id: string;
+  label: string;
+  startTimeMs: number;
+  volume: number;
+  file?: File | null;
+  filename?: string;
+}
+
+export interface AudioProductionSettings {
+  backgroundTrack?: BackgroundTrackSettings;
+  soundEffects: SoundEffectSettings[];
+}
+
+export interface PersistedAudioProductionSettings {
+  backgroundTrack?: Omit<BackgroundTrackSettings, 'file'>;
+  soundEffects: Array<Omit<SoundEffectSettings, 'file'>>;
+}
+
 export interface ManifestEntry {
   index: number;
   character: string;
   filename: string;
   text: string;
   estimatedDurationMs: number;
+  startTimeMs?: number;
+  endTimeMs?: number;
+  words?: WordTimestamp[];
 }

@@ -21,7 +21,7 @@ A React-based tool for turning screenplay dialogue into ElevenLabs audio, with o
 
 ## v0.1.x — MVP Polishing & Stability
 
-**Goal:** Take the current “it works” prototype and make it stable, predictable, and understandable for someone running `npm run dev` for the first time. :contentReference[oaicite:1]{index=1}  
+**Goal:** Take the current “it works” prototype and make it stable, predictable, and understandable for someone running `npm run dev` for the first time. :contentReference[oaicite:1]{index=1}
 
 ### 0.1.0 — Baseline Hardening
 
@@ -50,7 +50,7 @@ A React-based tool for turning screenplay dialogue into ElevenLabs audio, with o
 - [x] **TypeScript hygiene**
   - [x] Turn on stricter TS flags where reasonable.
   - [x] Eliminate `any` where easy wins exist, especially in parser/API code.
-  - [x] Centralize shared types in `types.ts` and use throughout. :contentReference[oaicite:2]{index=2}  
+  - [x] Centralize shared types in `types.ts` and use throughout. :contentReference[oaicite:2]{index=2}
 
 - [x] **Project structure + scripts**
   - [x] Confirm `npm run dev`, `npm run build`, and `npm run preview` are documented and working.
@@ -74,16 +74,16 @@ A React-based tool for turning screenplay dialogue into ElevenLabs audio, with o
   - [x] Support simple Fountain-style text (at least headings + character + dialogue).
   - [x] Provide one or two additional example screenplay files (short, realistic samples).
 
-- [x] **Parser diagnostics mode**
-  - [x] Optional “show parsed view” mode that lists detected characters and their lines.
-  - [x] Highlight lines that failed to parse so the user can tweak the script.
+- [ ] **Parser diagnostics mode**
+  - [ ] Optional “show parsed view” mode that lists detected characters and their lines.
+  - [ ] Highlight lines that failed to parse so the user can tweak the script.
 
 ### 0.2.1 — UI/UX Refinements
 
 - [x] **Script editing experience**
   - [x] Improve the script input area: monospaced font, higher default height.
   - [x] Add a full-screen editor modal (if not already fully wired) with keyboard shortcuts (e.g. `Ctrl+Enter` to save).
-  - [x] Clearly label expected format (inline hints from README’s “Screenplay Format” section). :contentReference[oaicite:3]{index=3}  
+  - [x] Clearly label expected format (inline hints from README’s “Screenplay Format” section). :contentReference[oaicite:3]{index=3}
 
 - [x] **Character configuration ergonomics**
   - [x] Allow searching/filtering within character list for long scripts.
@@ -125,9 +125,9 @@ A React-based tool for turning screenplay dialogue into ElevenLabs audio, with o
     - [x] Generates audio files (and optionally concatenates) using the same logic as the UI.
   - [x] Document usage in a separate `CLI.md`.
 
-- [x] **Batch processing**
-  - [x] Allow sequential processing of multiple screenplay files (chapters/episodes).
-  - [x] Provide basic rate-limiting and “cooldown” between runs to stay friendly with the ElevenLabs API.
+- [ ] **Batch processing**
+  - [ ] Allow sequential processing of multiple screenplay files (chapters/episodes).
+  - [ ] Provide basic rate-limiting and “cooldown” between runs to stay friendly with the ElevenLabs API.
 
 ---
 
@@ -167,6 +167,36 @@ A React-based tool for turning screenplay dialogue into ElevenLabs audio, with o
 
 ---
 
+## V2 Feature Integration Candidates
+
+This section documents major features from the experimental `v2` branch that can be integrated into `main`.
+
+- [ ] **Word-Level Timestamps & Subtitle Generation**
+  - [ ] Integrate with ElevenLabs alignment API to get word-level timestamps.
+  - [ ] Store `startTime` and `endTime` on each dialogue chunk.
+  - [ ] Add export options to generate and download subtitle files (SRT and VTT).
+
+- [ ] **Advanced Audio Production**
+  - [ ] Add a UI for defining and placing Sound Effects (SFX) in the script.
+  - [ ] Allow specifying a background music track (URL or upload).
+  - [ ] Update the backend concatenation service to mix dialogue, SFX, and background music using FFmpeg filters.
+
+- [ ] **Enhanced Robustness & UX**
+  - [ ] Implement a user-friendly error system that translates technical API errors (rate limits, invalid keys) into actionable advice.
+  - [ ] Persist the full generation state to `localStorage` to allow for cross-session resumption after a browser crash or refresh.
+  - [ ] Implement dynamic rate-limiting by inspecting API response headers (`x-rate-limit-remaining`) to adjust request delays automatically.
+  - [ ] Add a non-blocking toast notification system for feedback (e.g., "Project Saved").
+
+- [ ] **Project Sharing**
+  - [ ] Add a "Share Project" feature that serializes the entire project config into a shareable URL.
+  - [ ] Allow loading a project directly from this URL.
+
+- [ ] **State Management & Tooling**
+  - [ ] Refactor state management to use a dedicated library like Zustand for improved scalability.
+  - [ ] Consolidate build and test configurations.
+
+---
+
 ## Documentation & Developer Experience
 
 **Goal:** Make it easy for future-you (or collaborators) to understand and extend the project.
@@ -179,7 +209,7 @@ A React-based tool for turning screenplay dialogue into ElevenLabs audio, with o
 
 - [x] **Architecture overview**
   - [x] Add a short `ARCHITECTURE.md` describing:
-    - [x] React components layout (panels, modals, sliders). :contentReference[oaicite:4]{index=4}  
+    - [x] React components layout (panels, modals, sliders). :contentReference[oaicite:4]{index=4}
     - [x] Hook(s) for parsing and state management.
     - [x] Backend responsibilities and endpoints.
     - [x] Data flow: “screenplay → parsed blocks → ElevenLabs API → files → optional concat”.
