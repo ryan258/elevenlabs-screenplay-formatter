@@ -1,19 +1,30 @@
 import React, { useMemo, useState } from 'react';
-import { CharacterConfigs, CharacterConfig, VoiceSettings } from '../types';
+import { CharacterConfigs, CharacterConfig, VoicePresets, VoiceSettings } from '../types';
 import Slider from './Slider';
 
 interface CharacterConfigPanelProps {
   characters: string[];
   configs: CharacterConfigs;
   setConfigs: (configs: CharacterConfigs) => void;
+  voicePresets: VoicePresets;
+  onApplyPresetToCharacter: (presetName: string, character: string) => void;
+  onApplyPresetToAll: (presetName: string) => void;
 }
 
 const makeId = (character: string, prefix: string) =>
   `${prefix}-${character.replace(/[^a-zA-Z0-9]+/g, '-').toLowerCase()}`;
 
-const CharacterConfigPanel: React.FC<CharacterConfigPanelProps> = ({ characters, configs, setConfigs }) => {
+const CharacterConfigPanel: React.FC<CharacterConfigPanelProps> = ({
+  characters,
+  configs,
+  setConfigs,
+  voicePresets,
+  onApplyPresetToCharacter,
+  onApplyPresetToAll
+}) => {
   const [search, setSearch] = useState('');
   const [presetCharacter, setPresetCharacter] = useState('');
+  const [applyPresetName, setApplyPresetName] = useState('');
 
   const filteredCharacters = useMemo(() => {
     if (!search.trim()) {
@@ -22,10 +33,7 @@ const CharacterConfigPanel: React.FC<CharacterConfigPanelProps> = ({ characters,
     return characters.filter(char => char.toLowerCase().includes(search.trim().toLowerCase()));
   }, [characters, search]);
 
-  const availablePresets = useMemo(
-    () => characters.filter(char => configs[char]?.voiceId),
-    [characters, configs]
-  );
+  const presetNames = useMemo(() => Object.keys(voicePresets), [voicePresets]);
 
   const handleConfigChange = <K extends keyof CharacterConfig>(character: string, field: K, value: CharacterConfig[K]) => {
     const newConfig: CharacterConfig = {
@@ -70,42 +78,65 @@ const CharacterConfigPanel: React.FC<CharacterConfigPanelProps> = ({ characters,
           placeholder="Search characters..."
           className="w-full p-2 bg-primary border border-accent rounded-md focus:outline-none focus:ring-2 focus:ring-highlight text-sm"
         />
-        <div className="flex flex-col md:flex-row md:items-center md:space-x-3 text-xs text-text-secondary">
-          <div className="flex-1 flex items-center space-x-2">
-            <label htmlFor="preset-character" className="whitespace-nowrap">Apply preset from:</label>
-            <select
-              id="preset-character"
-              value={presetCharacter}
-              onChange={(e) => setPresetCharacter(e.target.value)}
-              className="flex-1 p-2 bg-primary border border-accent rounded-md focus:outline-none focus:ring-2 focus:ring-highlight text-sm"
-            >
-              <option value="">Select a character</option>
-              {availablePresets.map(char => (
-                <option key={char} value={char}>{char}</option>
-              ))}
-            </select>
-          </div>
-          <button
-            onClick={() => {
-              const source = presetCharacter && configs[presetCharacter];
-              if (!source) {
-                return;
-              }
-              const nextConfigs: CharacterConfigs = {};
-              characters.forEach(char => {
-                nextConfigs[char] = {
-                  voiceId: source.voiceId,
-                  voiceSettings: { ...source.voiceSettings }
-                };
-              });
-              setConfigs(nextConfigs);
-            }}
-            disabled={!presetCharacter || !configs[presetCharacter]}
-            className="mt-2 md:mt-0 px-3 py-1.5 bg-accent hover:bg-highlight rounded-md font-semibold text-white disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-highlight"
+      <div className="flex flex-col md:flex-row md:items-center md:space-x-3 text-xs text-text-secondary">
+        <div className="flex-1 flex items-center space-x-2">
+          <label htmlFor="preset-character" className="whitespace-nowrap">Copy from character:</label>
+          <select
+            id="preset-character"
+            value={presetCharacter}
+            onChange={(e) => setPresetCharacter(e.target.value)}
+            className="flex-1 p-2 bg-primary border border-accent rounded-md focus:outline-none focus:ring-2 focus:ring-highlight text-sm"
           >
-            Apply to all
-          </button>
+            <option value="">Select character</option>
+            {characters.filter(char => configs[char]?.voiceId).map(char => (
+              <option key={char} value={char}>{char}</option>
+            ))}
+          </select>
         </div>
+        <button
+          onClick={() => {
+            const source = presetCharacter && configs[presetCharacter];
+            if (!source) {
+              return;
+            }
+            const nextConfigs: CharacterConfigs = {};
+            characters.forEach(char => {
+              nextConfigs[char] = {
+                voiceId: source.voiceId,
+                voiceSettings: { ...source.voiceSettings }
+              };
+            });
+            setConfigs(nextConfigs);
+          }}
+          disabled={!presetCharacter || !configs[presetCharacter]}
+          className="mt-2 md:mt-0 px-3 py-1.5 bg-accent hover:bg-highlight rounded-md font-semibold text-white disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-highlight"
+        >
+          Apply to all
+        </button>
+      </div>
+      <div className="flex flex-col md:flex-row md:items-center md:space-x-3 text-xs text-text-secondary mt-2">
+        <div className="flex-1 flex items-center space-x-2">
+          <label htmlFor="preset-name" className="whitespace-nowrap">Apply saved preset:</label>
+          <select
+            id="preset-name"
+            value={applyPresetName}
+            onChange={(e) => setApplyPresetName(e.target.value)}
+            className="flex-1 p-2 bg-primary border border-accent rounded-md focus:outline-none focus:ring-2 focus:ring-highlight text-sm"
+          >
+            <option value="">Select preset</option>
+            {presetNames.map(name => (
+              <option key={name} value={name}>{name}</option>
+            ))}
+          </select>
+        </div>
+        <button
+          onClick={() => applyPresetName && onApplyPresetToAll(applyPresetName)}
+          disabled={!applyPresetName || !voicePresets[applyPresetName]}
+          className="mt-2 md:mt-0 px-3 py-1.5 bg-accent hover:bg-highlight rounded-md font-semibold text-white disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-highlight"
+        >
+          Apply preset to all
+        </button>
+      </div>
       </div>
       <div className="flex-grow overflow-y-auto custom-scrollbar pr-2">
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-1 gap-4">
@@ -129,6 +160,25 @@ const CharacterConfigPanel: React.FC<CharacterConfigPanelProps> = ({ characters,
                     <span className="text-xs px-2 py-0.5 rounded-full bg-red-600 text-white">No Voice ID</span>
                   )}
                 </div>
+                {presetNames.length > 0 && (
+                  <div className="flex items-center space-x-2">
+                    <select
+                      value=""
+                      onChange={(e) => {
+                        const preset = e.target.value;
+                        if (preset) {
+                          onApplyPresetToCharacter(preset, char);
+                        }
+                      }}
+                      className="flex-1 p-2 bg-secondary border border-accent rounded-md focus:outline-none focus:ring-2 focus:ring-highlight text-xs"
+                    >
+                      <option value="">Apply preset…</option>
+                      {presetNames.map(name => (
+                        <option key={name} value={name}>{name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div>
                   <label htmlFor={voiceId} className="block text-sm font-medium text-text-secondary mb-1">
                     Voice ID

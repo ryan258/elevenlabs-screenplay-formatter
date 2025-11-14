@@ -33,6 +33,7 @@ export interface AppStateSnapshot {
   characterConfigs: CharacterConfigs;
   scriptText?: string;
   rememberApiKey?: boolean;
+  voicePresets?: VoicePresets;
 }
 
 export interface GeneratedBlob {
@@ -48,3 +49,17 @@ export interface ResumeInfo {
 export interface ParserDiagnostics {
   unmatchedLines: Array<{ lineNumber: number; content: string }>;
 }
+
+export interface ProjectConfig {
+  version: string;
+  scriptText: string;
+  characterConfigs: CharacterConfigs;
+  projectSettings: ProjectSettings;
+  voicePresets?: VoicePresets;
+  metadata?: {
+    name?: string;
+    description?: string;
+  };
+}
+
+export type VoicePresets = Record<string, CharacterConfig>;

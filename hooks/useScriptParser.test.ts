@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseScript } from './useScriptParser';
+import { parseScript } from '../utils/parser';
 
 describe('parseScript', () => {
   it('parses multi-line dialogue blocks with declared characters', () => {

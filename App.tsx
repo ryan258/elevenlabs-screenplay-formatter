@@ -8,10 +8,13 @@ import OutputDisplay from './components/OutputDisplay';
 import ParserDiagnosticsPanel from './components/ParserDiagnosticsPanel';
 import Modal from './components/Modal';
 import { useScriptParser } from './hooks/useScriptParser';
-import { AppStateSnapshot, CharacterConfigs, GeneratedBlob, ProjectSettings, ResumeInfo } from './types';
+import { AppStateSnapshot, CharacterConfigs, GeneratedBlob, ProjectConfig, ProjectSettings, ResumeInfo, VoicePresets } from './types';
 import { validateConfiguration } from './utils/scriptGenerator';
 import { generateAllAudio, GenerationError, GenerationProgress, getConcatenationHealthUrl } from './utils/elevenLabsApi';
 import ConcatenationStatus from './components/ConcatenationStatus';
+import { demoProject } from './samples/demoProject';
+import ProjectManagerPanel from './components/ProjectManagerPanel';
+import VoicePresetsPanel from './components/VoicePresetsPanel';
 
 const STORAGE_KEY = 'elevenlabs_formatter_state';
 const MAX_PROGRESS_MESSAGES = 200;
@@ -36,6 +39,7 @@ function App() {
   const [isStateHydrated, setIsStateHydrated] = useState(false);
   const [rememberApiKey, setRememberApiKey] = useState(true);
   const [resumeInfo, setResumeInfo] = useState<ResumeInfo | null>(null);
+  const [voicePresets, setVoicePresets] = useState<VoicePresets>({});
   const [pendingBlobs, setPendingBlobs] = useState<GeneratedBlob[]>([]);
   const [currentProgress, setCurrentProgress] = useState<{ current: number; total: number; character: string; snippet: string }>({
     current: 0,
@@ -89,6 +93,9 @@ function App() {
         if (parsed.characterConfigs) {
           setCharacterConfigs(parsed.characterConfigs);
         }
+        if (parsed.voicePresets) {
+          setVoicePresets(parsed.voicePresets);
+        }
       }
     } catch (error) {
       console.warn('Failed to hydrate saved state:', error);
@@ -107,6 +114,7 @@ function App() {
       characterConfigs,
       scriptText,
       rememberApiKey,
+      voicePresets
     };
 
     if (rememberApiKey) {
@@ -118,7 +126,7 @@ function App() {
     } catch (error) {
       console.warn('Failed to persist state:', error);
     }
-  }, [apiKey, projectSettings, characterConfigs, scriptText, rememberApiKey, isStateHydrated]);
+  }, [apiKey, projectSettings, characterConfigs, scriptText, rememberApiKey, voicePresets, isStateHydrated]);
 
   const handleRememberToggle = (remember: boolean) => {
     setRememberApiKey(remember);
@@ -143,6 +151,110 @@ function App() {
       setConcatStatus('offline');
     });
   }, [checkConcatenationHealth]);
+
+  const buildProjectConfig = (): ProjectConfig => ({
+    version: '0.3.0',
+    scriptText,
+    characterConfigs,
+    projectSettings,
+    voicePresets
+  });
+
+  const downloadJson = (data: unknown, filename: string) => {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadProject = () => {
+    downloadJson(buildProjectConfig(), 'elevenlabs_project.json');
+  };
+
+  const handleLoadProjectConfig = (config: ProjectConfig) => {
+    if (config.scriptText !== undefined) {
+      setScriptText(config.scriptText);
+    }
+    if (config.characterConfigs) {
+      setCharacterConfigs(config.characterConfigs);
+    }
+    if (config.projectSettings) {
+      setProjectSettings(prev => ({ ...prev, ...config.projectSettings }));
+    }
+    if (config.voicePresets) {
+      setVoicePresets(config.voicePresets);
+    }
+  };
+
+  const handleLoadProjectFromFile = async (file: File) => {
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text) as ProjectConfig;
+      handleLoadProjectConfig(parsed);
+      setProgressMessagesLimited(prev => [...prev, '📁 Project loaded from file.']);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Invalid project file';
+      setProgressMessagesLimited(prev => [...prev, `❌ Failed to load project: ${message}`]);
+    }
+  };
+
+  const handleSaveVoicePreset = (presetName: string, sourceCharacter: string) => {
+    const trimmedName = presetName.trim();
+    if (!trimmedName) {
+      return;
+    }
+    const source = characterConfigs[sourceCharacter];
+    if (!source) {
+      return;
+    }
+    setVoicePresets(prev => ({
+      ...prev,
+      [trimmedName]: {
+        voiceId: source.voiceId,
+        voiceSettings: { ...source.voiceSettings }
+      }
+    }));
+  };
+
+  const handleDeletePreset = (presetName: string) => {
+    setVoicePresets(prev => {
+      const next = { ...prev };
+      delete next[presetName];
+      return next;
+    });
+  };
+
+  const handleApplyPresetToCharacter = (presetName: string, character: string) => {
+    const preset = voicePresets[presetName];
+    if (!preset) {
+      return;
+    }
+    setCharacterConfigs(prev => ({
+      ...prev,
+      [character]: {
+        voiceId: preset.voiceId,
+        voiceSettings: { ...preset.voiceSettings }
+      }
+    }));
+  };
+
+  const handleApplyPresetToAll = (presetName: string) => {
+    const preset = voicePresets[presetName];
+    if (!preset) {
+      return;
+    }
+    const nextConfigs: CharacterConfigs = {};
+    characters.forEach(char => {
+      nextConfigs[char] = {
+        voiceId: preset.voiceId,
+        voiceSettings: { ...preset.voiceSettings }
+      };
+    });
+    setCharacterConfigs(nextConfigs);
+  };
 
   const runGeneration = async (startIndex = 0, existingBlobs: GeneratedBlob[] = []) => {
     setIsLoading(true);
@@ -283,13 +395,37 @@ function App() {
               settings={projectSettings}
               setSettings={setProjectSettings}
             />
+            <ProjectManagerPanel
+              onDownloadProject={() => handleDownloadProject()}
+              onLoadProjectFile={(file) => handleLoadProjectFromFile(file)}
+              onLoadDemo={() => handleLoadProjectConfig(demoProject)}
+              metadata={{
+                characters: characters.length,
+                dialogueChunks: dialogueChunks.length,
+                unmatched: diagnostics.unmatchedLines.length
+              }}
+            />
+            <VoicePresetsPanel
+              characters={characters}
+              characterConfigs={characterConfigs}
+              voicePresets={voicePresets}
+              onSavePreset={handleSaveVoicePreset}
+              onDeletePreset={handleDeletePreset}
+            />
             <ConcatenationStatus
               status={concatStatus}
               onCheck={checkConcatenationHealth}
               endpoint={CONCATENATION_ENDPOINT}
               healthUrl={healthUrl}
             />
-            <CharacterConfigPanel characters={characters} configs={characterConfigs} setConfigs={setCharacterConfigs} />
+            <CharacterConfigPanel
+              characters={characters}
+              configs={characterConfigs}
+              setConfigs={setCharacterConfigs}
+              voicePresets={voicePresets}
+              onApplyPresetToCharacter={handleApplyPresetToCharacter}
+              onApplyPresetToAll={handleApplyPresetToAll}
+            />
             <GeneratePanel 
               onGenerate={handleGenerate}
               isGenerating={isLoading}

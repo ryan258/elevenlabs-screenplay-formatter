@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "lint": "eslint . --ext .ts,.tsx,.js,.jsx --max-warnings=0",
     "check": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "cli": "tsx cli/generate.ts"
   },
   "dependencies": {
     "react": "^19.2.0",
@@ -28,6 +29,7 @@
     "jsdom": "^27.2.0",
     "typescript": "~5.8.2",
     "typescript-eslint": "^8.46.4",
+    "tsx": "^4.19.1",
     "vite": "^6.2.0",
     "vitest": "^4.0.8"
   }

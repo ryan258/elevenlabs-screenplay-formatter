@@ -74,9 +74,9 @@ A React-based tool for turning screenplay dialogue into ElevenLabs audio, with o
   - [x] Support simple Fountain-style text (at least headings + character + dialogue).
   - [x] Provide one or two additional example screenplay files (short, realistic samples).
 
-- [ ] **Parser diagnostics mode**
-  - [ ] Optional “show parsed view” mode that lists detected characters and their lines.
-  - [ ] Highlight lines that failed to parse so the user can tweak the script.
+- [x] **Parser diagnostics mode**
+  - [x] Optional “show parsed view” mode that lists detected characters and their lines.
+  - [x] Highlight lines that failed to parse so the user can tweak the script.
 
 ### 0.2.1 — UI/UX Refinements
 
@@ -103,31 +103,31 @@ A React-based tool for turning screenplay dialogue into ElevenLabs audio, with o
 
 ### 0.3.0 — Projects & Presets
 
-- [ ] **Project save/load**
-  - [ ] Implement a JSON-based “project config” (script text, character mappings, voice settings, model, output format, concatenate toggle).
-  - [ ] Add “Download Project” and “Load Project” buttons (simple file download/upload).
-  - [ ] Optionally auto-save the last project to localStorage.
+- [x] **Project save/load**
+  - [x] Implement a JSON-based “project config” (script text, character mappings, voice settings, model, output format, concatenate toggle).
+  - [x] Add “Download Project” and “Load Project” buttons (simple file download/upload).
+  - [x] Optionally auto-save the last project to localStorage.
 
-- [ ] **Voice presets**
-  - [ ] Allow saving named voice presets (e.g. “Narrator”, “Hero”, “Comedic Sidekick”) with ElevenLabs settings.
-  - [ ] Quickly assign presets to characters via dropdown.
+- [x] **Voice presets**
+  - [x] Allow saving named voice presets (e.g. “Narrator”, “Hero”, “Comedic Sidekick”) with ElevenLabs settings.
+  - [x] Quickly assign presets to characters via dropdown.
 
-- [ ] **Default templates**
-  - [ ] Provide one or two starter project configs with sample scripts and voice mappings.
-  - [ ] A “Load demo project” button to show the workflow end-to-end.
+- [x] **Default templates**
+  - [x] Provide one or two starter project configs with sample scripts and voice mappings.
+  - [x] A “Load demo project” button to show the workflow end-to-end.
 
 ### 0.3.1 — CLI & Automation
 
-- [ ] **Node/CLI wrapper**
-  - [ ] Create a simple CLI script (inside `server/` or `utils/`) that:
-    - [ ] Takes a text/markdown screenplay file.
-    - [ ] Takes a JSON config of character voices.
-    - [ ] Generates audio files (and optionally concatenates) using the same logic as the UI.
-  - [ ] Document usage in a separate `CLI.md`.
+- [x] **Node/CLI wrapper**
+  - [x] Create a simple CLI script (inside `server/` or `utils/`) that:
+    - [x] Takes a text/markdown screenplay file.
+    - [x] Takes a JSON config of character voices.
+    - [x] Generates audio files (and optionally concatenates) using the same logic as the UI.
+  - [x] Document usage in a separate `CLI.md`.
 
-- [ ] **Batch processing**
-  - [ ] Allow sequential processing of multiple screenplay files (chapters/episodes).
-  - [ ] Provide basic rate-limiting and “cooldown” between runs to stay friendly with the ElevenLabs API.
+- [x] **Batch processing**
+  - [x] Allow sequential processing of multiple screenplay files (chapters/episodes).
+  - [x] Provide basic rate-limiting and “cooldown” between runs to stay friendly with the ElevenLabs API.
 
 ---
 
