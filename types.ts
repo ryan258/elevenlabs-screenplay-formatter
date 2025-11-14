@@ -30,4 +30,15 @@ export interface AppStateSnapshot {
   projectSettings: ProjectSettings;
   characterConfigs: CharacterConfigs;
   scriptText?: string;
+  rememberApiKey?: boolean;
+}
+
+export interface GeneratedBlob {
+  blob: Blob;
+  filename: string;
+}
+
+export interface ResumeInfo {
+  index: number;
+  character: string;
 }

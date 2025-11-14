@@ -8,8 +8,10 @@ A React-based web application that converts screenplay dialogue into AI-generate
 - **Character Voice Mapping** - Assign unique ElevenLabs voice IDs to each character
 - **Fine-Tuned Voice Control** - Adjust stability, similarity boost, style, and speed per character
 - **Audio Concatenation** - Option to merge all dialogue into a single audio file (requires backend server)
-- **Real-Time Progress Tracking** - Live updates as each dialogue chunk is generated
+- **Real-Time Progress Tracking** - Live progress bar, character previews, and copyable logs
+- **Resumable Generation** - Inline error surfaces, automatic retries, and a one-click “Resume from failed chunk” flow
 - **Batch Generation** - Processes entire screenplays automatically with rate limiting
+- **Concatenation Health Check** - Built-in status card to ping the backend server and show connectivity
 - **Multiple Model Support** - Choose between multilingual and monolingual ElevenLabs models
 - **Format Options** - Select output format (MP3 128kbps, 192kbps, or PCM 24kHz)
 
@@ -107,8 +109,16 @@ A React-based web application that converts screenplay dialogue into AI-generate
    - Paste your screenplay
    - Configure character voices
    - Enable "Concatenate Audio" toggle
+   - Use the **Concatenation Status** card to confirm the backend is reachable (click “Run Health Check” if unsure)
    - Click "Generate Audio"
    - A single `concatenated_audio.mp3` file will download
+
+## Error Handling & Resume Flow
+
+- The progress panel now includes a percentage bar, the currently processed character, and a snippet of dialogue.
+- If a chunk fails (bad API key, rate limit, network blip), the UI surfaces the exact line and enables a **Resume** button that continues from that chunk without reprocessing earlier ones.
+- ElevenLabs calls auto-retry up to three times with exponential backoff before surfacing an error.
+- Logs remain copyable for debugging, and the status banner reminds you that keys never leave the browser except for ElevenLabs requests.
 
 ## Project Structure
 
@@ -194,7 +204,7 @@ The backend server (`server/index.js`) provides a REST API endpoint:
   - `PORT` – change the concatenation server port (defaults to `3001`).
   - `ALLOWED_ORIGIN` – comma-separated list of allowed origins; leave unset locally.
 - Local storage: the browser caches your script, voice settings, and API key for convenience; clear site data to reset.
-- API key handling: your key stays in the browser and is only sent to ElevenLabs (or written to the offline bash script you export); it never goes through the optional concatenation server.
+- API key handling: your key stays in the browser and is only sent to ElevenLabs (or written to the offline bash script you export); it never goes through the optional concatenation server. Use the “Remember this key on this device” toggle in the UI to control whether it persists across reloads.
 
 ### Project Settings
 

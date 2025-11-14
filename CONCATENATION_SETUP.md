@@ -86,6 +86,7 @@ npm run dev
    - **Enabled**: Generates one `concatenated_audio.mp3` file
    - **Disabled**: Generates individual files (e.g., `0000_CHARACTER.mp3`)
 5. Click "Generate Audio"
+6. Use the **Concatenation Status** card in the UI to run on-demand health checks if you suspect the backend is unreachable.
 
 ## Troubleshooting
 

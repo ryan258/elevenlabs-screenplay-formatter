@@ -7,6 +7,8 @@ import { CharacterConfigs, ProjectSettings } from '../types';
 interface ConfigPanelProps {
   apiKey: string;
   setApiKey: (key: string) => void;
+  rememberApiKey: boolean;
+  onRememberChange: (remember: boolean) => void;
   projectSettings: ProjectSettings;
   setProjectSettings: (settings: ProjectSettings) => void;
   characters: string[];
@@ -18,6 +20,8 @@ interface ConfigPanelProps {
 const ConfigPanel: React.FC<ConfigPanelProps> = ({
   apiKey,
   setApiKey,
+  rememberApiKey,
+  onRememberChange,
   projectSettings,
   setProjectSettings,
   characters,
@@ -26,7 +30,12 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({
 }) => {
   return (
     <>
-      <ApiKeyPanel apiKey={apiKey} setApiKey={setApiKey} />
+      <ApiKeyPanel
+        apiKey={apiKey}
+        setApiKey={setApiKey}
+        rememberApiKey={rememberApiKey}
+        onRememberChange={onRememberChange}
+      />
       <ProjectSettingsPanel settings={projectSettings} setSettings={setProjectSettings} />
       <CharacterConfigPanel characters={characters} configs={characterConfigs} setConfigs={setCharacterConfigs} />
     </>

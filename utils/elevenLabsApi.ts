@@ -1,4 +1,6 @@
-import { DialogueChunk, CharacterConfig } from '../types';
+import { DialogueChunk, CharacterConfig, GeneratedBlob } from '../types';
+
+const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 const OUTPUT_FORMAT_DETAILS: Record<string, { extension: string; accept: string }> = {
   mp3_44100_128: { extension: 'mp3', accept: 'audio/mpeg' },
@@ -16,6 +18,18 @@ export interface GenerationProgress {
   currentCharacter: string;
   status: 'generating' | 'downloading' | 'complete' | 'error';
   message: string;
+  snippet?: string;
+}
+
+export class GenerationError extends Error {
+  constructor(
+    message: string,
+    public failedIndex: number,
+    public failedCharacter: string,
+    public completedBlobs: GeneratedBlob[] = []
+  ) {
+    super(message);
+  }
 }
 
 export const generateAudioFile = async (
@@ -26,7 +40,8 @@ export const generateAudioFile = async (
   outputFormat: string,
   onProgress?: (progress: GenerationProgress, current: number, total: number) => void,
   index: number = 0,
-  total: number = 1
+  total: number = 1,
+  maxRetries = 2
 ): Promise<Blob> => {
   const url = `https://api.elevenlabs.io/v1/text-to-speech/${config.voiceId}`;
 
@@ -42,43 +57,59 @@ export const generateAudioFile = async (
     }, index + 1, total);
   }
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Accept': accept,
-      'Content-Type': 'application/json',
-      'xi-api-key': apiKey
-    },
-    body: JSON.stringify({
-      text: chunk.text,
-      model_id: modelId,
-      output_format: outputFormat,
-      voice_settings: {
-        stability: config.voiceSettings.stability,
-        similarity_boost: config.voiceSettings.similarity_boost,
-        style: config.voiceSettings.style || 0,
-        use_speaker_boost: true
+  let attempt = 0;
+  let lastError: unknown = null;
+
+  while (attempt <= maxRetries) {
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Accept': accept,
+          'Content-Type': 'application/json',
+          'xi-api-key': apiKey
+        },
+        body: JSON.stringify({
+          text: chunk.text,
+          model_id: modelId,
+          output_format: outputFormat,
+          voice_settings: {
+            stability: config.voiceSettings.stability,
+            similarity_boost: config.voiceSettings.similarity_boost,
+            style: config.voiceSettings.style || 0,
+            use_speaker_boost: true
+          }
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`API Error for ${chunk.character}: ${response.status} - ${errorText}`);
       }
-    })
-  });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`API Error for ${chunk.character}: ${response.status} - ${errorText}`);
+      if (onProgress) {
+        onProgress({
+          current: index + 1,
+          total,
+          currentCharacter: chunk.character,
+          status: 'downloading',
+          message: `Downloading audio for ${chunk.character}...`
+        }, index + 1, total);
+      }
+
+      const blob = await response.blob();
+      return blob;
+    } catch (error) {
+      lastError = error;
+      if (attempt >= maxRetries) {
+        break;
+      }
+      await wait(Math.min(1000 * (attempt + 1), 5000));
+      attempt += 1;
+    }
   }
 
-  if (onProgress) {
-    onProgress({
-      current: index + 1,
-      total,
-      currentCharacter: chunk.character,
-      status: 'downloading',
-      message: `Downloading audio for ${chunk.character}...`
-    }, index + 1, total);
-  }
-
-  const blob = await response.blob();
-  return blob;
+  throw lastError instanceof Error ? lastError : new Error('Unknown error generating audio');
 };
 
 export const downloadBlob = (blob: Blob, filename: string) => {
@@ -93,6 +124,18 @@ export const downloadBlob = (blob: Blob, filename: string) => {
 };
 
 const CONCAT_SERVER_URL = import.meta.env?.VITE_CONCAT_SERVER_URL || 'http://localhost:3001/concatenate';
+
+const getConcatenateServerBase = () => {
+  try {
+    const url = new URL(CONCAT_SERVER_URL);
+    url.pathname = '/';
+    return url.toString().replace(/\/$/, '');
+  } catch {
+    return 'http://localhost:3001';
+  }
+};
+
+export const getConcatenationHealthUrl = () => `${getConcatenateServerBase()}/health`;
 
 const concatenateAudioFiles = async (
   blobs: { blob: Blob; filename: string }[],
@@ -155,6 +198,11 @@ const concatenateAudioFiles = async (
   }
 };
 
+interface GenerateAllAudioOptions {
+  startIndex?: number;
+  existingBlobs?: GeneratedBlob[];
+}
+
 export const generateAllAudio = async (
   dialogueChunks: DialogueChunk[],
   characterConfigs: { [key: string]: CharacterConfig },
@@ -162,14 +210,18 @@ export const generateAllAudio = async (
   modelId: string,
   outputFormat: string,
   concatenate: boolean,
-  onProgress?: (progress: GenerationProgress, current: number, total: number) => void
-): Promise<void> => {
+  onProgress?: (progress: GenerationProgress, current: number, total: number) => void,
+  options: GenerateAllAudioOptions = {}
+): Promise<GeneratedBlob[]> => {
   const total = dialogueChunks.length;
   const { extension } = getFormatDetails(outputFormat);
-  const generatedBlobs: { blob: Blob; filename: string }[] = [];
+  const startIndex = options.startIndex ?? 0;
+  const generatedBlobs: GeneratedBlob[] = concatenate
+    ? [...(options.existingBlobs ?? [])]
+    : [];
 
   // Generate all audio files
-  for (let i = 0; i < dialogueChunks.length; i++) {
+  for (let i = startIndex; i < dialogueChunks.length; i++) {
     const chunk = dialogueChunks[i];
     const config = characterConfigs[chunk.character];
 
@@ -184,7 +236,13 @@ export const generateAllAudio = async (
         apiKey,
         modelId,
         outputFormat,
-        onProgress,
+        (progress, current, totalCount) => {
+          onProgress?.(
+            { ...progress, snippet: chunk.text.slice(0, 80).trim() },
+            current,
+            totalCount
+          );
+        },
         i,
         total
       );
@@ -199,31 +257,36 @@ export const generateAllAudio = async (
         downloadBlob(blob, filename);
       }
 
-      if (onProgress) {
-        onProgress({
-          current: i + 1,
-          total,
-          currentCharacter: chunk.character,
-          status: 'complete',
-          message: `✓ Completed ${chunk.character}`
-        }, i + 1, total);
-      }
+      onProgress?.({
+        current: i + 1,
+        total,
+        currentCharacter: chunk.character,
+        status: 'complete',
+        message: `✓ Completed ${chunk.character}`,
+        snippet: chunk.text.slice(0, 80).trim()
+      }, i + 1, total);
 
       // Small delay between requests to avoid rate limiting
       if (i < dialogueChunks.length - 1) {
         await new Promise(resolve => setTimeout(resolve, 500));
       }
     } catch (error) {
-      if (onProgress) {
-        onProgress({
-          current: i + 1,
-          total,
-          currentCharacter: chunk.character,
-          status: 'error',
-          message: `✗ Failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-        }, i + 1, total);
-      }
-      throw error;
+      onProgress?.({
+        current: i + 1,
+        total,
+        currentCharacter: chunk.character,
+        status: 'error',
+        message: `✗ Failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        snippet: chunk.text.slice(0, 80).trim()
+      }, i + 1, total);
+      throw error instanceof GenerationError
+        ? error
+        : new GenerationError(
+            error instanceof Error ? error.message : 'Unknown error',
+            i,
+            chunk.character,
+            generatedBlobs
+          );
     }
   }
 
@@ -251,4 +314,6 @@ export const generateAllAudio = async (
       throw error;
     }
   }
+
+  return generatedBlobs;
 };

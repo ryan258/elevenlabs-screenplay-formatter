@@ -1,13 +1,30 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { ResumeInfo } from '../types';
 
 interface OutputDisplayProps {
   generatedOutput: string;
   isLoading: boolean;
   progressMessages?: string[];
+  progressPercent?: number;
+  currentCharacter?: string;
+  currentSnippet?: string;
+  errorMessage?: string | null;
+  onResume?: () => void;
+  resumeInfo?: ResumeInfo | null;
 }
 
 // Implemented OutputDisplay component to show generation results and loading states.
-const OutputDisplay: React.FC<OutputDisplayProps> = ({ generatedOutput, isLoading, progressMessages = [] }) => {
+const OutputDisplay: React.FC<OutputDisplayProps> = ({
+  generatedOutput,
+  isLoading,
+  progressMessages = [],
+  progressPercent = 0,
+  currentCharacter,
+  currentSnippet,
+  errorMessage,
+  onResume,
+  resumeInfo
+}) => {
   const outputEndRef = useRef<HTMLDivElement>(null);
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'error'>('idle');
 
@@ -46,6 +63,39 @@ const OutputDisplay: React.FC<OutputDisplayProps> = ({ generatedOutput, isLoadin
           {copyStatus === 'copied' ? 'Copied!' : copyStatus === 'error' ? 'Retry' : 'Copy Log'}
         </button>
       </div>
+      {(isLoading || progressPercent > 0) && (
+        <div className="mb-3">
+          <div className="flex justify-between text-xs text-text-secondary mb-1">
+            <span>{currentCharacter ? `Processing ${currentCharacter}` : 'Preparing...'}</span>
+            <span>{progressPercent}%</span>
+          </div>
+          <div className="w-full h-2 bg-accent/30 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-highlight transition-all"
+              style={{ width: `${progressPercent}%` }}
+              aria-valuenow={progressPercent}
+              aria-valuemin={0}
+              aria-valuemax={100}
+            />
+          </div>
+          {currentSnippet && (
+            <p className="text-xs text-text-secondary mt-1 italic truncate">“{currentSnippet}”</p>
+          )}
+        </div>
+      )}
+      {errorMessage && (
+        <div className="bg-red-900/40 border border-red-500 rounded-md p-3 mb-3">
+          <p className="text-sm mb-2">{errorMessage}</p>
+          {resumeInfo && onResume && (
+            <button
+              onClick={onResume}
+              className="text-sm px-3 py-1 bg-red-700 hover:bg-red-600 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-400"
+            >
+              Resume from chunk {resumeInfo.index + 1}
+            </button>
+          )}
+        </div>
+      )}
       <div className="flex-grow w-full p-3 bg-primary border border-accent rounded-md resize-none focus:outline-none text-text-primary custom-scrollbar overflow-auto">
         {isLoading ? (
           <div className="space-y-2">
