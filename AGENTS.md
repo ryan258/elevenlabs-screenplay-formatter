@@ -5,6 +5,7 @@ The Vite/React frontend lives at the repo root: `App.tsx` wires the panels in `c
 
 Key UI panels include:
 - `AudioProductionPanel` for background-music/SFX uploads and timing controls
+- `ProjectSettingsPanel` now merges ElevenLabs’ latest models (Multilingual, Turbo, Flash, etc.) with fallbacks so users can pick any model ID without editing code
 - `VoiceSuggestionsPanel` for role-based recommendations tied to the selected language
 - `ExportPanel` for JSON/CSV/ZIP/SRT/VTT downloads
 - `ProjectManagerPanel` handling shareable links + demo loading
@@ -26,7 +27,9 @@ Use `npm run test` for parser unit tests and `npm run lint` / `npm run check` be
 - Load `EXAMPLE_SCREENPLAY.md`, `EXAMPLE_FOUNTAIN.md`, or files in `plays/` to confirm parsing, diagnostics, and per-character settings.
 - Exercise both output modes: run just `npm run dev` for individual MP3 downloads, then repeat with the backend running to ensure `/concatenate` succeeds, audio production assets mix correctly, and a single file lands in `Downloads`.
 - Verify subtitle exports (`srt`, `vtt`) line up with timeline previews when editing the alignment or manifest code, and spot-check non-English runs (e.g., Spanish) to ensure the language selector + curated suggestions behave.
+- When adjusting Project Settings, confirm the model dropdown lists Multilingual/Turbo/Flash/Monolingual entries even without a fresh API fetch (thanks to bundled defaults). If you change the set, run a smoke test on at least one Turbo/Flash model.
 - When touching the ElevenLabs API integration, confirm custom voices load (after entering a real API key) and can be applied from the suggestions panel without regression.
+- When editing manifest/export code, download the Reaper template, unzip the audio ZIP, and open the `.rpp` in Reaper to ensure each character's clips land on the right track with the correct timing.
 - When editing `utils/elevenLabsApi.ts`, monitor retry/resume behavior, adaptive rate-limiting, toasted status messages, and ensure the Output/Diagnostics panels still stream updates.
 
 ## Commit & Pull Request Guidelines

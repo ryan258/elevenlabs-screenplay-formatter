@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import { AudioProductionSettings, CharacterConfigs, ElevenLabsVoice, ManifestEntry, ProjectSettings, ResumeInfo, VoicePresets } from '../types';
+import { AudioProductionSettings, CharacterConfigs, ElevenLabsModel, ElevenLabsVoice, ManifestEntry, ProjectSettings, ResumeInfo, VoicePresets } from '../types';
 import { SerializedGeneratedBlob } from '../utils/blobSerialization';
 
 const STORAGE_KEY = 'elevenlabs_formatter_state_v2';
@@ -80,6 +80,10 @@ interface AppStoreState {
   setAvailableVoices: (voices: ElevenLabsVoice[]) => void;
   voicesStatus: 'idle' | 'loading' | 'ready' | 'error';
   setVoicesStatus: (status: 'idle' | 'loading' | 'ready' | 'error') => void;
+  availableModels: ElevenLabsModel[];
+  setAvailableModels: (models: ElevenLabsModel[]) => void;
+  modelsStatus: 'idle' | 'loading' | 'ready' | 'error';
+  setModelsStatus: (status: 'idle' | 'loading' | 'ready' | 'error') => void;
 }
 
 const limitMessages = (messages: string[]) => {
@@ -182,7 +186,12 @@ export const useAppStore = create<AppStoreState>()(
       availableVoices: [],
       voicesStatus: 'idle',
       setAvailableVoices: (voices) => set({ availableVoices: voices }),
-      setVoicesStatus: (status) => set({ voicesStatus: status })
+      setVoicesStatus: (status) => set({ voicesStatus: status }),
+
+      availableModels: [],
+      modelsStatus: 'idle',
+      setAvailableModels: (models) => set({ availableModels: models }),
+      setModelsStatus: (status) => set({ modelsStatus: status })
     }),
     {
       name: STORAGE_KEY,
@@ -211,7 +220,9 @@ export const useAppStore = create<AppStoreState>()(
         manifestEntries: state.manifestEntries,
         currentProgress: state.currentProgress,
         errorInfo: state.errorInfo,
-        concatStatus: state.concatStatus
+        concatStatus: state.concatStatus,
+        availableModels: state.availableModels,
+        availableVoices: state.availableVoices
       }),
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true);

@@ -80,6 +80,7 @@ Either way, a success toast confirms the download, and the Exports panel now off
 - Standalone manifest JSON/CSV
 - SRT & VTT subtitle files using ElevenLabs word alignment
 - Another ZIP download button if you need to repackage everything
+- A Reaper template (`.rpp`) with one track per character so you can continue mixing inside your DAW
 
 ## 7. Export & Share
 

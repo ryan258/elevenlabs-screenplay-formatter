@@ -15,8 +15,10 @@ import { CharacterConfigs, GeneratedBlob, ManifestEntry, ProjectConfig, ProjectS
 import { validateConfiguration } from './utils/scriptGenerator';
 import { generateAllAudio, generateAudioFile, GenerationError, GenerationProgress, getConcatenationHealthUrl } from './utils/elevenLabsApi';
 import { buildManifestEntries, manifestToCsv, manifestToSrt, manifestToVtt } from './utils/manifest';
-import { fetchElevenLabsVoices } from './utils/elevenLabsClient';
+import { buildReaperProject } from './utils/reaperExport';
+import { fetchElevenLabsModels, fetchElevenLabsVoices } from './utils/elevenLabsClient';
 import { GENERATION_PROFILES } from './config/generationProfiles';
+import { isMultilingualModelId } from './config/modelOptions';
 import JSZip from 'jszip';
 import ConcatenationStatus from './components/ConcatenationStatus';
 import { demoProject } from './samples/demoProject';
@@ -117,7 +119,11 @@ function App() {
     availableVoices,
     setAvailableVoices,
     voicesStatus,
-    setVoicesStatus
+    setVoicesStatus,
+    availableModels,
+    setAvailableModels,
+    modelsStatus,
+    setModelsStatus
   } = useAppStore(useShallow(state => ({
     scriptText: state.scriptText,
     setScriptText: state.setScriptText,
@@ -160,7 +166,11 @@ function App() {
     availableVoices: state.availableVoices,
     setAvailableVoices: state.setAvailableVoices,
     voicesStatus: state.voicesStatus,
-    setVoicesStatus: state.setVoicesStatus
+    setVoicesStatus: state.setVoicesStatus,
+    availableModels: state.availableModels,
+    setAvailableModels: state.setAvailableModels,
+    modelsStatus: state.modelsStatus,
+    setModelsStatus: state.setModelsStatus
   })));
   const { characters, dialogueChunks, diagnostics } = useScriptParser(scriptText);
   const [timelinePreviews, setTimelinePreviews] = useState<Record<number, { loading?: boolean; url?: string; error?: string }>>({});
@@ -214,7 +224,7 @@ function App() {
   }, [hasHydrated, apiKey, setApiKey]);
 
   useEffect(() => {
-    if (projectSettings.languageCode && projectSettings.languageCode !== 'en' && projectSettings.model !== 'eleven_multilingual_v2') {
+    if (projectSettings.languageCode && projectSettings.languageCode !== 'en' && !isMultilingualModelId(projectSettings.model)) {
       setProjectSettings(prev => ({ ...prev, model: 'eleven_multilingual_v2' }));
     }
   }, [projectSettings.languageCode, projectSettings.model, setProjectSettings]);
@@ -272,6 +282,31 @@ function App() {
       controller.abort();
     };
   }, [apiKey, setAvailableVoices, setVoicesStatus, addToast]);
+
+  useEffect(() => {
+    if (!apiKey) {
+      setAvailableModels([]);
+      setModelsStatus('idle');
+      return;
+    }
+    const controller = new AbortController();
+    setModelsStatus('loading');
+    fetchElevenLabsModels(apiKey, controller.signal)
+      .then(models => {
+        setAvailableModels(models);
+        setModelsStatus('ready');
+      })
+      .catch(error => {
+        if (controller.signal.aborted) {
+          return;
+        }
+        console.warn('Failed to fetch ElevenLabs models:', error);
+        setModelsStatus('error');
+      });
+    return () => {
+      controller.abort();
+    };
+  }, [apiKey, setAvailableModels, setModelsStatus]);
 
   const handleExpand = () => setIsModalOpen(true);
   const handleCloseModal = () => setIsModalOpen(false);
@@ -578,6 +613,14 @@ function App() {
     downloadFile(zippedBlob, `elevenlabs_export_${Date.now()}.zip`);
   };
 
+  const handleDownloadReaperTemplate = () => {
+    if (!manifestEntries.length) return;
+    const projectLabel = projectSettings.versionLabel?.trim() || 'elevenlabs_session';
+    const rpp = buildReaperProject(manifestEntries, projectLabel);
+    const blob = new Blob([rpp], { type: 'text/plain' });
+    downloadFile(blob, `${slugify(projectLabel)}.rpp`);
+  };
+
   const runGeneration = async (startIndex = 0, existingBlobs: GeneratedBlob[] = []) => {
     setIsGenerating(true);
     if (startIndex === 0) {
@@ -744,6 +787,8 @@ function App() {
             <ProjectSettingsPanel
               settings={projectSettings}
               setSettings={setProjectSettings}
+              modelOptions={availableModels}
+              modelsStatus={modelsStatus}
             />
             <AudioProductionPanel
               audioProduction={audioProduction}
@@ -787,6 +832,7 @@ function App() {
               onDownloadZip={handleDownloadZip}
               onDownloadSrt={handleDownloadSrt}
               onDownloadVtt={handleDownloadVtt}
+              onDownloadReaper={handleDownloadReaperTemplate}
             />
             <ConcatenationStatus
               status={concatStatus}

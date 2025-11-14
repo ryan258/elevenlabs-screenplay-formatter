@@ -1,17 +1,32 @@
-import React from 'react';
-import { ProjectSettings } from '../types';
+import React, { useMemo } from 'react';
+import { ProjectSettings, ElevenLabsModel } from '../types';
 import { LANGUAGE_OPTIONS } from '../config/voiceSuggestions';
+import { KNOWN_ELEVENLABS_MODELS } from '../config/modelOptions';
 
 interface ProjectSettingsPanelProps {
   settings: ProjectSettings;
   setSettings: (settings: ProjectSettings) => void;
+  modelOptions: ElevenLabsModel[];
+  modelsStatus: 'idle' | 'loading' | 'ready' | 'error';
 }
 
 // Implemented ProjectSettingsPanel to provide UI for project-level configurations.
-const ProjectSettingsPanel: React.FC<ProjectSettingsPanelProps> = ({ settings, setSettings }) => {
+const ProjectSettingsPanel: React.FC<ProjectSettingsPanelProps> = ({ settings, setSettings, modelOptions, modelsStatus }) => {
   const handleSettingChange = (field: keyof ProjectSettings, value: string | boolean) => {
     setSettings({ ...settings, [field]: value });
   };
+
+  const availableModels = useMemo(() => {
+    const merged = [...KNOWN_ELEVENLABS_MODELS];
+    modelOptions.forEach(option => {
+      if (!merged.find(model => model.model_id === option.model_id)) {
+        merged.push(option);
+      }
+    });
+    return merged;
+  }, [modelOptions]);
+
+  const selectedModel = availableModels.find(model => model.model_id === settings.model);
 
   return (
     <div className="bg-secondary p-4 rounded-lg shadow-lg">
@@ -27,9 +42,18 @@ const ProjectSettingsPanel: React.FC<ProjectSettingsPanelProps> = ({ settings, s
             onChange={(e) => handleSettingChange('model', e.target.value)}
             className="w-full p-2 bg-primary border border-accent rounded-md focus:outline-none focus:ring-2 focus:ring-highlight"
           >
-            <option value="eleven_multilingual_v2">Eleven Multilingual v2</option>
-            <option value="eleven_monolingual_v1">Eleven Monolingual v1</option>
+            {availableModels.map(model => (
+              <option key={model.model_id} value={model.model_id}>
+                {model.name || model.model_id}
+              </option>
+            ))}
           </select>
+          <p className="text-xs text-text-secondary mt-1">
+            {modelsStatus === 'loading' && 'Loading ElevenLabs models…'}
+            {modelsStatus === 'error' && 'Failed to load live model list; showing defaults.'}
+            {modelsStatus === 'ready' && selectedModel?.description}
+            {modelsStatus === 'idle' && 'Enter your API key to load the latest models.'}
+          </p>
         </div>
         <div>
           <label htmlFor="output-format" className="block text-sm font-medium text-text-secondary mb-1">

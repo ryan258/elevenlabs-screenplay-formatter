@@ -16,12 +16,13 @@ A React-based web application that converts screenplay dialogue into AI-generate
 - **Parser Diagnostics Panel** - See detected characters, parsed lines, and any lines the parser skipped
 - **Batch Generation** - Processes entire screenplays automatically with rate limiting
 - **Concatenation Health Check** - Built-in status card to ping the backend server and show connectivity
-- **Multiple Model Support** - Choose between multilingual and monolingual ElevenLabs models
+- **Multiple Model Support** - Choose between multilingual, Monolingual v1, Turbo, or Flash models directly from the dropdown
 - **Format Options** - Select output format (MP3 128kbps, 192kbps, or PCM 24kHz)
 - **Language Selector & Voice Suggestions** - Pick the dialogue language and apply curated role-based voice recommendations per locale.
 - **Subtitle & Timing Exports** - Generate manifests plus SRT/VTT subtitle files backed by ElevenLabs word-alignment timestamps.
 - **Audio Production Mixing** - Attach a looping background track and timed sound effects that are mixed alongside dialogue during concatenation.
 - **Shareable Project Links** - Copy a single URL that encodes your script, settings, and presets for collaborators.
+- **Reaper Template Export** - Download a ready-to-open `.rpp` file with each character on its own track and timeline placement derived from the manifest.
 
 ## Prerequisites
 
@@ -139,6 +140,20 @@ After a successful generation, the **Exports** card lets you download:
 - `subtitles.srt` / `subtitles.vtt` – caption files built from ElevenLabs alignment data (falls back to estimated timing when alignment is unavailable)
 
 These exports pick up the current timing data (including resume runs), so you can feed them directly into video editors or localization pipelines.
+
+## Reaper Template Export
+
+Hit **Download Reaper Template (.rpp)** in the Exports card to grab a project file with:
+
+- One track per character
+- Items positioned according to each line’s start/end time
+- Audio sources pointing to the generated filenames
+
+Workflow tips:
+
+1. If you ran without concatenation, unzip the audio bundle and place the `.rpp` file next to the clips so the relative paths resolve automatically.
+2. For concatenated runs, regenerate without concatenation (or reuse the ZIP) so Reaper can reference individual clips.
+3. Open the `.rpp` in Reaper, confirm the media items line up, and start mixing/FX work from there.
 
 ## Language & Voice Suggestions
 
@@ -301,8 +316,13 @@ The backend server (`server/index.js`) provides a REST API endpoint:
 
 - **Model**:
 
-  - `eleven_multilingual_v2` - Supports 29+ languages (default)
-  - `eleven_monolingual_v1` - English-only, faster
+  - `eleven_multilingual_v2` – Flagship model covering 29+ languages (default)
+  - `eleven_multilingual_v1` – Legacy multilingual model
+  - `eleven_turbo_v2 / v2_5` – Low-latency multilingual models great for previews
+  - `eleven_flash_v2 / v2_5` – Fast draft-quality models
+  - `eleven_monolingual_v1` – Classic English-only model
+
+  > The dropdown auto-populates with the latest models from ElevenLabs once you enter an API key, falling back to the list above if the API is unavailable.
 
 - **Output Format**:
 

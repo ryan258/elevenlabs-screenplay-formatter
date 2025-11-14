@@ -6,6 +6,8 @@
 - Background-music/SFX Audio Production panel with persisted presets; concatenation server now mixes uploads alongside dialogue.
 - Shareable project URLs, toast notifications, and enhanced UX messaging for status/errors, including auto-loading shared configs.
 - Dialogue language selector plus curated voice suggestions per locale with one-click role presets.
+- Project settings now surface ElevenLabs' full model catalog (Multilingual, Turbo, Flash, Monolingual) and auto-load new models when an API key is present.
+- Reaper `.rpp` export option: generate per-character tracks with timeline placement for DAW workflows.
 - Alias-aware screenplay parser with parenthetical handling, local-storage state persistence, progress-log controls, and accessibility tweaks.
 - Environment-driven output formats and concatenation URL support, plus ESLint/Vitest tooling and parser unit tests.
 - Backend security knobs (configurable port/origin) and docs for advanced usage, API key handling, and contributor onboarding.

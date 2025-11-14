@@ -115,6 +115,14 @@ export interface ElevenLabsVoice {
   preview_url?: string;
 }
 
+export interface ElevenLabsModel {
+  model_id: string;
+  name: string;
+  description?: string;
+  can_be_fineturned?: boolean;
+  languages?: string[];
+}
+
 export interface ManifestEntry {
   index: number;
   character: string;
