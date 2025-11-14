@@ -463,27 +463,17 @@ export const generateAllAudio = async (
       const concatenatedBlob = await concatenateAudioFiles(generatedBlobs, onProgress, options.audioProduction);
       downloadBlob(concatenatedBlob, 'concatenated_audio.mp3');
     } catch (error) {
-      // If concatenation fails, fallback to individual downloads
       if (onProgress) {
         onProgress({
           current: total,
           total,
           currentCharacter: 'All',
           status: 'error',
-          message: `⚠ Concatenation failed, downloading individual files instead...`
+          message: `⚠ Concatenation failed. Download audio individually from the Exports panel.`
         }, total, total);
       }
-
-      generatedBlobs.forEach(({ blob, filename }) => {
-        downloadBlob(blob, filename);
-      });
-
       throw error;
     }
-  } else {
-    generatedBlobs.forEach(({ blob, filename }) => {
-      downloadBlob(blob, filename);
-    });
   }
 
   return generatedBlobs;

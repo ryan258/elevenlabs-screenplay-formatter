@@ -57,6 +57,20 @@ const decodeSharePayload = (value: string) => {
     : '';
 };
 
+const buildZipBundle = async (blobs: GeneratedBlob[], manifestEntries: ManifestEntry[]) => {
+  const zip = new JSZip();
+  blobs.forEach(({ blob, filename }) => {
+    const safeName = filename || `clip_${Date.now()}.mp3`;
+    zip.file(safeName, blob);
+  });
+  if (manifestEntries.length) {
+    zip.file('manifest.json', JSON.stringify(manifestEntries, null, 2));
+    const csv = manifestToCsv(manifestEntries);
+    zip.file('manifest.csv', csv);
+  }
+  return zip.generateAsync({ type: 'blob' });
+};
+
 // Implemented the main App component to structure the application and manage state.
 function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -511,14 +525,7 @@ function App() {
 
   const handleDownloadZip = async () => {
     if (!manifestEntries.length || !lastGeneratedBlobs.length) return;
-    const zip = new JSZip();
-    lastGeneratedBlobs.forEach(({ blob, filename }) => {
-      zip.file(filename, blob);
-    });
-    zip.file('manifest.json', JSON.stringify(manifestEntries, null, 2));
-    const csv = manifestToCsv(manifestEntries);
-    zip.file('manifest.csv', csv);
-    const zippedBlob = await zip.generateAsync({ type: 'blob' });
+    const zippedBlob = await buildZipBundle(lastGeneratedBlobs, manifestEntries);
     downloadFile(zippedBlob, `elevenlabs_export_${Date.now()}.zip`);
   };
 
@@ -581,22 +588,29 @@ function App() {
           audioProduction
         }
       );
-      setManifestEntries(buildManifestEntries(preparedChunks, blobs));
+      const manifest = buildManifestEntries(preparedChunks, blobs);
+      setManifestEntries(manifest);
       const serialized = await serializeGeneratedBlobs(blobs);
       setLastGeneratedBlobsSerialized(serialized);
 
       // Success message
       const successMessage = projectSettings.concatenate
         ? `\n✅ Generation Complete!\n\nAll ${dialogueChunks.length} audio files have been generated and concatenated into a single file.\nCheck your Downloads folder for "concatenated_audio.mp3".`
-        : `\n✅ Generation Complete!\n\nAll ${dialogueChunks.length} audio files have been generated and downloaded.\nCheck your Downloads folder for the audio files.`;
+        : `\n✅ Generation Complete!\n\nAll ${dialogueChunks.length} audio files have been generated and bundled into a ZIP archive.\nCheck your Downloads folder for the ZIP file.`;
       appendProgressMessages(successMessage);
       setGeneratedOutput(successMessage);
       setPendingBlobsSerialized([]);
       setResumeInfo(null);
       setErrorInfo(null);
       setCurrentProgress({ current: 0, total: 0, character: '', snippet: '' });
+      if (!projectSettings.concatenate) {
+        const zipBlob = await buildZipBundle(blobs, manifest);
+        downloadFile(zipBlob, `elevenlabs_audio_${Date.now()}.zip`);
+        addToast('Generation complete (ZIP downloaded)', 'success');
+      } else {
+        addToast('Generation complete', 'success');
+      }
       setIsGenerating(false);
-      addToast('Generation complete', 'success');
 
     } catch (error) {
       console.error('Generation error:', error);

@@ -87,7 +87,7 @@ A React-based web application that converts screenplay dialogue into AI-generate
    - Configure voice IDs for each detected character
    - Disable "Concatenate Audio" toggle
    - Click "Generate Audio"
-   - Individual audio files will download to your Downloads folder
+   - A ZIP archive containing all audio files plus manifests will download to your Downloads folder
 
 ### Advanced Usage (Concatenated Audio)
 
