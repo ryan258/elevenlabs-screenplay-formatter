@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { LANGUAGE_OPTIONS, ROLE_SUGGESTIONS, RoleSuggestion, VoiceSuggestion } from '../config/voiceSuggestions';
 import { ElevenLabsVoice } from '../types';
 
@@ -25,15 +25,20 @@ const VoiceSuggestionsPanel: React.FC<VoiceSuggestionsPanelProps> = ({
   const roleSuggestions = ROLE_SUGGESTIONS[availableLanguage] ?? [];
   const languageLabel = LANGUAGE_OPTIONS.find(option => option.code === availableLanguage)?.label ?? 'English';
 
-  const safeCharacter = useMemo(() => {
+  useEffect(() => {
     if (!selectedCharacter && characters.length) {
       setSelectedCharacter(characters[0]);
+    } else if (selectedCharacter && !characters.includes(selectedCharacter)) {
+      setSelectedCharacter(characters[0] || '');
+    }
+  }, [characters, selectedCharacter]);
+
+  const safeCharacter = useMemo(() => {
+    if (!selectedCharacter && characters.length) {
       return characters[0];
     }
     if (selectedCharacter && !characters.includes(selectedCharacter)) {
-      const fallback = characters[0] || '';
-      setSelectedCharacter(fallback);
-      return fallback;
+      return characters[0] || '';
     }
     return selectedCharacter;
   }, [characters, selectedCharacter]);

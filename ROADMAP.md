@@ -62,31 +62,31 @@ _Context: Personal project for single-user use. Security priorities adjusted acc
 
 ### 🟡 High Priority (Functional Issues That Impact You)
 
-- [ ] **Voice speed slider is non-functional**
+- [x] **Voice speed slider is non-functional**
   - **Severity:** High (feature doesn't work)
   - **Files:** `components/CharacterConfigPanel.tsx:195-200`, `utils/elevenLabsApi.ts:123-131`, `utils/scriptGenerator.ts:48-53`, `cli/generate.ts:71-88`
   - **Issue:** UI lets you tune `voiceSettings.speed` but all API calls omit this field. Only stability/similarity/style are sent. The slider literally does nothing.
   - **Fix:** Include `speed` in all `voice_settings` payloads. Update CLI and script generator to respect speed setting.
 
-- [ ] **Missing React error boundaries**
+- [x] **Missing React error boundaries**
   - **Severity:** High (causes full app crashes)
   - **File:** `App.tsx`
   - **Issue:** No error boundaries to catch component rendering errors. Any component failure crashes the entire app with no recovery.
   - **Fix:** Implement React error boundary wrapper with fallback UI and reload option.
 
-- [ ] **Reaper export declares wrong source type**
+- [x] **Reaper export declares wrong source type**
   - **Severity:** High (Reaper won't load files)
   - **File:** `utils/reaperExport.ts:36-38`
   - **Issue:** Always outputs `<SOURCE WAV>` regardless of actual file format. MP3 exports flagged as offline in Reaper, making the export useless.
   - **Fix:** Inspect filename/format and emit correct source type (`<SOURCE MP3>` or WAV).
 
-- [ ] **CLI ignores output format and voice speed**
+- [x] **CLI ignores output format and voice speed**
   - **Severity:** High (CLI doesn't respect settings)
   - **File:** `cli/generate.ts:71-88`
   - **Issue:** CLI always sends `Accept: audio/mpeg` and never includes `voice_settings.speed`. Produces MP3s at default speed regardless of your config.
   - **Fix:** Reuse UI's format lookup for `Accept` header and extension. Pass through all voice settings including speed.
 
-- [ ] **VoiceSuggestionsPanel mutates state during render**
+- [x] **VoiceSuggestionsPanel mutates state during render**
   - **Severity:** Medium (React warnings, possible loops)
   - **File:** `components/VoiceSuggestionsPanel.tsx:28-39`
   - **Issue:** `safeCharacter` useMemo calls `setSelectedCharacter` during render, triggering React warnings and potential infinite loops in StrictMode.
