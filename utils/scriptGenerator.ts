@@ -48,6 +48,7 @@ export const generateElevenLabsScript = (
       voice_settings: {
         ...config.voiceSettings,
         style: config.voiceSettings.style || 0,
+        speed: config.voiceSettings.speed ?? 1,
         use_speaker_boost: true
       },
       output_format: projectSettings.outputFormat

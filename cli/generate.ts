@@ -16,6 +16,11 @@ interface CliOptions {
 
 const DEFAULT_DELAY = 500;
 const slugify = (value: string) => value.replace(/[^\w]+/g, '_').replace(/^_+|_+$/g, '').toLowerCase();
+const OUTPUT_FORMAT_DETAILS: Record<string, { extension: string; accept: string }> = {
+  mp3_44100_128: { extension: 'mp3', accept: 'audio/mpeg' },
+  mp3_44100_192: { extension: 'mp3', accept: 'audio/mpeg' },
+  pcm_24000: { extension: 'wav', accept: 'audio/wav' }
+};
 
 const parseArgs = (): CliOptions => {
   const args = process.argv.slice(2);
@@ -60,7 +65,8 @@ const generateChunk = async (
   chunkCharacter: string,
   config: ProjectConfig,
   apiKey: string,
-  filename: string
+  filename: string,
+  formatDetails: { extension: string; accept: string }
 ) => {
   const projectSettings = config.projectSettings;
   const characterConfig = config.characterConfigs[chunkCharacter];
@@ -71,7 +77,7 @@ const generateChunk = async (
   const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${characterConfig.voiceId}`, {
     method: 'POST',
     headers: {
-      'Accept': 'audio/mpeg',
+      'Accept': formatDetails.accept,
       'Content-Type': 'application/json',
       'xi-api-key': apiKey
     },
@@ -83,6 +89,7 @@ const generateChunk = async (
         stability: characterConfig.voiceSettings.stability,
         similarity_boost: characterConfig.voiceSettings.similarity_boost,
         style: characterConfig.voiceSettings.style,
+        speed: characterConfig.voiceSettings.speed ?? 1,
         use_speaker_boost: true
       }
     })
@@ -121,6 +128,7 @@ const run = async () => {
   const configContent = await readFile(resolve(options.configPath), 'utf-8');
   const projectConfig = JSON.parse(configContent) as ProjectConfig;
   await mkdir(options.outputDir, { recursive: true });
+  const formatDetails = OUTPUT_FORMAT_DETAILS[projectConfig.projectSettings.outputFormat] || OUTPUT_FORMAT_DETAILS.mp3_44100_128;
 
   for (const scriptPath of options.scripts) {
     const scriptText = await readFile(resolve(scriptPath), 'utf-8');
@@ -131,10 +139,10 @@ const run = async () => {
     for (let i = 0; i < parsed.dialogueChunks.length; i++) {
       const chunk = parsed.dialogueChunks[i];
       const text = projectConfig.projectSettings.speakParentheticals && chunk.originalText ? chunk.originalText : chunk.text;
-      const filename = resolve(options.outputDir, `${slug}_${String(i).padStart(4, '0')}_${slugify(chunk.character)}.mp3`);
+      const filename = resolve(options.outputDir, `${slug}_${String(i).padStart(4, '0')}_${slugify(chunk.character)}.${formatDetails.extension}`);
 
       console.log(`[${i + 1}/${parsed.dialogueChunks.length}] ${chunk.character}`);
-      await generateChunk(text, chunk.character, projectConfig, options.apiKey!, filename);
+      await generateChunk(text, chunk.character, projectConfig, options.apiKey!, filename, formatDetails);
       generatedFiles.push(filename);
       if (i < parsed.dialogueChunks.length - 1) {
         await wait(options.delayMs);

@@ -4,10 +4,25 @@ const seconds = (ms?: number) => ((ms ?? 0) / 1000).toFixed(6);
 
 const escapeName = (value: string) => value.replace(/"/g, "'");
 
+const getReaperSourceType = (filename?: string) => {
+  if (!filename) {
+    return 'WAV';
+  }
+  const ext = filename.split('.').pop()?.toLowerCase();
+  if (ext === 'wav' || ext === 'wave' || ext === 'pcm') {
+    return 'WAV';
+  }
+  if (ext === 'mp3') {
+    return 'MP3';
+  }
+  return 'WAV';
+};
+
 const buildItem = (entry: ManifestEntry) => {
   const start = entry.startTimeMs ?? 0;
   const end = entry.endTimeMs ?? (start + entry.estimatedDurationMs);
   const length = Math.max(0.001, (end - start) / 1000);
+  const sourceType = getReaperSourceType(entry.filename);
   return [
     '    <ITEM',
     `      POSITION ${seconds(start)}`,
@@ -33,7 +48,7 @@ const buildItem = (entry: ManifestEntry) => {
     '        SOFFS 0.000000',
     '        STARTOFFS 0.000000',
     '        SEL 1',
-    `        <SOURCE WAV`,
+    `        <SOURCE ${sourceType}`,
     `          FILE "${escapeName(entry.filename)}"`,
     '        >',
     '      >',

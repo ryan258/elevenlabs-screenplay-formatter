@@ -127,6 +127,7 @@ export const generateAudioFile = async (
             stability: config.voiceSettings.stability,
             similarity_boost: config.voiceSettings.similarity_boost,
             style: config.voiceSettings.style || 0,
+            speed: config.voiceSettings.speed ?? 1,
             use_speaker_boost: true
           }
         })
