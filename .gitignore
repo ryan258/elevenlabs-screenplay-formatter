@@ -1,5 +1,7 @@
-plays/*.md
+plays/*
+*-AUDIT.md
 .env
+
 
 # Logs
 logs

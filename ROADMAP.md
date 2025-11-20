@@ -15,7 +15,132 @@ A React-based tool for turning screenplay dialogue into ElevenLabs audio, with o
 - **Parsing & UX Enhancements (v0.2.x)** — Better screenplay handling and friendlier UI.
 - **Workflow & Automation (v0.3.x)** — Project saving, batch runs, CLI, and exports.
 - **Power-User Tools (v0.4.x+)** — Advanced editing, DAW-friendly exports, presets, and collaboration.
+- **Technical Debt & Known Issues** — Consolidated findings from code audits requiring attention.
 - **Backlog / Experiments** — Ideas to revisit after the core is solid.
+
+---
+
+## Technical Debt & Known Issues
+
+_Consolidated from GPT-AUDIT.md and CLAUDE-AUDIT.md (2025-11-20)_
+_Context: Personal project for single-user use. Security priorities adjusted accordingly._
+
+**TL;DR for what actually matters:**
+- 🔴 **Fix first:** localStorage quota crashes, resume flow bugs, concatenation failures that waste API credits
+- 🟡 **Fix when annoying:** Voice speed slider doesn't work, CLI ignores settings, Reaper export broken
+- 🟢 **Fix when bored:** Code organization, performance optimizations, better error messages
+
+---
+
+### 🔴 Critical Priority (Actually Breaks Your Workflow)
+
+- [ ] **Blob storage in localStorage exhausts browser quota**
+  - **Severity:** Critical (causes crashes)
+  - **Files:** `store/useAppStore.ts:199-225`, `App.tsx:657-687`, `utils/blobSerialization.ts`
+  - **Issue:** Base64-encoded audio blobs stored in localStorage (33% size increase) quickly exceed 5-10MB quota, throwing `DOMException: Quota exceeded`. Breaks persistence and failed resumes for any non-trivial script.
+  - **Fix:** Remove binary audio from localStorage. Migrate to IndexedDB for blob storage. Persist only manifest metadata and resume indices. Add quota checking before saves.
+
+- [ ] **Resume flow loses clips when concatenation is disabled**
+  - **Severity:** Critical (wastes API credits)
+  - **File:** `App.tsx:707-735`
+  - **Issue:** `GenerationError` catch block only stores `error.completedBlobs` if `concatenate` is true. In ZIP mode, `serializedPendingBlobs` remains empty, so resume only generates tail of script. You lose all previously generated clips.
+  - **Fix:** Always preserve `error.completedBlobs` regardless of concatenation setting. Serialize completed blobs for all modes.
+
+- [ ] **Concatenation failures discard all generated clips**
+  - **Severity:** Critical (wastes API credits)
+  - **Files:** `utils/elevenLabsApi.ts:460-476`, `App.tsx:707-727`
+  - **Issue:** If FFmpeg server fails, `generateAllAudio` throws and catch clears all generated blobs/manifest. You lose minutes of paid API usage because downstream concatenation failed.
+  - **Fix:** Return `generatedBlobs` even when concatenation fails. Surface warning and allow ZIP download. Enable retry of just concatenation step.
+
+- [ ] **Memory leaks from unreleased object URLs**
+  - **Severity:** High (causes browser slowdown)
+  - **Files:** `App.tsx:345-350`, `App.tsx:559-580`
+  - **Issue:** `URL.createObjectURL()` creates memory that's only freed on unmount, not when previews are replaced. Memory accumulates with each preview generation, slowing down browser.
+  - **Fix:** Revoke object URLs immediately when replaced. Implement cleanup in `handlePreviewLine` before creating new URLs.
+
+---
+
+### 🟡 High Priority (Functional Issues That Impact You)
+
+- [ ] **Voice speed slider is non-functional**
+  - **Severity:** High (feature doesn't work)
+  - **Files:** `components/CharacterConfigPanel.tsx:195-200`, `utils/elevenLabsApi.ts:123-131`, `utils/scriptGenerator.ts:48-53`, `cli/generate.ts:71-88`
+  - **Issue:** UI lets you tune `voiceSettings.speed` but all API calls omit this field. Only stability/similarity/style are sent. The slider literally does nothing.
+  - **Fix:** Include `speed` in all `voice_settings` payloads. Update CLI and script generator to respect speed setting.
+
+- [ ] **Missing React error boundaries**
+  - **Severity:** High (causes full app crashes)
+  - **File:** `App.tsx`
+  - **Issue:** No error boundaries to catch component rendering errors. Any component failure crashes the entire app with no recovery.
+  - **Fix:** Implement React error boundary wrapper with fallback UI and reload option.
+
+- [ ] **Reaper export declares wrong source type**
+  - **Severity:** High (Reaper won't load files)
+  - **File:** `utils/reaperExport.ts:36-38`
+  - **Issue:** Always outputs `<SOURCE WAV>` regardless of actual file format. MP3 exports flagged as offline in Reaper, making the export useless.
+  - **Fix:** Inspect filename/format and emit correct source type (`<SOURCE MP3>` or WAV).
+
+- [ ] **CLI ignores output format and voice speed**
+  - **Severity:** High (CLI doesn't respect settings)
+  - **File:** `cli/generate.ts:71-88`
+  - **Issue:** CLI always sends `Accept: audio/mpeg` and never includes `voice_settings.speed`. Produces MP3s at default speed regardless of your config.
+  - **Fix:** Reuse UI's format lookup for `Accept` header and extension. Pass through all voice settings including speed.
+
+- [ ] **VoiceSuggestionsPanel mutates state during render**
+  - **Severity:** Medium (React warnings, possible loops)
+  - **File:** `components/VoiceSuggestionsPanel.tsx:28-39`
+  - **Issue:** `safeCharacter` useMemo calls `setSelectedCharacter` during render, triggering React warnings and potential infinite loops in StrictMode.
+  - **Fix:** Derive `safeCharacter` without side effects using `useEffect` or event handler fallback.
+
+---
+
+### 🟢 Medium Priority (Quality of Life Improvements)
+
+- [ ] **App.tsx is too large (880 lines)**
+  - **Why it matters:** Hard to navigate and modify. Makes debugging harder.
+  - **File:** `App.tsx`
+  - **Fix:** Extract custom hooks (`useProjectManager`, `useAudioGeneration`, `useVoicePresets`), split into smaller components when you need to make changes.
+
+- [ ] **Inefficient re-renders in App.tsx**
+  - **Why it matters:** UI feels sluggish when generating audio or updating state.
+  - **File:** `App.tsx:127-174`
+  - **Fix:** Split store selectors into smaller chunks, use React.memo for expensive components when performance becomes noticeable.
+
+- [ ] **Missing pagination/virtualization for long scripts**
+  - **Why it matters:** Browser slows down with 200+ dialogue chunks.
+  - **Files:** `components/TimelinePanel.tsx`, `components/CharacterConfigPanel.tsx`
+  - **Fix:** Implement virtual scrolling (react-window) or pagination when you actually process scripts this large.
+
+- [ ] **Unoptimized parser (O(n²) complexity)**
+  - **Why it matters:** Parsing slows down noticeably on 1000+ line scripts.
+  - **File:** `utils/parser.ts:171-214`
+  - **Fix:** Build character lookup Map upfront instead of linear search per line. Only fix if you notice slowness.
+
+- [ ] **Inconsistent error handling patterns**
+  - **Why it matters:** Makes debugging harder when something goes wrong.
+  - **Files:** Throughout codebase
+  - **Fix:** Standardize on try-catch with user notifications when you touch error handling code anyway.
+
+---
+
+### ⚪ Low Priority (If You Ever Get Bored)
+
+- [ ] **Add tests for critical paths**
+  - **Why it matters:** Helps prevent regressions when you make changes months from now.
+  - **Where to start:** Parser tests, API client tests, resume flow tests.
+  - **Fix:** Add basic unit tests when you break something and want to prevent it happening again.
+
+- [ ] **Better error recovery**
+  - **Why it matters:** Less annoying when something fails.
+  - **Fix:** Add automatic retry for transient failures, better localStorage corruption handling.
+
+- [ ] **Script length validation**
+  - **Why it matters:** Prevents accidentally processing massive scripts that hit API limits.
+  - **Fix:** Add character/word count display, warn before processing 50K+ word scripts.
+
+- [ ] **Create server package.json**
+  - **Why it matters:** Makes it clearer what server dependencies are needed.
+  - **Fix:** Create `server/package.json` with express, cors, multer, fluent-ffmpeg listed.
 
 ---
 
