@@ -175,6 +175,17 @@ function App() {
   const { characters, dialogueChunks, diagnostics } = useScriptParser(scriptText);
   const [timelinePreviews, setTimelinePreviews] = useState<Record<number, { loading?: boolean; url?: string; error?: string }>>({});
   const previewUrlsRef = useRef<string[]>([]);
+  const cleanupPreviewUrls = useCallback(() => {
+    previewUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+    previewUrlsRef.current = [];
+  }, []);
+  const releasePreviewUrl = useCallback((url?: string) => {
+    if (!url) {
+      return;
+    }
+    URL.revokeObjectURL(url);
+    previewUrlsRef.current = previewUrlsRef.current.filter(existing => existing !== url);
+  }, []);
   const pendingBlobs = useMemo(() => deserializeGeneratedBlobs(serializedPendingBlobs), [serializedPendingBlobs]);
   const lastGeneratedBlobs = useMemo(() => deserializeGeneratedBlobs(serializedLastGeneratedBlobs), [serializedLastGeneratedBlobs]);
   const handleLoadProjectConfig = useCallback((config: ProjectConfig) => {
@@ -343,17 +354,17 @@ function App() {
   }, [checkConcatenationHealth]);
 
   useEffect(() => {
-    const urlsRef = previewUrlsRef.current;
     return () => {
-      urlsRef.forEach(url => URL.revokeObjectURL(url));
+      cleanupPreviewUrls();
     };
-  }, []);
+  }, [cleanupPreviewUrls]);
 
   useEffect(() => {
+    cleanupPreviewUrls();
     setTimelinePreviews({});
     setManifestEntries([]);
     setLastGeneratedBlobsSerialized([]);
-  }, [scriptText, setManifestEntries, setLastGeneratedBlobsSerialized]);
+  }, [scriptText, cleanupPreviewUrls, setManifestEntries, setLastGeneratedBlobsSerialized]);
 
   const buildProjectConfig = (): ProjectConfig => ({
     version: '0.3.0',
@@ -561,7 +572,7 @@ function App() {
       setTimelinePreviews(prev => {
         const previousUrl = prev[index]?.url;
         if (previousUrl) {
-          URL.revokeObjectURL(previousUrl);
+          releasePreviewUrl(previousUrl);
         }
         return {
           ...prev,
@@ -656,7 +667,7 @@ function App() {
 
       // Generate all audio files
       const versionSlug = projectSettings.versionLabel ? slugify(projectSettings.versionLabel) : undefined;
-      const blobs = await generateAllAudio(
+      const { blobs, concatenationFailed } = await generateAllAudio(
         preparedChunks,
         characterConfigs,
         apiKey,
@@ -687,7 +698,9 @@ function App() {
 
       // Success message
       const successMessage = projectSettings.concatenate
-        ? `\n✅ Generation Complete!\n\nAll ${dialogueChunks.length} audio files have been generated and concatenated into a single file.\nCheck your Downloads folder for "concatenated_audio.mp3".`
+        ? concatenationFailed
+          ? `\n⚠ Generation finished, but concatenation failed.\n\nAll ${dialogueChunks.length} audio files were generated. The concatenation server returned an error, so a ZIP with individual clips was downloaded instead.`
+          : `\n✅ Generation Complete!\n\nAll ${dialogueChunks.length} audio files have been generated and concatenated into a single file.\nCheck your Downloads folder for "concatenated_audio.mp3".`
         : `\n✅ Generation Complete!\n\nAll ${dialogueChunks.length} audio files have been generated and bundled into a ZIP archive.\nCheck your Downloads folder for the ZIP file.`;
       appendProgressMessages(successMessage);
       setGeneratedOutput(successMessage);
@@ -695,10 +708,14 @@ function App() {
       setResumeInfo(null);
       setErrorInfo(null);
       setCurrentProgress({ current: 0, total: 0, character: '', snippet: '' });
-      if (!projectSettings.concatenate) {
+      if (!projectSettings.concatenate || concatenationFailed) {
         const zipBlob = await buildZipBundle(blobs, manifest);
         downloadFile(zipBlob, `elevenlabs_audio_${Date.now()}.zip`);
-        addToast('Generation complete (ZIP downloaded)', 'success');
+        if (projectSettings.concatenate && concatenationFailed) {
+          addToast('Concatenation failed. Downloaded ZIP with individual files instead.', 'error');
+        } else {
+          addToast('Generation complete (ZIP downloaded)', 'success');
+        }
       } else {
         addToast('Generation complete', 'success');
       }
@@ -712,10 +729,8 @@ function App() {
         appendProgressMessages(resumeMessage);
         setGeneratedOutput(resumeMessage);
         setResumeInfo({ index: error.failedIndex, character: error.failedCharacter });
-        if (projectSettings.concatenate) {
-          const serialized = await serializeGeneratedBlobs(error.completedBlobs);
-          setPendingBlobsSerialized(serialized);
-        }
+        const serialized = await serializeGeneratedBlobs(error.completedBlobs);
+        setPendingBlobsSerialized(serialized);
         setErrorInfo(resumeMessage);
       } else {
         const errorMessage = `❌ Error during generation:\n\n${error instanceof Error ? error.message : 'Unknown error occurred'}`;

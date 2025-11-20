@@ -34,25 +34,25 @@ _Context: Personal project for single-user use. Security priorities adjusted acc
 
 ### 🔴 Critical Priority (Actually Breaks Your Workflow)
 
-- [ ] **Blob storage in localStorage exhausts browser quota**
+- [x] **Blob storage in localStorage exhausts browser quota**
   - **Severity:** Critical (causes crashes)
   - **Files:** `store/useAppStore.ts:199-225`, `App.tsx:657-687`, `utils/blobSerialization.ts`
   - **Issue:** Base64-encoded audio blobs stored in localStorage (33% size increase) quickly exceed 5-10MB quota, throwing `DOMException: Quota exceeded`. Breaks persistence and failed resumes for any non-trivial script.
   - **Fix:** Remove binary audio from localStorage. Migrate to IndexedDB for blob storage. Persist only manifest metadata and resume indices. Add quota checking before saves.
 
-- [ ] **Resume flow loses clips when concatenation is disabled**
+- [x] **Resume flow loses clips when concatenation is disabled**
   - **Severity:** Critical (wastes API credits)
   - **File:** `App.tsx:707-735`
   - **Issue:** `GenerationError` catch block only stores `error.completedBlobs` if `concatenate` is true. In ZIP mode, `serializedPendingBlobs` remains empty, so resume only generates tail of script. You lose all previously generated clips.
   - **Fix:** Always preserve `error.completedBlobs` regardless of concatenation setting. Serialize completed blobs for all modes.
 
-- [ ] **Concatenation failures discard all generated clips**
+- [x] **Concatenation failures discard all generated clips**
   - **Severity:** Critical (wastes API credits)
   - **Files:** `utils/elevenLabsApi.ts:460-476`, `App.tsx:707-727`
   - **Issue:** If FFmpeg server fails, `generateAllAudio` throws and catch clears all generated blobs/manifest. You lose minutes of paid API usage because downstream concatenation failed.
   - **Fix:** Return `generatedBlobs` even when concatenation fails. Surface warning and allow ZIP download. Enable retry of just concatenation step.
 
-- [ ] **Memory leaks from unreleased object URLs**
+- [x] **Memory leaks from unreleased object URLs**
   - **Severity:** High (causes browser slowdown)
   - **Files:** `App.tsx:345-350`, `App.tsx:559-580`
   - **Issue:** `URL.createObjectURL()` creates memory that's only freed on unmount, not when previews are replaced. Memory accumulates with each preview generation, slowing down browser.

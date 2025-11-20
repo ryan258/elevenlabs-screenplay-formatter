@@ -196,6 +196,17 @@ export const useAppStore = create<AppStoreState>()(
     {
       name: STORAGE_KEY,
       storage,
+      version: 2,
+      migrate: (persisted, version) => {
+        if (!persisted) {
+          return persisted;
+        }
+        if (version < 2) {
+          delete (persisted as Partial<AppStoreState>).serializedPendingBlobs;
+          delete (persisted as Partial<AppStoreState>).serializedLastGeneratedBlobs;
+        }
+        return persisted;
+      },
       partialize: (state) => ({
         scriptText: state.scriptText,
         apiKey: state.rememberApiKey ? state.apiKey : '',
@@ -215,8 +226,6 @@ export const useAppStore = create<AppStoreState>()(
         generatedOutput: state.generatedOutput,
         progressMessages: state.progressMessages,
         resumeInfo: state.resumeInfo,
-        serializedPendingBlobs: state.serializedPendingBlobs,
-        serializedLastGeneratedBlobs: state.serializedLastGeneratedBlobs,
         manifestEntries: state.manifestEntries,
         currentProgress: state.currentProgress,
         errorInfo: state.errorInfo,

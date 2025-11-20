@@ -329,6 +329,11 @@ interface GenerateAllAudioOptions {
   audioProduction?: AudioProductionSettings;
 }
 
+export interface GenerateAllAudioResult {
+  blobs: GeneratedBlob[];
+  concatenationFailed: boolean;
+}
+
 export const generateAllAudio = async (
   dialogueChunks: DialogueChunk[],
   characterConfigs: { [key: string]: CharacterConfig },
@@ -338,13 +343,14 @@ export const generateAllAudio = async (
   concatenate: boolean,
   onProgress?: (progress: GenerationProgress, current: number, total: number) => void,
   options: GenerateAllAudioOptions = {}
-): Promise<GeneratedBlob[]> => {
+): Promise<GenerateAllAudioResult> => {
   const total = dialogueChunks.length;
   const { extension } = getFormatDetails(outputFormat);
   const startIndex = options.startIndex ?? 0;
   const generatedBlobs: GeneratedBlob[] = [...(options.existingBlobs ?? [])];
   const baseDelay = options.delayMs ?? 500;
   let adaptiveDelay = baseDelay;
+  let concatenationFailed = false;
 
   const computeInitialCursor = () => {
     if (!generatedBlobs.length) {
@@ -463,6 +469,7 @@ export const generateAllAudio = async (
       const concatenatedBlob = await concatenateAudioFiles(generatedBlobs, onProgress, options.audioProduction);
       downloadBlob(concatenatedBlob, 'concatenated_audio.mp3');
     } catch (error) {
+      concatenationFailed = true;
       if (onProgress) {
         onProgress({
           current: total,
@@ -472,9 +479,10 @@ export const generateAllAudio = async (
           message: `⚠ Concatenation failed. Download audio individually from the Exports panel.`
         }, total, total);
       }
-      throw error;
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Failed to concatenate audio files:', message);
     }
   }
 
-  return generatedBlobs;
+  return { blobs: generatedBlobs, concatenationFailed };
 };
