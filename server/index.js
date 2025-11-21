@@ -6,6 +6,10 @@ import { promises as fs, createReadStream } from 'fs';
 import path from 'path';
 import { pipeline } from 'stream/promises';
 
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const { logError } = require('../utils/errorHandling.cjs');
+
 const app = express();
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3001;
 const allowedOrigins = process.env.ALLOWED_ORIGIN
@@ -31,7 +35,7 @@ const ensureUploadsDir = async () => {
   try {
     await fs.mkdir('uploads', { recursive: true });
   } catch (error) {
-    console.error('Failed to initialize uploads directory:', error);
+    logError('Failed to initialize uploads directory', error);
     throw error;
   }
 };
@@ -56,7 +60,10 @@ const mixBackgroundTrack = (basePath, backgroundPath, volume, suffix) => {
       .outputOptions(['-map [mix]', '-shortest'])
       .output(nextPath)
       .on('end', () => resolve(nextPath))
-      .on('error', (err) => reject(err))
+      .on('error', (err) => {
+        logError('FFmpeg background mix error', err);
+        reject(err);
+      })
       .run();
   });
 };
@@ -78,7 +85,10 @@ const overlaySoundEffect = (basePath, effectPath, startMs, volume, suffix, index
       .outputOptions(['-map [mix]', '-shortest'])
       .output(nextPath)
       .on('end', () => resolve(nextPath))
-      .on('error', (err) => reject(err))
+      .on('error', (err) => {
+        logError('FFmpeg SFX overlay error', err);
+        reject(err);
+      })
       .run();
   });
 };
@@ -102,7 +112,7 @@ app.post('/concatenate', upload.any(), async (req, res) => {
     try {
       mixConfig = JSON.parse(req.body.mixConfig);
     } catch (error) {
-      console.warn('Failed to parse mix config:', error);
+      logError('Failed to parse mix config', error);
     }
   }
   const backgroundRef = mixConfig?.background?.ref;
@@ -126,7 +136,7 @@ app.post('/concatenate', upload.any(), async (req, res) => {
     res.send(fileStream);
 
     // Cleanup
-    await fs.unlink(file.path).catch(console.error);
+    await fs.unlink(file.path).catch(err => logError('Cleanup failed for single file', err));
     return;
   }
 
@@ -159,8 +169,7 @@ app.post('/concatenate', upload.any(), async (req, res) => {
             resolve();
           })
           .on('error', (err, stdout, stderr) => {
-            console.error('FFmpeg error:', err.message);
-            console.error('FFmpeg stderr:', stderr);
+            logError('FFmpeg error', { message: err.message, stderr });
             reject(err);
           })
           .run();
@@ -201,10 +210,10 @@ app.post('/concatenate', upload.any(), async (req, res) => {
       fs.unlink(fileListPath).catch(() => {}),
       ...tempArtifacts.map(file => fs.unlink(file).catch(() => {})),
       ...uploadedFiles.map(file => fs.unlink(file.path).catch(() => {}))
-    ]).catch(console.error);
+    ]).catch(err => logError('Cleanup failed after success', err));
 
   } catch (error) {
-    console.error('Concatenation error:', error);
+    logError('Concatenation error', error);
 
     // Cleanup on error
     await Promise.all([

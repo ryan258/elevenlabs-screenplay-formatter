@@ -4,6 +4,7 @@ import { basename, resolve } from 'path';
 import { spawn } from 'child_process';
 import { parseScript } from '../utils/parser';
 import { ProjectConfig } from '../types';
+import { logError } from '../utils/errorHandling';
 
 interface CliOptions {
   scripts: string[];
@@ -154,13 +155,13 @@ const run = async () => {
         await concatenateWithFfmpeg(generatedFiles, options.outputDir);
         console.log('Concatenated audio saved to concatenated_audio.mp3');
       } catch (error) {
-        console.warn('Concatenation failed:', error);
+        logError('Concatenation failed', error);
       }
     }
   }
 };
 
 run().catch(error => {
-  console.error(error);
+  logError('CLI Error', error);
   process.exit(1);
 });

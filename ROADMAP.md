@@ -120,7 +120,7 @@ _Context: Personal project for single-user use. Security priorities adjusted acc
   - **Fix:** Build character lookup Map upfront instead of linear search per line. Only fix if you notice slowness.
   - **Resolution:** Replaced linear character search with Map-based lookups (`aliasMap` and `fullNameMap`) for O(1) character resolution. Parser now runs in O(n) time.
 
-- [ ] **Inconsistent error handling patterns**
+- [x] **Inconsistent error handling patterns**
   - **Why it matters:** Makes debugging harder when something goes wrong.
   - **Files:** Throughout codebase
   - **Fix:** Standardize on try-catch with user notifications when you touch error handling code anyway.

@@ -1,12 +1,14 @@
 import { useCallback } from 'react';
 import { AudioProductionSettings, CharacterConfigs, DialogueChunk, GeneratedBlob, ProjectSettings } from '../types';
 import useAppStore from '../store/useAppStore';
-import { generateAllAudio, GenerationError, GenerationProgress } from '../utils/elevenLabsApi';
+import { generateAllAudio, GenerationProgress } from '../utils/elevenLabsApi';
 import { validateConfiguration } from '../utils/scriptGenerator';
 import { buildManifestEntries } from '../utils/manifest';
 import { serializeGeneratedBlobs } from '../utils/blobSerialization';
 import { buildZipBundle, downloadFile } from '../utils/downloads';
 import { slugify } from '../utils/stringUtils';
+import { notifyError } from '../utils/errorHandling';
+import { isGenerationError } from '../utils/type-guards';
 
 interface UseAudioGenerationParams {
   dialogueChunks: DialogueChunk[];
@@ -142,9 +144,8 @@ export const useAudioGeneration = ({
       }
       setIsGenerating(false);
     } catch (error) {
-      console.error('Generation error:', error);
       setManifestEntries([]);
-      if (error instanceof GenerationError) {
+      if (isGenerationError(error)) {
         const resumeMessage = `❌ Error on chunk ${error.failedIndex + 1} (${error.failedCharacter}). Fix the issue and press Resume to continue from this point.`;
         appendProgressMessages(resumeMessage);
         setGeneratedOutput(resumeMessage);
@@ -152,14 +153,14 @@ export const useAudioGeneration = ({
         const serialized = await serializeGeneratedBlobs(error.completedBlobs);
         setPendingBlobsSerialized(serialized);
         setErrorInfo(resumeMessage);
+        addToast('Generation failed - can resume', 'error');
       } else {
-        const errorMessage = `❌ Error during generation:\n\n${error instanceof Error ? error.message : 'Unknown error occurred'}`;
+        const errorMessage = notifyError('Generation failed', error, addToast);
         appendProgressMessages(errorMessage);
         setGeneratedOutput(errorMessage);
         setErrorInfo(errorMessage);
       }
       setIsGenerating(false);
-      addToast('Generation failed', 'error');
     }
   }, [
     addToast,

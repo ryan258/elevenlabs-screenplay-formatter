@@ -1,4 +1,5 @@
 import { AudioProductionSettings, DialogueChunk, CharacterConfig, GeneratedBlob, WordTimestamp } from '../types';
+import { logError, notifyError } from './errorHandling';
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -209,7 +210,7 @@ const fetchAlignmentData = async (
       }))
       .filter((item: WordTimestamp) => item.word.length > 0);
   } catch (error) {
-    console.warn('Alignment fetch failed:', error);
+    logError('Alignment fetch failed', error);
     return null;
   }
 };
@@ -308,17 +309,8 @@ const concatenateAudioFiles = async (
 
     return concatenatedBlob;
   } catch (error) {
-    if (onProgress) {
-      onProgress({
-        current: blobs.length,
-        total: blobs.length,
-        currentCharacter: 'All',
-        status: 'error',
-        message: `✗ Concatenation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-      }, blobs.length, blobs.length);
-    }
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    throw new Error(`Failed to concatenate audio: ${message}`);
+    const message = notifyError('Concatenation failed', error, undefined, 'Failed to concatenate audio');
+    throw new Error(message);
   }
 };
 
@@ -471,17 +463,7 @@ export const generateAllAudio = async (
       downloadBlob(concatenatedBlob, 'concatenated_audio.mp3');
     } catch (error) {
       concatenationFailed = true;
-      if (onProgress) {
-        onProgress({
-          current: total,
-          total,
-          currentCharacter: 'All',
-          status: 'error',
-          message: `⚠ Concatenation failed. Download audio individually from the Exports panel.`
-        }, total, total);
-      }
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      console.error('Failed to concatenate audio files:', message);
+      logError('Failed to concatenate audio files', error);
     }
   }
 
