@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { FixedSizeList as List, ListChildComponentProps } from 'react-window';
 import { DialogueChunk, ManifestEntry } from '../types';
 
 const WORDS_PER_MINUTE = 150;
@@ -46,36 +47,48 @@ const TimelinePanel: React.FC<TimelinePanelProps> = ({ chunks, previewStates, on
         <h2 className="text-xl font-bold text-highlight">Timeline</h2>
         <span className="text-xs text-text-secondary">Estimated runtime: {formatDuration(totalDuration)}</span>
       </div>
-      <div className="max-h-64 overflow-y-auto custom-scrollbar pr-2 space-y-2">
-        {entries.map(({ index, chunk, durationMs }) => {
-          const preview = previewStates[index];
-          return (
-            <div key={index} className="p-2 bg-primary border border-accent rounded-md text-sm">
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-text-primary truncate">[{index + 1}] {chunk.character}</span>
-                <span className="text-xs text-text-secondary">{formatDuration(durationMs)}</span>
-              </div>
-              <p className="text-xs text-text-secondary mt-1 truncate">{chunk.text}</p>
-              <div className="mt-2 flex items-center space-x-2">
-                <button
-                  onClick={() => onPreview(index)}
-                  className="text-xs px-2 py-1 bg-accent hover:bg-highlight rounded focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-highlight disabled:opacity-60"
-                  disabled={preview?.loading}
-                >
-                  {preview?.loading ? 'Loading…' : preview?.url ? 'Replay' : 'Preview'}
-                </button>
-                {preview?.url && (
-                  <audio controls className="w-full" src={preview.url} />
-                )}
-                {preview?.error && (
-                  <span className="text-xs text-red-300">{preview.error}</span>
-                )}
-              </div>
-            </div>
-          );
-        })}
-        {entries.length === 0 && (
+      <div className="max-h-64 overflow-hidden">
+        {entries.length === 0 ? (
           <p className="text-xs text-text-secondary">Add screenplay text to populate the timeline.</p>
+        ) : (
+          <List
+            height={256}
+            itemCount={entries.length}
+            itemSize={110}
+            width="100%"
+            className="custom-scrollbar pr-2 space-y-2"
+          >
+            {({ index, style }: ListChildComponentProps) => {
+              const entry = entries[index];
+              const preview = previewStates[entry.index];
+              return (
+                <div style={style} className="pr-2">
+                  <div className="p-2 bg-primary border border-accent rounded-md text-sm h-full">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-text-primary truncate">[{entry.index + 1}] {entry.chunk.character}</span>
+                      <span className="text-xs text-text-secondary">{formatDuration(entry.durationMs)}</span>
+                    </div>
+                    <p className="text-xs text-text-secondary mt-1 truncate">{entry.chunk.text}</p>
+                    <div className="mt-2 flex items-center space-x-2">
+                      <button
+                        onClick={() => onPreview(entry.index)}
+                        className="text-xs px-2 py-1 bg-accent hover:bg-highlight rounded focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-highlight disabled:opacity-60"
+                        disabled={preview?.loading}
+                      >
+                        {preview?.loading ? 'Loading…' : preview?.url ? 'Replay' : 'Preview'}
+                      </button>
+                      {preview?.url && (
+                        <audio controls className="w-full" src={preview.url} />
+                      )}
+                      {preview?.error && (
+                        <span className="text-xs text-red-300">{preview.error}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            }}
+          </List>
         )}
       </div>
     </div>

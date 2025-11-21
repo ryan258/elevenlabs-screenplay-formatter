@@ -63,6 +63,8 @@ export const parseScript = (scriptText: string): ParsedScript => {
   const lines = scriptText.split('\n');
   const chunks: DialogueChunk[] = [];
   const definedCharacters: DefinedCharacter[] = [];
+  const aliasMap = new Map<string, DefinedCharacter>();
+  const fullNameMap = new Map<string, DefinedCharacter>();
   const unmatchedLines: ParserDiagnostics['unmatchedLines'] = [];
 
   const sceneHeadingRegex = /^(INT\.?|EXT\.?|I\/E\.?|SCENE \d+|EST\.|INT\/EXT\.?|\.)/i;
@@ -70,20 +72,8 @@ export const parseScript = (scriptText: string): ParsedScript => {
   const sameLineDialogueRegex = /^([A-Z0-9\s()."'-]+):\s*(.*)/;
   const uppercaseCharacterRegex = /^[A-Z][A-Z0-9\s.'"()-]*$/;
 
-  const findCharacter = (name: string) => {
-    const normalized = normalizeCharacterName(name);
-    if (!normalized) {
-      return undefined;
-    }
-    return definedCharacters.find(c => c.aliases.has(normalized));
-  };
-
-  const registerCharacter = (rawName: string): DefinedCharacter | undefined => {
-    const fullName = normalizeCharacterName(rawName);
-    if (!fullName) {
-      return undefined;
-    }
-    const existing = definedCharacters.find(c => c.fullName === fullName);
+  const addCharacter = (fullName: string): DefinedCharacter => {
+    const existing = fullNameMap.get(fullName);
     if (existing) {
       return existing;
     }
@@ -92,7 +82,25 @@ export const parseScript = (scriptText: string): ParsedScript => {
       aliases: generateAliases(fullName)
     };
     definedCharacters.push(newCharacter);
+    fullNameMap.set(fullName, newCharacter);
+    newCharacter.aliases.forEach(alias => aliasMap.set(alias, newCharacter));
     return newCharacter;
+  };
+
+  const findCharacter = (name: string) => {
+    const normalized = normalizeCharacterName(name);
+    if (!normalized) {
+      return undefined;
+    }
+    return aliasMap.get(normalized);
+  };
+
+  const registerCharacter = (rawName: string): DefinedCharacter | undefined => {
+    const fullName = normalizeCharacterName(rawName);
+    if (!fullName) {
+      return undefined;
+    }
+    return addCharacter(fullName);
   };
 
   let currentCharacterFullName: string | null = null;
@@ -195,10 +203,7 @@ export const parseScript = (scriptText: string): ParsedScript => {
         const rawName = openParenIndex !== -1 ? characterDef.substring(0, openParenIndex) : characterDef;
         const fullName = normalizeCharacterName(rawName);
         if (fullName) {
-          definedCharacters.push({
-            fullName,
-            aliases: generateAliases(fullName)
-          });
+          addCharacter(fullName);
         }
         continue;
       } else if (trimmedLine !== '' && !trimmedLine.startsWith('-')) {

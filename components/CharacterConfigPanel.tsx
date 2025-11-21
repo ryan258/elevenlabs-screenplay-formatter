@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { FixedSizeList as List, ListChildComponentProps } from 'react-window';
 import { CharacterConfigs, CharacterConfig, VoicePresets, VoiceSettings } from '../types';
 import Slider from './Slider';
 
@@ -138,70 +139,80 @@ const CharacterConfigPanel: React.FC<CharacterConfigPanelProps> = ({
         </button>
       </div>
       </div>
-      <div className="flex-grow overflow-y-auto custom-scrollbar pr-2">
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-1 gap-4">
-          {filteredCharacters.length === 0 && (
-            <div className="p-3 border bg-primary border-accent rounded-md text-center text-text-secondary">
-              No characters match “{search}”.
-            </div>
-          )}
-          {filteredCharacters.map((char) => {
-            const config = configs[char] || { voiceId: '', voiceSettings: { stability: 0.5, similarity_boost: 0.75, style: 0.1, speed: 1.0 } };
-            const voiceId = makeId(char, 'voice-id');
-            const stabilityId = makeId(char, 'stability');
-            const similarityId = makeId(char, 'similarity');
-            const styleId = makeId(char, 'style');
-            const speedId = makeId(char, 'speed');
-            return (
-              <div key={char} className="p-3 border bg-primary border-accent rounded-md flex flex-col space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-text-primary truncate">{char}</h3>
-                  {!config.voiceId && (
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-red-600 text-white">No Voice ID</span>
-                  )}
-                </div>
-                {presetNames.length > 0 && (
-                  <div className="flex items-center space-x-2">
-                    <select
-                      value=""
-                      onChange={(e) => {
-                        const preset = e.target.value;
-                        if (preset) {
-                          onApplyPresetToCharacter(preset, char);
-                        }
-                      }}
-                      className="flex-1 p-2 bg-secondary border border-accent rounded-md focus:outline-none focus:ring-2 focus:ring-highlight text-xs"
-                    >
-                      <option value="">Apply preset…</option>
-                      {presetNames.map(name => (
-                        <option key={name} value={name}>{name}</option>
-                      ))}
-                    </select>
+      <div className="flex-grow overflow-hidden">
+        {filteredCharacters.length === 0 ? (
+          <div className="p-3 border bg-primary border-accent rounded-md text-center text-text-secondary">
+            No characters match “{search}”.
+          </div>
+        ) : (
+          <List
+            height={Math.min(520, filteredCharacters.length * 260)}
+            itemCount={filteredCharacters.length}
+            itemSize={260}
+            width="100%"
+            className="custom-scrollbar pr-2"
+          >
+            {({ index, style }: ListChildComponentProps) => {
+              const char = filteredCharacters[index];
+              const config = configs[char] || { voiceId: '', voiceSettings: { stability: 0.5, similarity_boost: 0.75, style: 0.1, speed: 1.0 } };
+              const voiceId = makeId(char, 'voice-id');
+              const stabilityId = makeId(char, 'stability');
+              const similarityId = makeId(char, 'similarity');
+              const styleId = makeId(char, 'style');
+              const speedId = makeId(char, 'speed');
+              return (
+                <div style={style} className="pr-3">
+                  <div className="p-3 border bg-primary border-accent rounded-md flex flex-col space-y-3 h-full">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold text-text-primary truncate">{char}</h3>
+                      {!config.voiceId && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-red-600 text-white">No Voice ID</span>
+                      )}
+                    </div>
+                    {presetNames.length > 0 && (
+                      <div className="flex items-center space-x-2">
+                        <select
+                          value=""
+                          onChange={(e) => {
+                            const preset = e.target.value;
+                            if (preset) {
+                              onApplyPresetToCharacter(preset, char);
+                            }
+                          }}
+                          className="flex-1 p-2 bg-secondary border border-accent rounded-md focus:outline-none focus:ring-2 focus:ring-highlight text-xs"
+                        >
+                          <option value="">Apply preset…</option>
+                          {presetNames.map(name => (
+                            <option key={name} value={name}>{name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    <div>
+                      <label htmlFor={voiceId} className="block text-sm font-medium text-text-secondary mb-1">
+                        Voice ID
+                      </label>
+                      <input
+                        id={voiceId}
+                        type="text"
+                        value={config.voiceId}
+                        onChange={(e) => handleConfigChange(char, 'voiceId', e.target.value)}
+                        placeholder="Enter Voice ID"
+                        className="w-full p-2 bg-secondary border border-accent rounded-md focus:outline-none focus:ring-2 focus:ring-highlight"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Slider id={stabilityId} label="Stability" value={config.voiceSettings.stability} min={0} max={1} step={0.01} onChange={(e) => handleSliderChange(char, 'stability', e.target.value)} />
+                      <Slider id={similarityId} label="Similarity Boost" value={config.voiceSettings.similarity_boost} min={0} max={1} step={0.01} onChange={(e) => handleSliderChange(char, 'similarity_boost', e.target.value)} />
+                      <Slider id={styleId} label="Style Exaggeration" value={config.voiceSettings.style} min={0} max={1} step={0.01} onChange={(e) => handleSliderChange(char, 'style', e.target.value)} />
+                      <Slider id={speedId} label="Speed" value={config.voiceSettings.speed} min={0.5} max={2} step={0.05} onChange={(e) => handleSliderChange(char, 'speed', e.target.value)} />
+                    </div>
                   </div>
-                )}
-                <div>
-                  <label htmlFor={voiceId} className="block text-sm font-medium text-text-secondary mb-1">
-                    Voice ID
-                  </label>
-                  <input
-                    id={voiceId}
-                    type="text"
-                    value={config.voiceId}
-                    onChange={(e) => handleConfigChange(char, 'voiceId', e.target.value)}
-                    placeholder="Enter Voice ID"
-                    className="w-full p-2 bg-secondary border border-accent rounded-md focus:outline-none focus:ring-2 focus:ring-highlight"
-                  />
                 </div>
-                <div className="space-y-2">
-                    <Slider id={stabilityId} label="Stability" value={config.voiceSettings.stability} min={0} max={1} step={0.01} onChange={(e) => handleSliderChange(char, 'stability', e.target.value)} />
-                    <Slider id={similarityId} label="Similarity Boost" value={config.voiceSettings.similarity_boost} min={0} max={1} step={0.01} onChange={(e) => handleSliderChange(char, 'similarity_boost', e.target.value)} />
-                    <Slider id={styleId} label="Style Exaggeration" value={config.voiceSettings.style} min={0} max={1} step={0.01} onChange={(e) => handleSliderChange(char, 'style', e.target.value)} />
-                    <Slider id={speedId} label="Speed" value={config.voiceSettings.speed} min={0.5} max={2} step={0.05} onChange={(e) => handleSliderChange(char, 'speed', e.target.value)} />
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            }}
+          </List>
+        )}
       </div>
     </div>
   );

@@ -96,30 +96,35 @@ _Context: Personal project for single-user use. Security priorities adjusted acc
 
 ### 🟢 Medium Priority (Quality of Life Improvements)
 
-- [ ] **App.tsx is too large (880 lines)**
+- [x] **App.tsx is too large (880 lines)**
   - **Why it matters:** Hard to navigate and modify. Makes debugging harder.
   - **File:** `App.tsx`
   - **Fix:** Extract custom hooks (`useProjectManager`, `useAudioGeneration`, `useVoicePresets`), split into smaller components when you need to make changes.
+  - **Resolution:** Reduced from 895 lines to 723 lines (-19%). Extracted `useAudioGeneration` hook and created utility modules (`downloads.ts`, `stringUtils.ts`, `errorHandling.ts`).
 
-- [ ] **Inefficient re-renders in App.tsx**
+- [x] **Inefficient re-renders in App.tsx**
   - **Why it matters:** UI feels sluggish when generating audio or updating state.
   - **File:** `App.tsx:127-174`
   - **Fix:** Split store selectors into smaller chunks, use React.memo for expensive components when performance becomes noticeable.
+  - **Resolution:** Split monolithic selector into 7 focused selectors using `useShallow` for fine-grained subscriptions (App.tsx:59-113).
 
-- [ ] **Missing pagination/virtualization for long scripts**
+- [x] **Missing pagination/virtualization for long scripts**
   - **Why it matters:** Browser slows down with 200+ dialogue chunks.
   - **Files:** `components/TimelinePanel.tsx`, `components/CharacterConfigPanel.tsx`
   - **Fix:** Implement virtual scrolling (react-window) or pagination when you actually process scripts this large.
+  - **Resolution:** Implemented `react-window` with `FixedSizeList` in both components. CharacterConfigPanel uses 260px items, TimelinePanel uses 110px items.
 
-- [ ] **Unoptimized parser (O(n²) complexity)**
+- [x] **Unoptimized parser (O(n²) complexity)**
   - **Why it matters:** Parsing slows down noticeably on 1000+ line scripts.
   - **File:** `utils/parser.ts:171-214`
   - **Fix:** Build character lookup Map upfront instead of linear search per line. Only fix if you notice slowness.
+  - **Resolution:** Replaced linear character search with Map-based lookups (`aliasMap` and `fullNameMap`) for O(1) character resolution. Parser now runs in O(n) time.
 
 - [ ] **Inconsistent error handling patterns**
   - **Why it matters:** Makes debugging harder when something goes wrong.
   - **Files:** Throughout codebase
   - **Fix:** Standardize on try-catch with user notifications when you touch error handling code anyway.
+  - **Progress:** Created `utils/errorHandling.ts` with `logError` and `notifyError` utilities. Still needs to be applied throughout codebase.
 
 ---
 

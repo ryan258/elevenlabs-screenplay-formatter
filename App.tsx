@@ -11,15 +11,14 @@ import GenerationProfilesPanel from './components/GenerationProfilesPanel';
 import ExportPanel from './components/ExportPanel';
 import Modal from './components/Modal';
 import { useScriptParser } from './hooks/useScriptParser';
-import { CharacterConfigs, GeneratedBlob, ManifestEntry, ProjectConfig, ProjectSettings, ResumeInfo, VoicePresets, VoiceSettings } from './types';
-import { validateConfiguration } from './utils/scriptGenerator';
-import { generateAllAudio, generateAudioFile, GenerationError, GenerationProgress, getConcatenationHealthUrl } from './utils/elevenLabsApi';
-import { buildManifestEntries, manifestToCsv, manifestToSrt, manifestToVtt } from './utils/manifest';
+import { useAudioGeneration } from './hooks/useAudioGeneration';
+import { CharacterConfigs, ProjectConfig, VoiceSettings } from './types';
+import { generateAudioFile, getConcatenationHealthUrl } from './utils/elevenLabsApi';
+import { manifestToCsv, manifestToSrt, manifestToVtt } from './utils/manifest';
 import { buildReaperProject } from './utils/reaperExport';
 import { fetchElevenLabsModels, fetchElevenLabsVoices } from './utils/elevenLabsClient';
 import { GENERATION_PROFILES } from './config/generationProfiles';
 import { isMultilingualModelId } from './config/modelOptions';
-import JSZip from 'jszip';
 import ConcatenationStatus from './components/ConcatenationStatus';
 import { demoProject } from './samples/demoProject';
 import ProjectManagerPanel from './components/ProjectManagerPanel';
@@ -29,7 +28,10 @@ import VoiceSuggestionsPanel from './components/VoiceSuggestionsPanel';
 import ToastContainer from './components/ToastContainer';
 import useAppStore from './store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
-import { deserializeGeneratedBlobs, serializeGeneratedBlobs } from './utils/blobSerialization';
+import { deserializeGeneratedBlobs } from './utils/blobSerialization';
+import { buildZipBundle, downloadFile } from './utils/downloads';
+import { slugify } from './utils/stringUtils';
+import { notifyError } from './utils/errorHandling';
 
 const CONCATENATION_ENDPOINT = import.meta.env?.VITE_CONCAT_SERVER_URL || 'http://localhost:3001/concatenate';
 const DEFAULT_VOICE_SETTINGS = {
@@ -37,15 +39,6 @@ const DEFAULT_VOICE_SETTINGS = {
   similarity_boost: 0.75,
   style: 0.1,
   speed: 1
-};
-const slugify = (value: string) => value.replace(/[^\w]+/g, '_').replace(/^_+|_+$/g, '').toLowerCase();
-const downloadFile = (blob: Blob, filename: string) => {
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.click();
-  URL.revokeObjectURL(url);
 };
 
 const encodeSharePayload = (value: string) => {
@@ -60,109 +53,55 @@ const decodeSharePayload = (value: string) => {
     : '';
 };
 
-const buildZipBundle = async (blobs: GeneratedBlob[], manifestEntries: ManifestEntry[]) => {
-  const zip = new JSZip();
-  blobs.forEach(({ blob, filename }) => {
-    const safeName = filename || `clip_${Date.now()}.mp3`;
-    zip.file(safeName, blob);
-  });
-  if (manifestEntries.length) {
-    zip.file('manifest.json', JSON.stringify(manifestEntries, null, 2));
-    const csv = manifestToCsv(manifestEntries);
-    zip.file('manifest.csv', csv);
-  }
-  return zip.generateAsync({ type: 'blob' });
-};
-
 // Implemented the main App component to structure the application and manage state.
 function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const {
-    scriptText,
-    setScriptText,
-    apiKey,
-    setApiKey,
-    rememberApiKey,
-    setRememberApiKey,
-    projectSettings,
-    setProjectSettings,
-    characterConfigs,
-    setCharacterConfigs,
-    voicePresets,
-    setVoicePresets,
-    audioProduction,
-    setAudioProduction,
-    generatedOutput,
-    setGeneratedOutput,
-    isGenerating,
-    setIsGenerating,
-    progressMessages,
-    setProgressMessages,
-    appendProgressMessages,
-    resumeInfo,
-    setResumeInfo,
-    serializedPendingBlobs,
-    setPendingBlobsSerialized,
-    manifestEntries,
-    setManifestEntries,
-    serializedLastGeneratedBlobs,
-    setLastGeneratedBlobsSerialized,
-    currentProgress,
-    setCurrentProgress,
-    errorInfo,
-    setErrorInfo,
-    concatStatus,
-    setConcatStatus,
-    hasHydrated,
-    setHasHydrated,
-    addToast,
-    availableVoices,
-    setAvailableVoices,
-    voicesStatus,
-    setVoicesStatus,
-    availableModels,
-    setAvailableModels,
-    modelsStatus,
-    setModelsStatus
-  } = useAppStore(useShallow(state => ({
+  const { scriptText, setScriptText } = useAppStore(useShallow(state => ({
     scriptText: state.scriptText,
-    setScriptText: state.setScriptText,
+    setScriptText: state.setScriptText
+  })));
+  const { characterConfigs, setCharacterConfigs, voicePresets, setVoicePresets } = useAppStore(useShallow(state => ({
+    characterConfigs: state.characterConfigs,
+    setCharacterConfigs: state.setCharacterConfigs,
+    voicePresets: state.voicePresets,
+    setVoicePresets: state.setVoicePresets
+  })));
+  const { apiKey, setApiKey, rememberApiKey, setRememberApiKey, projectSettings, setProjectSettings } = useAppStore(useShallow(state => ({
     apiKey: state.apiKey,
     setApiKey: state.setApiKey,
     rememberApiKey: state.rememberApiKey,
     setRememberApiKey: state.setRememberApiKey,
     projectSettings: state.projectSettings,
-    setProjectSettings: state.setProjectSettings,
-    characterConfigs: state.characterConfigs,
-    setCharacterConfigs: state.setCharacterConfigs,
-    voicePresets: state.voicePresets,
-    setVoicePresets: state.setVoicePresets,
+    setProjectSettings: state.setProjectSettings
+  })));
+  const { audioProduction, setAudioProduction } = useAppStore(useShallow(state => ({
     audioProduction: state.audioProduction,
-    setAudioProduction: state.setAudioProduction,
+    setAudioProduction: state.setAudioProduction
+  })));
+  const { generatedOutput, isGenerating, progressMessages, currentProgress, errorInfo, resumeInfo, appendProgressMessages } = useAppStore(useShallow(state => ({
     generatedOutput: state.generatedOutput,
-    setGeneratedOutput: state.setGeneratedOutput,
     isGenerating: state.isGenerating,
-    setIsGenerating: state.setIsGenerating,
     progressMessages: state.progressMessages,
-    setProgressMessages: state.setProgressMessages,
-    appendProgressMessages: state.appendProgressMessages,
+    currentProgress: state.currentProgress,
+    errorInfo: state.errorInfo,
     resumeInfo: state.resumeInfo,
-    setResumeInfo: state.setResumeInfo,
+    appendProgressMessages: state.appendProgressMessages
+  })));
+  const { serializedPendingBlobs, manifestEntries, setManifestEntries, serializedLastGeneratedBlobs, setLastGeneratedBlobsSerialized } = useAppStore(useShallow(state => ({
     serializedPendingBlobs: state.serializedPendingBlobs,
-    setPendingBlobsSerialized: state.setPendingBlobsSerialized,
     manifestEntries: state.manifestEntries,
     setManifestEntries: state.setManifestEntries,
     serializedLastGeneratedBlobs: state.serializedLastGeneratedBlobs,
-    setLastGeneratedBlobsSerialized: state.setLastGeneratedBlobsSerialized,
-    currentProgress: state.currentProgress,
-    setCurrentProgress: state.setCurrentProgress,
-    errorInfo: state.errorInfo,
-    setErrorInfo: state.setErrorInfo,
+    setLastGeneratedBlobsSerialized: state.setLastGeneratedBlobsSerialized
+  })));
+  const { concatStatus, setConcatStatus, hasHydrated, setHasHydrated, addToast } = useAppStore(useShallow(state => ({
     concatStatus: state.concatStatus,
     setConcatStatus: state.setConcatStatus,
     hasHydrated: state.hasHydrated,
     setHasHydrated: state.setHasHydrated,
-    addToast: state.addToast,
+    addToast: state.addToast
+  })));
+  const { availableVoices, setAvailableVoices, voicesStatus, setVoicesStatus, availableModels, setAvailableModels, modelsStatus, setModelsStatus } = useAppStore(useShallow(state => ({
     availableVoices: state.availableVoices,
     setAvailableVoices: state.setAvailableVoices,
     voicesStatus: state.voicesStatus,
@@ -188,6 +127,15 @@ function App() {
   }, []);
   const pendingBlobs = useMemo(() => deserializeGeneratedBlobs(serializedPendingBlobs), [serializedPendingBlobs]);
   const lastGeneratedBlobs = useMemo(() => deserializeGeneratedBlobs(serializedLastGeneratedBlobs), [serializedLastGeneratedBlobs]);
+  const { handleGenerate, handleResume } = useAudioGeneration({
+    dialogueChunks,
+    characterConfigs,
+    projectSettings,
+    apiKey,
+    audioProduction,
+    pendingBlobs,
+    addToast
+  });
   const handleLoadProjectConfig = useCallback((config: ProjectConfig) => {
     if (config.scriptText !== undefined) {
       setScriptText(config.scriptText);
@@ -258,8 +206,7 @@ function App() {
       handleLoadProjectConfig(parsed);
       addToast('Shared project loaded', 'success');
     } catch (error) {
-      console.error('Failed to load shared project:', error);
-      addToast('Failed to load shared project', 'error');
+      notifyError('Load shared project', error, addToast, 'Failed to load shared project');
     } finally {
       params.delete('project');
       const nextQuery = params.toString();
@@ -285,9 +232,8 @@ function App() {
         if (controller.signal.aborted) {
           return;
         }
-        console.warn('Failed to fetch ElevenLabs voices:', error);
         setVoicesStatus('error');
-        addToast('Unable to load ElevenLabs voices.', 'error');
+        notifyError('Fetch voices', error, addToast, 'Unable to load ElevenLabs voices.');
       });
     return () => {
       controller.abort();
@@ -311,8 +257,8 @@ function App() {
         if (controller.signal.aborted) {
           return;
         }
-        console.warn('Failed to fetch ElevenLabs models:', error);
         setModelsStatus('error');
+        notifyError('Fetch models', error, undefined, 'Unable to load ElevenLabs models.');
       });
     return () => {
       controller.abort();
@@ -342,16 +288,16 @@ function App() {
       }
       setConcatStatus('online');
     } catch (error) {
-      console.warn('Concatenation health check failed:', error);
+      notifyError('Concatenation health', error);
       setConcatStatus('offline');
     }
-  }, [healthUrl]);
+  }, [healthUrl, setConcatStatus]);
 
   useEffect(() => {
     checkConcatenationHealth().catch(() => {
       setConcatStatus('offline');
     });
-  }, [checkConcatenationHealth]);
+  }, [checkConcatenationHealth, setConcatStatus]);
 
   useEffect(() => {
     return () => {
@@ -418,8 +364,7 @@ function App() {
       await navigator.clipboard.writeText(shareUrl);
       addToast('Shareable link copied to clipboard', 'success');
     } catch (error) {
-      console.error('Failed to copy share link:', error);
-      addToast('Failed to copy share link', 'error');
+      notifyError('Copy share link', error, addToast, 'Failed to copy share link');
     }
   };
 
@@ -436,9 +381,8 @@ function App() {
       appendProgressMessages('📁 Project loaded from file.');
       addToast('Project loaded from file', 'success');
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Invalid project file';
+      const message = notifyError('Load project file', error, addToast, 'Failed to load project file');
       appendProgressMessages(`❌ Failed to load project: ${message}`);
-      addToast('Failed to load project file', 'error');
     }
   };
 
@@ -632,123 +576,7 @@ function App() {
     downloadFile(blob, `${slugify(projectLabel)}.rpp`);
   };
 
-  const runGeneration = async (startIndex = 0, existingBlobs: GeneratedBlob[] = []) => {
-    setIsGenerating(true);
-    if (startIndex === 0) {
-      setProgressMessages([]);
-    }
-    setGeneratedOutput('');
-    setErrorInfo(null);
-    setResumeInfo(null);
-
-    try {
-      // Validate configuration
-      const validation = validateConfiguration(dialogueChunks, characterConfigs, apiKey);
-
-      if (!validation.valid) {
-        setGeneratedOutput(`❌ Configuration Errors:\n\n${validation.errors.join('\n')}\n\nPlease fix these issues and try again.`);
-        setIsGenerating(false);
-        return;
-      }
-
-      const modeMessage = startIndex === 0
-        ? `🚀 Starting audio generation...\n\nTotal dialogue chunks: ${dialogueChunks.length}\nCharacters: ${Object.keys(characterConfigs).join(', ')}\nModel: ${projectSettings.model}\nConcatenate: ${projectSettings.concatenate ? 'Yes' : 'No'}\n\n`
-        : `🔁 Resuming generation from chunk ${startIndex + 1} (${dialogueChunks[startIndex]?.character || 'Unknown'})`;
-      if (startIndex === 0) {
-        setProgressMessages([modeMessage]);
-      } else {
-        appendProgressMessages(modeMessage);
-      }
-
-      const preparedChunks = dialogueChunks.map(chunk => ({
-        ...chunk,
-        text: projectSettings.speakParentheticals && chunk.originalText ? chunk.originalText : chunk.text
-      }));
-
-      // Generate all audio files
-      const versionSlug = projectSettings.versionLabel ? slugify(projectSettings.versionLabel) : undefined;
-      const { blobs, concatenationFailed } = await generateAllAudio(
-        preparedChunks,
-        characterConfigs,
-        apiKey,
-        projectSettings.model,
-        projectSettings.outputFormat,
-        projectSettings.concatenate,
-        (progress: GenerationProgress, current: number, total: number) => {
-          appendProgressMessages(`[${current}/${total}] ${progress.message}`);
-          setCurrentProgress({
-            current,
-            total,
-            character: progress.currentCharacter,
-            snippet: progress.snippet || ''
-          });
-        },
-        {
-          startIndex,
-          existingBlobs,
-          delayMs: projectSettings.requestDelayMs,
-          filenamePrefix: versionSlug,
-          audioProduction
-        }
-      );
-      const manifest = buildManifestEntries(preparedChunks, blobs);
-      setManifestEntries(manifest);
-      const serialized = await serializeGeneratedBlobs(blobs);
-      setLastGeneratedBlobsSerialized(serialized);
-
-      // Success message
-      const successMessage = projectSettings.concatenate
-        ? concatenationFailed
-          ? `\n⚠ Generation finished, but concatenation failed.\n\nAll ${dialogueChunks.length} audio files were generated. The concatenation server returned an error, so a ZIP with individual clips was downloaded instead.`
-          : `\n✅ Generation Complete!\n\nAll ${dialogueChunks.length} audio files have been generated and concatenated into a single file.\nCheck your Downloads folder for "concatenated_audio.mp3".`
-        : `\n✅ Generation Complete!\n\nAll ${dialogueChunks.length} audio files have been generated and bundled into a ZIP archive.\nCheck your Downloads folder for the ZIP file.`;
-      appendProgressMessages(successMessage);
-      setGeneratedOutput(successMessage);
-      setPendingBlobsSerialized([]);
-      setResumeInfo(null);
-      setErrorInfo(null);
-      setCurrentProgress({ current: 0, total: 0, character: '', snippet: '' });
-      if (!projectSettings.concatenate || concatenationFailed) {
-        const zipBlob = await buildZipBundle(blobs, manifest);
-        downloadFile(zipBlob, `elevenlabs_audio_${Date.now()}.zip`);
-        if (projectSettings.concatenate && concatenationFailed) {
-          addToast('Concatenation failed. Downloaded ZIP with individual files instead.', 'error');
-        } else {
-          addToast('Generation complete (ZIP downloaded)', 'success');
-        }
-      } else {
-        addToast('Generation complete', 'success');
-      }
-      setIsGenerating(false);
-
-    } catch (error) {
-      console.error('Generation error:', error);
-      setManifestEntries([]);
-      if (error instanceof GenerationError) {
-        const resumeMessage = `❌ Error on chunk ${error.failedIndex + 1} (${error.failedCharacter}). Fix the issue and press Resume to continue from this point.`;
-        appendProgressMessages(resumeMessage);
-        setGeneratedOutput(resumeMessage);
-        setResumeInfo({ index: error.failedIndex, character: error.failedCharacter });
-        const serialized = await serializeGeneratedBlobs(error.completedBlobs);
-        setPendingBlobsSerialized(serialized);
-        setErrorInfo(resumeMessage);
-      } else {
-        const errorMessage = `❌ Error during generation:\n\n${error instanceof Error ? error.message : 'Unknown error occurred'}`;
-        appendProgressMessages(errorMessage);
-        setGeneratedOutput(errorMessage);
-        setErrorInfo(errorMessage);
-      }
-      setIsGenerating(false);
-      addToast('Generation failed', 'error');
-    }
-  };
-
-  const handleGenerate = () => runGeneration(0, []);
-  const handleResume = () => {
-    if (resumeInfo) {
-      runGeneration(resumeInfo.index, pendingBlobs);
-    }
-  };
+  // audio generation handled by useAudioGeneration hook
 
   const progressPercent = currentProgress.total > 0
     ? Math.min(100, Math.round((currentProgress.current / currentProgress.total) * 100))
