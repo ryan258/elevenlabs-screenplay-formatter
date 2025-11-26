@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { AudioProductionSettings, CharacterConfigs, DialogueChunk, GeneratedBlob, ProjectSettings } from '../types';
 import useAppStore from '../store/useAppStore';
 import { generateAllAudio, GenerationProgress } from '../utils/elevenLabsApi';
@@ -41,7 +42,7 @@ export const useAudioGeneration = ({
     setPendingBlobsSerialized,
     setLastGeneratedBlobsSerialized,
     resumeInfo
-  } = useAppStore(state => ({
+  } = useAppStore(useShallow(state => ({
     setIsGenerating: state.setIsGenerating,
     setProgressMessages: state.setProgressMessages,
     appendProgressMessages: state.appendProgressMessages,
@@ -53,7 +54,7 @@ export const useAudioGeneration = ({
     setPendingBlobsSerialized: state.setPendingBlobsSerialized,
     setLastGeneratedBlobsSerialized: state.setLastGeneratedBlobsSerialized,
     resumeInfo: state.resumeInfo
-  }));
+  })));
   const cachedBlobs = pendingBlobs;
 
   const runGeneration = useCallback(async (startIndex = 0, existingBlobs: GeneratedBlob[] = []) => {

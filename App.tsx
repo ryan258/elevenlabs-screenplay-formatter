@@ -153,10 +153,10 @@ function App() {
       setAudioProduction({
         backgroundTrack: config.audioProduction.backgroundTrack
           ? {
-              volume: config.audioProduction.backgroundTrack.volume,
-              filename: config.audioProduction.backgroundTrack.filename,
-              file: undefined
-            }
+            volume: config.audioProduction.backgroundTrack.volume,
+            filename: config.audioProduction.backgroundTrack.filename,
+            file: undefined
+          }
           : undefined,
         soundEffects: config.audioProduction.soundEffects?.map(effect => ({
           ...effect,
@@ -321,9 +321,9 @@ function App() {
     audioProduction: {
       backgroundTrack: audioProduction.backgroundTrack
         ? {
-            volume: audioProduction.backgroundTrack.volume,
-            filename: audioProduction.backgroundTrack.filename
-          }
+          volume: audioProduction.backgroundTrack.volume,
+          filename: audioProduction.backgroundTrack.filename
+        }
         : undefined,
       soundEffects: audioProduction.soundEffects.map(effect => ({
         id: effect.id,
@@ -589,11 +589,11 @@ function App() {
         <h1 className="text-2xl font-bold text-highlight text-center">Script-to-Audio</h1>
         <p className="text-center text-text-secondary">Bring your screenplay to life with AI-powered voice generation.</p>
       </header>
-      
+
       <main className="p-4 md:p-8 grid grid-cols-1 xl:grid-cols-3 gap-8">
         <div className="xl:col-span-2 flex flex-col gap-8">
-          <ScriptInput 
-            scriptText={scriptText} 
+          <ScriptInput
+            scriptText={scriptText}
             setScriptText={setScriptText}
             onExpand={handleExpand}
           />
@@ -621,83 +621,83 @@ function App() {
         </div>
 
         <aside className="xl:col-span-1 flex flex-col gap-8">
-            <ApiKeyPanel
-              apiKey={apiKey}
-              setApiKey={setApiKey}
-              rememberApiKey={rememberApiKey}
-              onRememberChange={handleRememberToggle}
-            />
-            <ProjectSettingsPanel
-              settings={projectSettings}
-              setSettings={setProjectSettings}
-              modelOptions={availableModels}
-              modelsStatus={modelsStatus}
-            />
-            <AudioProductionPanel
-              audioProduction={audioProduction}
-              onChange={(updater) => setAudioProduction(updater)}
-            />
-            <GenerationProfilesPanel
-              selectedProfileId={projectSettings.profileId}
-              onSelectProfile={handleSelectProfile}
-            />
-            <ProjectManagerPanel
-              onDownloadProject={() => handleDownloadProject()}
-              onLoadProjectFile={(file) => handleLoadProjectFromFile(file)}
-              onLoadDemo={handleLoadDemoProject}
-              onCopyShareLink={handleCopyShareLink}
-              metadata={{
-                characters: characters.length,
-                dialogueChunks: dialogueChunks.length,
-                unmatched: diagnostics.unmatchedLines.length,
-                versionLabel: projectSettings.versionLabel
-              }}
-            />
-            <VoicePresetsPanel
-              characters={characters}
-              characterConfigs={characterConfigs}
-              voicePresets={voicePresets}
-              onSavePreset={handleSaveVoicePreset}
-              onDeletePreset={handleDeletePreset}
-            />
-            <VoiceSuggestionsPanel
-              languageCode={projectSettings.languageCode}
-              characters={characters}
-              onApplySuggestion={handleApplyVoiceSuggestion}
-              customVoices={availableVoices}
-              voicesStatus={voicesStatus}
-              onApplyCustomVoice={handleApplyCustomVoice}
-            />
-            <ExportPanel
-              manifestEntries={manifestEntries}
-              onDownloadJson={handleDownloadManifestJson}
-              onDownloadCsv={handleDownloadManifestCsv}
-              onDownloadZip={handleDownloadZip}
-              onDownloadSrt={handleDownloadSrt}
-              onDownloadVtt={handleDownloadVtt}
-              onDownloadReaper={handleDownloadReaperTemplate}
-            />
-            <ConcatenationStatus
-              status={concatStatus}
-              onCheck={checkConcatenationHealth}
-              endpoint={CONCATENATION_ENDPOINT}
-              healthUrl={healthUrl}
-            />
-            <CharacterConfigPanel
-              characters={characters}
-              configs={characterConfigs}
-              setConfigs={setCharacterConfigs}
-              voicePresets={voicePresets}
-              onApplyPresetToCharacter={handleApplyPresetToCharacter}
-              onApplyPresetToAll={handleApplyPresetToAll}
-            />
-            <GeneratePanel 
-              onGenerate={handleGenerate}
-              isGenerating={isGenerating}
-              canGenerate={canGenerate}
-              onResume={resumeInfo ? handleResume : undefined}
-              resumeInfo={resumeInfo}
-            />
+          <ApiKeyPanel
+            apiKey={apiKey}
+            setApiKey={setApiKey}
+            rememberApiKey={rememberApiKey}
+            onRememberChange={handleRememberToggle}
+          />
+          <ProjectSettingsPanel
+            settings={projectSettings}
+            setSettings={setProjectSettings}
+            modelOptions={availableModels}
+            modelsStatus={modelsStatus}
+          />
+          <AudioProductionPanel
+            audioProduction={audioProduction}
+            onChange={(updater) => setAudioProduction(updater)}
+          />
+          <GenerationProfilesPanel
+            selectedProfileId={projectSettings.profileId}
+            onSelectProfile={handleSelectProfile}
+          />
+          <ProjectManagerPanel
+            onDownloadProject={() => handleDownloadProject()}
+            onLoadProjectFile={(file) => handleLoadProjectFromFile(file)}
+            onLoadDemo={handleLoadDemoProject}
+            onCopyShareLink={handleCopyShareLink}
+            metadata={{
+              characters: characters.length,
+              dialogueChunks: dialogueChunks.length,
+              unmatched: diagnostics.unmatchedLines.length,
+              versionLabel: projectSettings.versionLabel
+            }}
+          />
+          <VoicePresetsPanel
+            characters={characters}
+            characterConfigs={characterConfigs}
+            voicePresets={voicePresets}
+            onSavePreset={handleSaveVoicePreset}
+            onDeletePreset={handleDeletePreset}
+          />
+          <VoiceSuggestionsPanel
+            languageCode={projectSettings.languageCode}
+            characters={characters}
+            onApplySuggestion={handleApplyVoiceSuggestion}
+            customVoices={availableVoices}
+            voicesStatus={voicesStatus}
+            onApplyCustomVoice={handleApplyCustomVoice}
+          />
+          <ExportPanel
+            manifestEntries={manifestEntries}
+            onDownloadJson={handleDownloadManifestJson}
+            onDownloadCsv={handleDownloadManifestCsv}
+            onDownloadZip={handleDownloadZip}
+            onDownloadSrt={handleDownloadSrt}
+            onDownloadVtt={handleDownloadVtt}
+            onDownloadReaper={handleDownloadReaperTemplate}
+          />
+          <ConcatenationStatus
+            status={concatStatus}
+            onCheck={checkConcatenationHealth}
+            endpoint={CONCATENATION_ENDPOINT}
+            healthUrl={healthUrl}
+          />
+          <CharacterConfigPanel
+            characters={characters}
+            configs={characterConfigs}
+            setConfigs={setCharacterConfigs}
+            voicePresets={voicePresets}
+            onApplyPresetToCharacter={handleApplyPresetToCharacter}
+            onApplyPresetToAll={handleApplyPresetToAll}
+          />
+          <GeneratePanel
+            onGenerate={handleGenerate}
+            isGenerating={isGenerating}
+            canGenerate={canGenerate}
+            onResume={resumeInfo ? handleResume : undefined}
+            resumeInfo={resumeInfo}
+          />
         </aside>
       </main>
 
