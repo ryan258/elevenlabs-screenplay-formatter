@@ -32,6 +32,7 @@ import { deserializeGeneratedBlobs } from './utils/blobSerialization';
 import { buildZipBundle, downloadFile } from './utils/downloads';
 import { slugify } from './utils/stringUtils';
 import { notifyError } from './utils/errorHandling';
+import { extractVoiceIdsFromScript } from './utils/voiceExtraction';
 
 const CONCATENATION_ENDPOINT = import.meta.env?.VITE_CONCAT_SERVER_URL || 'http://localhost:3001/concatenate';
 const DEFAULT_VOICE_SETTINGS = {
@@ -483,6 +484,35 @@ function App() {
     addToast(`Applied ${voice.name || 'custom voice'} to ${character}`, 'success');
   };
 
+  const handleAutoFillVoiceIds = () => {
+    const extracted = extractVoiceIdsFromScript(scriptText);
+    const count = Object.keys(extracted).length;
+
+    if (count === 0) {
+      addToast('No Voice IDs found in script', 'error');
+      return;
+    }
+
+    setCharacterConfigs(prev => {
+      const next = { ...prev };
+      Object.entries(extracted).forEach(([char, voiceId]) => {
+        // Normalize character name to match keys in characterConfigs (uppercase)
+        const normalizedChar = char.toUpperCase();
+
+        // Only update if we have a valid voice ID and it's different
+        if (voiceId) {
+          next[normalizedChar] = {
+            ...(next[normalizedChar] || { voiceSettings: { ...DEFAULT_VOICE_SETTINGS } }),
+            voiceId: voiceId
+          };
+        }
+      });
+      return next;
+    });
+
+    addToast(`Found and applied ${count} Voice IDs`, 'success');
+  };
+
   const handlePreviewLine = async (index: number) => {
     const chunk = dialogueChunks[index];
     if (!chunk || !apiKey) {
@@ -690,6 +720,7 @@ function App() {
             voicePresets={voicePresets}
             onApplyPresetToCharacter={handleApplyPresetToCharacter}
             onApplyPresetToAll={handleApplyPresetToAll}
+            onAutoFill={handleAutoFillVoiceIds}
           />
           <GeneratePanel
             onGenerate={handleGenerate}

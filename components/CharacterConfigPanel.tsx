@@ -10,6 +10,7 @@ interface CharacterConfigPanelProps {
   voicePresets: VoicePresets;
   onApplyPresetToCharacter: (presetName: string, character: string) => void;
   onApplyPresetToAll: (presetName: string) => void;
+  onAutoFill: () => void;
 }
 
 const makeId = (character: string, prefix: string) =>
@@ -21,7 +22,8 @@ const CharacterConfigPanel: React.FC<CharacterConfigPanelProps> = ({
   setConfigs,
   voicePresets,
   onApplyPresetToCharacter,
-  onApplyPresetToAll
+  onApplyPresetToAll,
+  onAutoFill
 }) => {
   const [search, setSearch] = useState('');
   const [presetCharacter, setPresetCharacter] = useState('');
@@ -38,13 +40,13 @@ const CharacterConfigPanel: React.FC<CharacterConfigPanelProps> = ({
 
   const handleConfigChange = <K extends keyof CharacterConfig>(character: string, field: K, value: CharacterConfig[K]) => {
     const newConfig: CharacterConfig = {
-      ...(configs[character] || { 
-          voiceId: '', 
-          voiceSettings: { stability: 0.5, similarity_boost: 0.75, style: 0.1, speed: 1.0 } 
+      ...(configs[character] || {
+        voiceId: '',
+        voiceSettings: { stability: 0.5, similarity_boost: 0.75, style: 0.1, speed: 1.0 }
       }),
       [field]: value,
     };
-    
+
     setConfigs({
       ...configs,
       [character]: newConfig,
@@ -59,7 +61,7 @@ const CharacterConfigPanel: React.FC<CharacterConfigPanelProps> = ({
     };
     handleConfigChange(character, 'voiceSettings', newVoiceSettings);
   };
-  
+
   if (characters.length === 0) {
     return (
       <div className="bg-secondary p-4 rounded-lg shadow-lg h-full flex items-center justify-center">
@@ -79,65 +81,74 @@ const CharacterConfigPanel: React.FC<CharacterConfigPanelProps> = ({
           placeholder="Search characters..."
           className="w-full p-2 bg-primary border border-accent rounded-md focus:outline-none focus:ring-2 focus:ring-highlight text-sm"
         />
-      <div className="flex flex-col md:flex-row md:items-center md:space-x-3 text-xs text-text-secondary">
-        <div className="flex-1 flex items-center space-x-2">
-          <label htmlFor="preset-character" className="whitespace-nowrap">Copy from character:</label>
-          <select
-            id="preset-character"
-            value={presetCharacter}
-            onChange={(e) => setPresetCharacter(e.target.value)}
-            className="flex-1 p-2 bg-primary border border-accent rounded-md focus:outline-none focus:ring-2 focus:ring-highlight text-sm"
+        <div className="flex flex-col md:flex-row md:items-center md:space-x-3 text-xs text-text-secondary">
+          <div className="flex-1 flex items-center space-x-2">
+            <label htmlFor="preset-character" className="whitespace-nowrap">Copy from character:</label>
+            <select
+              id="preset-character"
+              value={presetCharacter}
+              onChange={(e) => setPresetCharacter(e.target.value)}
+              className="flex-1 p-2 bg-primary border border-accent rounded-md focus:outline-none focus:ring-2 focus:ring-highlight text-sm"
+            >
+              <option value="">Select character</option>
+              {characters.filter(char => configs[char]?.voiceId).map(char => (
+                <option key={char} value={char}>{char}</option>
+              ))}
+            </select>
+          </div>
+          <button
+            onClick={() => {
+              const source = presetCharacter && configs[presetCharacter];
+              if (!source) {
+                return;
+              }
+              const nextConfigs: CharacterConfigs = {};
+              characters.forEach(char => {
+                nextConfigs[char] = {
+                  voiceId: source.voiceId,
+                  voiceSettings: { ...source.voiceSettings }
+                };
+              });
+              setConfigs(nextConfigs);
+            }}
+            disabled={!presetCharacter || !configs[presetCharacter]}
+            className="mt-2 md:mt-0 px-3 py-1.5 bg-accent hover:bg-highlight rounded-md font-semibold text-white disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-highlight"
           >
-            <option value="">Select character</option>
-            {characters.filter(char => configs[char]?.voiceId).map(char => (
-              <option key={char} value={char}>{char}</option>
-            ))}
-          </select>
+            Apply to all
+          </button>
         </div>
-        <button
-          onClick={() => {
-            const source = presetCharacter && configs[presetCharacter];
-            if (!source) {
-              return;
-            }
-            const nextConfigs: CharacterConfigs = {};
-            characters.forEach(char => {
-              nextConfigs[char] = {
-                voiceId: source.voiceId,
-                voiceSettings: { ...source.voiceSettings }
-              };
-            });
-            setConfigs(nextConfigs);
-          }}
-          disabled={!presetCharacter || !configs[presetCharacter]}
-          className="mt-2 md:mt-0 px-3 py-1.5 bg-accent hover:bg-highlight rounded-md font-semibold text-white disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-highlight"
-        >
-          Apply to all
-        </button>
-      </div>
-      <div className="flex flex-col md:flex-row md:items-center md:space-x-3 text-xs text-text-secondary mt-2">
-        <div className="flex-1 flex items-center space-x-2">
-          <label htmlFor="preset-name" className="whitespace-nowrap">Apply saved preset:</label>
-          <select
-            id="preset-name"
-            value={applyPresetName}
-            onChange={(e) => setApplyPresetName(e.target.value)}
-            className="flex-1 p-2 bg-primary border border-accent rounded-md focus:outline-none focus:ring-2 focus:ring-highlight text-sm"
+        <div className="flex flex-col md:flex-row md:items-center md:space-x-3 text-xs text-text-secondary mt-2">
+          <div className="flex-1 flex items-center space-x-2">
+            <label htmlFor="preset-name" className="whitespace-nowrap">Apply saved preset:</label>
+            <select
+              id="preset-name"
+              value={applyPresetName}
+              onChange={(e) => setApplyPresetName(e.target.value)}
+              className="flex-1 p-2 bg-primary border border-accent rounded-md focus:outline-none focus:ring-2 focus:ring-highlight text-sm"
+            >
+              <option value="">Select preset</option>
+              {presetNames.map(name => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+            </select>
+          </div>
+          <button
+            onClick={() => applyPresetName && onApplyPresetToAll(applyPresetName)}
+            disabled={!applyPresetName || !voicePresets[applyPresetName]}
+            className="mt-2 md:mt-0 px-3 py-1.5 bg-accent hover:bg-highlight rounded-md font-semibold text-white disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-highlight"
           >
-            <option value="">Select preset</option>
-            {presetNames.map(name => (
-              <option key={name} value={name}>{name}</option>
-            ))}
-          </select>
+            Apply preset to all
+          </button>
         </div>
-        <button
-          onClick={() => applyPresetName && onApplyPresetToAll(applyPresetName)}
-          disabled={!applyPresetName || !voicePresets[applyPresetName]}
-          className="mt-2 md:mt-0 px-3 py-1.5 bg-accent hover:bg-highlight rounded-md font-semibold text-white disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-highlight"
-        >
-          Apply preset to all
-        </button>
-      </div>
+        <div className="flex justify-end mt-2">
+          <button
+            onClick={onAutoFill}
+            className="px-3 py-1.5 bg-accent hover:bg-highlight rounded-md font-semibold text-white text-xs focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-highlight"
+            title="Extract Voice IDs from character list in script"
+          >
+            Auto-fill Voice IDs
+          </button>
+        </div>
       </div>
       <div className="flex-grow overflow-hidden">
         {filteredCharacters.length === 0 ? (
