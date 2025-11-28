@@ -90,7 +90,7 @@ export const useAudioGeneration = ({
       }));
       const versionSlug = projectSettings.versionLabel ? slugify(projectSettings.versionLabel) : undefined;
 
-      const { blobs, concatenationFailed } = await generateAllAudio(
+      const { blobs, concatenationFailed, concatenatedBlob } = await generateAllAudio(
         preparedChunks,
         characterConfigs,
         apiKey,
@@ -132,17 +132,21 @@ export const useAudioGeneration = ({
       setErrorInfo(null);
       setCurrentProgress({ current: 0, total: 0, character: '', snippet: '' });
 
-      if (!projectSettings.concatenate || concatenationFailed) {
+      if (projectSettings.concatenate && !concatenationFailed && concatenatedBlob) {
+        downloadFile(concatenatedBlob, 'concatenated_audio.mp3');
+        addToast('Generation complete (Concatenated audio downloaded)', 'success');
+      } else {
+        // Fallback to ZIP if concatenation failed or was not requested
         const zipBlob = await buildZipBundle(blobs, manifest);
         downloadFile(zipBlob, `elevenlabs_audio_${Date.now()}.zip`);
+
         if (projectSettings.concatenate && concatenationFailed) {
           addToast('Concatenation failed. Downloaded ZIP with individual files instead.', 'error');
         } else {
           addToast('Generation complete (ZIP downloaded)', 'success');
         }
-      } else {
-        addToast('Generation complete', 'success');
       }
+      setIsGenerating(false);
       setIsGenerating(false);
     } catch (error) {
       setManifestEntries([]);

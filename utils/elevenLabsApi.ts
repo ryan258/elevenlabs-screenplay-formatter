@@ -165,16 +165,7 @@ export const generateAudioFile = async (
   throw lastError instanceof Error ? lastError : new Error('Unknown error generating audio');
 };
 
-export const downloadBlob = (blob: Blob, filename: string) => {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-};
+
 
 const fetchAlignmentData = async (
   chunk: DialogueChunk,
@@ -325,6 +316,7 @@ interface GenerateAllAudioOptions {
 export interface GenerateAllAudioResult {
   blobs: GeneratedBlob[];
   concatenationFailed: boolean;
+  concatenatedBlob?: Blob;
 }
 
 export const generateAllAudio = async (
@@ -344,6 +336,7 @@ export const generateAllAudio = async (
   const baseDelay = options.delayMs ?? 500;
   let adaptiveDelay = baseDelay;
   let concatenationFailed = false;
+  let concatenatedBlob: Blob | undefined;
 
   const computeInitialCursor = () => {
     if (!generatedBlobs.length) {
@@ -399,10 +392,10 @@ export const generateAllAudio = async (
       const alignment = await fetchAlignmentData(chunk, config, apiKey, modelId);
       const offsetAlignment: WordTimestamp[] | undefined = alignment
         ? alignment.map(word => ({
-            word: word.word,
-            startMs: word.startMs + timelineCursor,
-            endMs: word.endMs + timelineCursor
-          }))
+          word: word.word,
+          startMs: word.startMs + timelineCursor,
+          endMs: word.endMs + timelineCursor
+        }))
         : undefined;
       const startTimeMs = offsetAlignment?.[0]?.startMs ?? timelineCursor;
       const estimatedDuration = offsetAlignment?.length
@@ -448,24 +441,23 @@ export const generateAllAudio = async (
       throw error instanceof GenerationError
         ? error
         : new GenerationError(
-            error instanceof Error ? error.message : 'Unknown error',
-            i,
-            chunk.character,
-            generatedBlobs
-          );
+          error instanceof Error ? error.message : 'Unknown error',
+          i,
+          chunk.character,
+          generatedBlobs
+        );
     }
   }
 
   // If concatenation is enabled, send all files to the server
   if (concatenate && generatedBlobs.length > 0) {
     try {
-      const concatenatedBlob = await concatenateAudioFiles(generatedBlobs, onProgress, options.audioProduction);
-      downloadBlob(concatenatedBlob, 'concatenated_audio.mp3');
+      concatenatedBlob = await concatenateAudioFiles(generatedBlobs, onProgress, options.audioProduction);
     } catch (error) {
       concatenationFailed = true;
       logError('Failed to concatenate audio files', error);
     }
   }
 
-  return { blobs: generatedBlobs, concatenationFailed };
+  return { blobs: generatedBlobs, concatenationFailed, concatenatedBlob };
 };
