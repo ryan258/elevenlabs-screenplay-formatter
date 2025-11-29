@@ -25,14 +25,14 @@ const OutputDisplay: React.FC<OutputDisplayProps> = ({
   onResume,
   resumeInfo
 }) => {
-  const outputEndRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'error'>('idle');
   const [isOpen, setIsOpen] = useState(false);
 
   // Auto-scroll to bottom when new progress messages arrive
   useEffect(() => {
-    if (outputEndRef.current && isLoading) {
-      outputEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (containerRef.current && isLoading) {
+      containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
   }, [progressMessages, isLoading]);
 
@@ -120,7 +120,10 @@ const OutputDisplay: React.FC<OutputDisplayProps> = ({
               )}
             </div>
           )}
-          <div className="flex-grow w-full p-3 bg-primary border border-accent rounded-md resize-none focus:outline-none text-text-primary custom-scrollbar overflow-auto">
+          <div
+            ref={containerRef}
+            className="flex-grow w-full p-3 bg-primary border border-accent rounded-md resize-none focus:outline-none text-text-primary custom-scrollbar overflow-auto"
+          >
             {isLoading ? (
               <div className="space-y-2">
                 <div className="flex items-center space-x-3 mb-4">
@@ -133,7 +136,6 @@ const OutputDisplay: React.FC<OutputDisplayProps> = ({
                       {msg}
                     </div>
                   ))}
-                  <div ref={outputEndRef} />
                 </div>
               </div>
             ) : generatedOutput ? (
