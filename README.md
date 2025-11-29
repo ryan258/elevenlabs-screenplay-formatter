@@ -6,11 +6,12 @@ A React-based web application that converts screenplay dialogue into AI-generate
 
 - **Intelligent Script Parsing** - Automatically detects characters and extracts dialogue from screenplay format
 - **Character Voice Mapping** - Assign unique ElevenLabs voice IDs to each character
+- **Auto-fill Voice IDs** - Extract Voice IDs directly from character lists in format `- CHARACTER (Voice ID: abc123...)`
 - **Fine-Tuned Voice Control** - Adjust stability, similarity boost, style, and speed per character
 - **Audio Concatenation** - Option to merge all dialogue into a single audio file (requires backend server)
 - **Real-Time Progress Tracking** - Live progress bar, character previews, and copyable logs
 - **Fountain-Style Support** - Paste Fountain scripts (no `Characters:` list required) and let the parser auto-detect speakers
-- **Resumable Generation** - Inline error surfaces, automatic retries, and a one-click “Resume from failed chunk” flow
+- **Resumable Generation** - Inline error surfaces, automatic retries, and a one-click "Resume from failed chunk" flow
 - **Timeline Preview** - Per-line preview buttons, cached audio snippets, and estimated runtimes
 - **Generation Profiles & Exports** - One-click profiles, manifest/zip exports, and CLI automation for batch workflows
 - **Parser Diagnostics Panel** - See detected characters, parsed lines, and any lines the parser skipped
@@ -18,11 +19,12 @@ A React-based web application that converts screenplay dialogue into AI-generate
 - **Concatenation Health Check** - Built-in status card to ping the backend server and show connectivity
 - **Multiple Model Support** - Choose between multilingual, Monolingual v1, Turbo, or Flash models directly from the dropdown
 - **Format Options** - Select output format (MP3 128kbps, 192kbps, or PCM 24kHz)
-- **Language Selector & Voice Suggestions** - Pick the dialogue language and apply curated role-based voice recommendations per locale.
-- **Subtitle & Timing Exports** - Generate manifests plus SRT/VTT subtitle files backed by ElevenLabs word-alignment timestamps.
-- **Audio Production Mixing** - Attach a looping background track and timed sound effects that are mixed alongside dialogue during concatenation.
-- **Shareable Project Links** - Copy a single URL that encodes your script, settings, and presets for collaborators.
-- **Reaper Template Export** - Download a ready-to-open `.rpp` file with each character on its own track and timeline placement derived from the manifest.
+- **Language Selector & Voice Suggestions** - Pick the dialogue language and apply curated role-based voice recommendations per locale
+- **Subtitle & Timing Exports** - Generate manifests plus SRT/VTT subtitle files backed by ElevenLabs word-alignment timestamps
+- **Audio Production Mixing** - Attach a looping background track and timed sound effects that are mixed alongside dialogue during concatenation
+- **Shareable Project Links** - Copy a single URL that encodes your script, settings, and presets for collaborators
+- **Reaper Template Export** - Download a ready-to-open `.rpp` file with each character on its own track and timeline placement derived from the manifest
+- **Project Persistence** - Auto-saves your work to browser storage with cross-session resume capability
 
 ## Prerequisites
 
@@ -547,18 +549,21 @@ The app includes automatic rate limiting (500ms delay between requests) to avoid
 1. **Browser-based**: Audio generation happens client-side, so large scripts may consume significant bandwidth
 2. **Concatenation requires backend**: Cannot concatenate audio files purely in the browser without significant performance impact
 3. **ElevenLabs only**: Currently only supports ElevenLabs API (no other TTS providers)
-4. **No persistence**: Settings and configurations are lost on page refresh
-5. **Sequential generation**: Audio files are generated one at a time to respect rate limits
+4. **Sequential generation**: Audio files are generated one at a time to respect rate limits
+5. **Audio assets not persisted**: Background music and SFX files are stored in browser memory only and need to be reattached after refresh
 
 ## Future Enhancements
 
-- [ ] Save/load project configurations
-- [ ] Bulk voice assignment (all characters → same voice)
-- [ ] Preview audio before downloading
+See [ROADMAP.md](./ROADMAP.md) for the complete roadmap and planned features.
+
+Priority items include:
+- [ ] Comprehensive test coverage (parser, API client, end-to-end)
+- [ ] Parser diagnostics mode with confidence scores
+- [ ] Batch processing improvements for multiple screenplay files
+- [ ] Enhanced error recovery and validation
+- [ ] Additional DAW exports (Pro Tools, Logic Pro, Studio One)
 - [ ] Support for other TTS providers
-- [ ] Server-side generation option
 - [ ] Audio waveform visualization
-- [ ] Character voice presets
 
 ## License
 

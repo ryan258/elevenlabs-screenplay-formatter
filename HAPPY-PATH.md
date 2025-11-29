@@ -40,11 +40,12 @@ In **Step 2: Project Settings**:
 
 ## 4. Assign Voices
 
-You have three options:
+You have four options:
 
-1. **Character Voices panel** – manually paste voice IDs or reuse Voice Presets.
-2. **Voice Suggestions panel** – choose a character, then click **Apply** for any recommended narrator/hero/villain. These are tinted by language.
-3. Scroll through **My ElevenLabs Voices** (auto-loaded after entering your API key) to apply custom voices with optional preview playback.
+1. **Auto-fill Voice IDs** (fastest) – If your screenplay includes Voice IDs in the character list format `- CHARACTER (Voice ID: abc123...)`, click the **Auto-fill Voice IDs** button in the Character Voices panel to extract and apply them automatically.
+2. **Character Voices panel** – manually paste voice IDs or reuse Voice Presets.
+3. **Voice Suggestions panel** – choose a character, then click **Apply** for any recommended narrator/hero/villain. These are tinted by language.
+4. Scroll through **My ElevenLabs Voices** (auto-loaded after entering your API key) to apply custom voices with optional preview playback.
 
 Repeat until every character shows a voice ID (characters with missing IDs display a red badge).
 
