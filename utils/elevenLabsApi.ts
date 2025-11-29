@@ -92,7 +92,9 @@ export const generateAudioFile = async (
   onProgress?: (progress: GenerationProgress, current: number, total: number) => void,
   index: number = 0,
   total: number = 1,
-  maxRetries = 2
+  maxRetries = 2,
+  previousText?: string,
+  nextText?: string
 ): Promise<AudioGenerationResult> => {
   const url = `https://api.elevenlabs.io/v1/text-to-speech/${config.voiceId}`;
 
@@ -124,6 +126,8 @@ export const generateAudioFile = async (
           text: chunk.text,
           model_id: modelId,
           output_format: outputFormat,
+          previous_text: previousText,
+          next_text: nextText,
           voice_settings: {
             stability: config.voiceSettings.stability,
             similarity_boost: config.voiceSettings.similarity_boost,
@@ -372,6 +376,9 @@ export const generateAllAudio = async (
     }
 
     try {
+      const previousText = i > 0 ? dialogueChunks[i - 1].text : undefined;
+      const nextText = i < dialogueChunks.length - 1 ? dialogueChunks[i + 1].text : undefined;
+
       const result = await generateAudioFile(
         chunk,
         config,
@@ -386,7 +393,10 @@ export const generateAllAudio = async (
           );
         },
         i,
-        total
+        total,
+        2,
+        previousText,
+        nextText
       );
 
       const alignment = await fetchAlignmentData(chunk, config, apiKey, modelId);

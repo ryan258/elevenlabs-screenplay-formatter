@@ -112,7 +112,7 @@ function App() {
     modelsStatus: state.modelsStatus,
     setModelsStatus: state.setModelsStatus
   })));
-  const { characters, dialogueChunks, diagnostics } = useScriptParser(scriptText);
+  const { characters, dialogueChunks, diagnostics } = useScriptParser(scriptText, projectSettings.preserveStageDirections);
   const [timelinePreviews, setTimelinePreviews] = useState<Record<number, { loading?: boolean; url?: string; error?: string }>>({});
   const previewUrlsRef = useRef<string[]>([]);
   const cleanupPreviewUrls = useCallback(() => {
@@ -534,12 +534,21 @@ function App() {
 
     try {
       const text = projectSettings.speakParentheticals && chunk.originalText ? chunk.originalText : chunk.text;
+      const previousText = index > 0 ? dialogueChunks[index - 1].text : undefined;
+      const nextText = index < dialogueChunks.length - 1 ? dialogueChunks[index + 1].text : undefined;
+
       const { blob } = await generateAudioFile(
         { ...chunk, text },
         config,
         apiKey,
         projectSettings.model,
-        projectSettings.outputFormat
+        projectSettings.outputFormat,
+        undefined,
+        index,
+        dialogueChunks.length,
+        2,
+        previousText,
+        nextText
       );
       const url = URL.createObjectURL(blob);
       previewUrlsRef.current.push(url);

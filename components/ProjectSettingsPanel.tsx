@@ -91,12 +91,12 @@ const ProjectSettingsPanel: React.FC<ProjectSettingsPanelProps> = ({ settings, s
         <label htmlFor="concatenate" className="flex items-center justify-between cursor-pointer">
           <span className="text-sm font-medium text-text-secondary">Concatenate Audio</span>
           <span className="relative inline-flex items-center">
-            <input 
-              type="checkbox" 
+            <input
+              type="checkbox"
               id="concatenate"
               checked={settings.concatenate}
               onChange={(e) => handleSettingChange('concatenate', e.target.checked)}
-              className="sr-only peer" 
+              className="sr-only peer"
               aria-checked={settings.concatenate}
             />
             <span className="w-11 h-6 bg-primary peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-highlight rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-highlight" aria-hidden="true"></span>
@@ -105,13 +105,30 @@ const ProjectSettingsPanel: React.FC<ProjectSettingsPanelProps> = ({ settings, s
         <label htmlFor="speak-parentheticals" className="flex items-center justify-between cursor-pointer">
           <span className="text-sm font-medium text-text-secondary">Speak Parentheticals</span>
           <span className="relative inline-flex items-center">
-            <input 
-              type="checkbox" 
+            <input
+              type="checkbox"
               id="speak-parentheticals"
               checked={settings.speakParentheticals}
               onChange={(e) => handleSettingChange('speakParentheticals', e.target.checked)}
-              className="sr-only peer" 
+              className="sr-only peer"
               aria-checked={settings.speakParentheticals}
+            />
+            <span className="w-11 h-6 bg-primary peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-highlight rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-highlight" aria-hidden="true"></span>
+          </span>
+        </label>
+        <label htmlFor="preserve-stage-directions" className="flex items-center justify-between cursor-pointer">
+          <div className="flex flex-col">
+            <span className="text-sm font-medium text-text-secondary">Preserve Stage Directions [Brackets]</span>
+            <span className="text-xs text-text-secondary opacity-75">For Turbo v2.5+ only. Older models may read these aloud.</span>
+          </div>
+          <span className="relative inline-flex items-center">
+            <input
+              type="checkbox"
+              id="preserve-stage-directions"
+              checked={settings.preserveStageDirections || false}
+              onChange={(e) => handleSettingChange('preserveStageDirections', e.target.checked)}
+              className="sr-only peer"
+              aria-checked={settings.preserveStageDirections}
             />
             <span className="w-11 h-6 bg-primary peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-highlight rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-highlight" aria-hidden="true"></span>
           </span>

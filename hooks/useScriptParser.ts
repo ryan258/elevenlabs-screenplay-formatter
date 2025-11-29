@@ -3,6 +3,6 @@ import { parseScript, ParsedScript } from '../utils/parser';
 
 export { parseScript } from '../utils/parser';
 
-export const useScriptParser = (scriptText: string): ParsedScript => {
-  return useMemo(() => parseScript(scriptText), [scriptText]);
+export const useScriptParser = (scriptText: string, preserveStageDirections: boolean = false): ParsedScript => {
+  return useMemo(() => parseScript(scriptText, preserveStageDirections), [scriptText, preserveStageDirections]);
 };

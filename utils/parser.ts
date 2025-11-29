@@ -5,8 +5,12 @@ interface DefinedCharacter {
   aliases: Set<string>;
 }
 
-const cleanDialogue = (text: string) => {
-  return text.replace(/\([^)]+\)/g, '').replace(/\[[^\]]+\]/g, '').replace(/\s+/g, ' ').trim();
+const cleanDialogue = (text: string, preserveBrackets: boolean = false) => {
+  let cleaned = text.replace(/\([^)]+\)/g, '');
+  if (!preserveBrackets) {
+    cleaned = cleaned.replace(/\[[^\]]+\]/g, '');
+  }
+  return cleaned.replace(/\s+/g, ' ').trim();
 };
 
 const normalizeCharacterName = (value: string) => {
@@ -55,7 +59,7 @@ export interface ParsedScript {
   diagnostics: ParserDiagnostics;
 }
 
-export const parseScript = (scriptText: string): ParsedScript => {
+export const parseScript = (scriptText: string, preserveStageDirections: boolean = false): ParsedScript => {
   if (!scriptText) {
     return { characters: [], dialogueChunks: [], diagnostics: { unmatchedLines: [] } };
   }
@@ -109,7 +113,7 @@ export const parseScript = (scriptText: string): ParsedScript => {
   const flushDialogue = () => {
     if (currentCharacterFullName && currentDialogue.length > 0) {
       const raw = currentDialogue.join(' ').trim();
-      const text = cleanDialogue(raw);
+      const text = cleanDialogue(raw, preserveStageDirections);
       if (text) {
         chunks.push({ character: currentCharacterFullName, text, originalText: raw });
       }
@@ -151,7 +155,7 @@ export const parseScript = (scriptText: string): ParsedScript => {
       if (foundCharacter) {
         flushDialogue();
         const rawLine = dialoguePart.trim();
-        const text = cleanDialogue(rawLine);
+        const text = cleanDialogue(rawLine, preserveStageDirections);
         if (text) {
           chunks.push({ character: foundCharacter.fullName, text, originalText: rawLine });
         }

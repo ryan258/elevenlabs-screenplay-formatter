@@ -307,6 +307,18 @@ Everything will be okay.
 
 The audio will only include: "I can't believe he's gone." and "Everything will be okay."
 
+### Stage Directions [Brackets]
+
+For newer models (Turbo v2.5, Multilingual v3), you can use brackets to give performance instructions. These are **preserved** and sent to the AI:
+
+```
+JOHN
+[whispering] Don't make a sound.
+[shouting] Run!
+```
+
+**Note:** Older models may read these brackets out loud. Use with caution.
+
 ### Scene Headings
 
 Scene headings are recognized but not converted to audio:

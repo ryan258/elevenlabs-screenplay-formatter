@@ -38,6 +38,7 @@ export interface ProjectSettings {
   requestDelayMs?: number;
   versionLabel?: string;
   languageCode?: string;
+  preserveStageDirections?: boolean;
 }
 
 export interface AppStateSnapshot {
