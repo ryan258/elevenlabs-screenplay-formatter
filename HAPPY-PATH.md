@@ -35,8 +35,11 @@ In **Step 2: Project Settings**:
 
 1. Pick an output model (typically `Eleven Multilingual v2`).
 2. Set the **Dialogue Language** to match your script; this unlocks curated voice suggestions and automatically keeps multilingual mode enabled.
-3. Choose the audio format (MP3 or PCM) and toggle **Speak Parentheticals** if desired.
-4. Decide whether to enable **Concatenate Audio**. For the happy path, leave it on so you get one mixed file after generation.
+3. Choose the audio format (MP3 or PCM).
+4. Configure dialogue processing toggles:
+   - **Speak Parentheticals** - Keep `(V.O.)` or `(CONT'D)` in spoken audio
+   - **Preserve Stage Directions [Brackets]** - Enable for Turbo v2.5+ models to send performance instructions like `[whispering]` or `[shouting]` to the AI
+5. Decide whether to enable **Concatenate Audio**. For the happy path, leave it on so you get one mixed file after generation.
 
 ## 4. Assign Voices
 

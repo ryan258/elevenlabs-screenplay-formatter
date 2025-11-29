@@ -5,6 +5,8 @@ Version 0.4.0 represents a feature-complete production-ready application with co
 
 **Recent additions:**
 - Auto-fill Voice IDs from character lists (`utils/voiceExtraction.ts`)
+- Context-aware audio generation (sends previous/next dialogue to ElevenLabs API)
+- Stage direction preservation with `[brackets]` for Turbo v2.5+ models
 - Virtual scrolling for large scripts (react-window in Timeline and CharacterConfig panels)
 - Optimized O(n) parser with Map-based character lookups
 - Comprehensive error handling with user-friendly translations
@@ -42,6 +44,8 @@ The project uses React hooks with TypeScript options defined in `tsconfig.json`.
 Use `npm run test` for parser unit tests (including `voiceExtraction.test.ts`) and `npm run lint` / `npm run check` before commits. For manual QA:
 - Load `EXAMPLE_SCREENPLAY.md`, `EXAMPLE_FOUNTAIN.md`, or files in `plays/` to confirm parsing, diagnostics, and per-character settings.
 - Test the **Auto-fill Voice IDs** feature by creating a character list with Voice IDs in format `- CHARACTER (Voice ID: abc123...)` and clicking the Auto-fill button in CharacterConfigPanel. Verify voice IDs populate correctly and character name normalization matches (uppercase).
+- Test **Stage Direction Preservation**: Create a script with bracketed stage directions like `[whispering]` or `[shouting]`, enable the "Preserve Stage Directions [Brackets]" toggle in Project Settings, and verify the brackets are preserved in the generated dialogue chunks (check both the parser output and the text sent to the API). Test with the toggle disabled to confirm brackets are removed.
+- Test **Context-Aware Generation**: Generate audio for a multi-line conversation and verify that `previousText` and `nextText` are correctly extracted and passed to the ElevenLabs API (check network requests or add logging). Confirm edge cases work (first chunk has no previous, last chunk has no next).
 - Exercise both output modes: run just `npm run dev` for individual MP3 downloads, then repeat with the backend running to ensure `/concatenate` succeeds, audio production assets mix correctly, and a single file lands in `Downloads`.
 - Verify subtitle exports (`srt`, `vtt`) line up with timeline previews when editing the alignment or manifest code, and spot-check non-English runs (e.g., Spanish) to ensure the language selector + curated suggestions behave.
 - Test project persistence: generate audio, refresh the browser, and confirm the app resumes from the correct state with all metadata and generated audio intact (IndexedDB for blobs, localStorage for config).

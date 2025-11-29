@@ -8,6 +8,8 @@ A React-based web application that converts screenplay dialogue into AI-generate
 - **Character Voice Mapping** - Assign unique ElevenLabs voice IDs to each character
 - **Auto-fill Voice IDs** - Extract Voice IDs directly from character lists in format `- CHARACTER (Voice ID: abc123...)`
 - **Fine-Tuned Voice Control** - Adjust stability, similarity boost, style, and speed per character
+- **Context-Aware Audio Generation** - Sends previous and next dialogue to ElevenLabs for improved continuity and natural transitions
+- **Stage Direction Preservation** - Use brackets `[whispering]`, `[shouting]` to give performance instructions to Turbo v2.5+ models
 - **Audio Concatenation** - Option to merge all dialogue into a single audio file (requires backend server)
 - **Real-Time Progress Tracking** - Live progress bar, character previews, and copyable logs
 - **Fountain-Style Support** - Paste Fountain scripts (no `Characters:` list required) and let the parser auto-detect speakers
@@ -335,6 +337,11 @@ The backend server (`server/index.js`) provides a REST API endpoint:
 - **Concatenate Audio**:
   - `Enabled` - Combines all audio into one file (requires backend server)
   - `Disabled` - Downloads individual files (e.g., `0000_CHARACTER.mp3`)
+
+- **Preserve Stage Directions [Brackets]**:
+  - `Enabled` - Stage directions in brackets like `[whispering]` or `[shouting]` are preserved and sent to the AI for more expressive audio
+  - `Disabled` - Brackets are removed from dialogue (default)
+  - **Note**: Only works with Turbo v2.5+ and Multilingual v3 models. Older models may read brackets aloud.
 
 ### Character Voice Settings
 

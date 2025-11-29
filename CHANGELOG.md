@@ -5,6 +5,8 @@ All notable changes to the ElevenLabs Screenplay Formatter project.
 ## [Unreleased]
 ### Added
 - Auto-fill Voice IDs feature: extracts Voice IDs from character lists in screenplay format `- CHARACTER (Voice ID: <ID>)` with one-click population of character configs.
+- Context-aware audio generation: sends previous and next dialogue text to ElevenLabs API for improved audio continuity and natural transitions between lines.
+- Stage direction preservation: new "Preserve Stage Directions [Brackets]" toggle for Turbo v2.5+ and Multilingual v3 models to send performance instructions like `[whispering]` or `[shouting]` to the AI for more expressive audio generation.
 
 ## [0.4.0] - 2025-11-28
 ### Added - Core Features
