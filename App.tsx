@@ -627,6 +627,12 @@ function App() {
             setScriptText={setScriptText}
             onExpand={handleExpand}
           />
+          <TimelinePanel
+            chunks={dialogueChunks}
+            previewStates={timelinePreviews}
+            onPreview={handlePreviewLine}
+            timings={manifestEntries}
+          />
           <OutputDisplay
             generatedOutput={generatedOutput}
             isLoading={isGenerating}
@@ -642,15 +648,18 @@ function App() {
             chunks={dialogueChunks}
             unmatchedLines={diagnostics.unmatchedLines}
           />
-          <TimelinePanel
-            chunks={dialogueChunks}
-            previewStates={timelinePreviews}
-            onPreview={handlePreviewLine}
-            timings={manifestEntries}
-          />
         </div>
 
         <aside className="xl:col-span-1 flex flex-col gap-8">
+          <CharacterConfigPanel
+            characters={characters}
+            configs={characterConfigs}
+            setConfigs={setCharacterConfigs}
+            voicePresets={voicePresets}
+            onApplyPresetToCharacter={handleApplyPresetToCharacter}
+            onApplyPresetToAll={handleApplyPresetToAll}
+            onAutoFill={handleAutoFillVoiceIds}
+          />
           <ApiKeyPanel
             apiKey={apiKey}
             setApiKey={setApiKey}
@@ -713,15 +722,7 @@ function App() {
             endpoint={CONCATENATION_ENDPOINT}
             healthUrl={healthUrl}
           />
-          <CharacterConfigPanel
-            characters={characters}
-            configs={characterConfigs}
-            setConfigs={setCharacterConfigs}
-            voicePresets={voicePresets}
-            onApplyPresetToCharacter={handleApplyPresetToCharacter}
-            onApplyPresetToAll={handleApplyPresetToAll}
-            onAutoFill={handleAutoFillVoiceIds}
-          />
+
           <GeneratePanel
             onGenerate={handleGenerate}
             isGenerating={isGenerating}

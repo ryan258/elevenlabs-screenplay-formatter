@@ -72,7 +72,7 @@ const CharacterConfigPanel: React.FC<CharacterConfigPanelProps> = ({
 
   return (
     <div className="bg-secondary p-4 rounded-lg shadow-lg h-full flex flex-col">
-      <h2 className="text-xl font-bold text-highlight mb-4">Step 3: Character Voices</h2>
+      <h2 className="text-xl font-bold text-highlight mb-4">Step 0: Character Voices</h2>
       <div className="flex flex-col gap-2 mb-4">
         <input
           type="text"

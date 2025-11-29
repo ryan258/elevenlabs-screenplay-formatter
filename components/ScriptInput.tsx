@@ -25,7 +25,7 @@ Response here.
 See EXAMPLE_SCREENPLAY.md for detailed formatting guide.`;
 
   return (
-    <div className="flex flex-col h-full bg-secondary p-4 rounded-lg shadow-lg">
+    <div className="flex flex-col h-[500px] bg-secondary p-4 rounded-lg shadow-lg">
       <div className="flex justify-between items-center mb-2">
         <h2 className="text-xl font-bold text-highlight">Screenplay Input</h2>
         <div className="flex items-center space-x-2">
@@ -71,7 +71,7 @@ See EXAMPLE_SCREENPLAY.md for detailed formatting guide.`;
         onChange={(e) => setScriptText(e.target.value)}
         placeholder={placeholderText}
         aria-label="Screenplay input"
-        className="flex-grow w-full p-3 bg-primary border border-accent rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-highlight text-text-primary custom-scrollbar font-mono min-h-[320px]"
+        className="flex-grow w-full p-3 bg-primary border border-accent rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-highlight text-text-primary custom-scrollbar font-mono h-full"
         style={{ scrollbarWidth: 'thin', scrollbarColor: '#e94560 #1a1a2e' }}
       />
     </div>

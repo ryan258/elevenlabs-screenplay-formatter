@@ -42,17 +42,17 @@ const TimelinePanel: React.FC<TimelinePanelProps> = ({ chunks, previewStates, on
   const totalDuration = entries.reduce((sum, entry) => sum + entry.durationMs, 0);
 
   return (
-    <div className="bg-secondary p-4 rounded-lg shadow-lg">
-      <div className="flex items-center justify-between mb-2">
+    <div className="h-[500px] bg-secondary p-4 rounded-lg shadow-lg flex flex-col">
+      <div className="flex items-center justify-between mb-2 flex-shrink-0">
         <h2 className="text-xl font-bold text-highlight">Timeline</h2>
         <span className="text-xs text-text-secondary">Estimated runtime: {formatDuration(totalDuration)}</span>
       </div>
-      <div className="max-h-64 overflow-hidden">
+      <div className="flex-grow overflow-hidden">
         {entries.length === 0 ? (
           <p className="text-xs text-text-secondary">Add screenplay text to populate the timeline.</p>
         ) : (
           <List
-            height={256}
+            height={430}
             itemCount={entries.length}
             itemSize={110}
             width="100%"
