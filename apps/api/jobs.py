@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+from collections import deque
 import threading
 import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from queue import Full, Queue
-from typing import Any, Dict, List, Optional
+from typing import Any, Deque, Dict, List, Optional, Tuple
 
 from apps.api.config import AppConfig
 from lib.elevenlabs.client import ElevenLabsClient
@@ -43,7 +43,9 @@ class Job:
     error: Optional[str] = None
     export_path: Optional[Path] = None
     work_dir: Path = field(default_factory=Path)
-    events: "Queue[Dict[str, Any]]" = field(default_factory=lambda: Queue(maxsize=2000))
+    _event_seq: int = 0
+    _events: Deque[Dict[str, Any]] = field(default_factory=lambda: deque(maxlen=2000))
+    _event_cond: threading.Condition = field(default_factory=lambda: threading.Condition())
 
     def snapshot(self) -> JobSnapshot:
         return JobSnapshot(
@@ -57,6 +59,27 @@ class Job:
             error=self.error,
             export_ready=self.export_path is not None and self.export_path.exists(),
         )
+
+    def add_event(self, event: str, data: Dict[str, Any]) -> int:
+        with self._event_cond:
+            self._event_seq += 1
+            payload = {"id": self._event_seq, "event": event, "data": data, "ts": time.time()}
+            self._events.append(payload)
+            self._event_cond.notify_all()
+            return self._event_seq
+
+    def get_events_since(self, last_event_id: int) -> List[Dict[str, Any]]:
+        with self._event_cond:
+            return [e for e in self._events if int(e.get("id", 0)) > last_event_id]
+
+    def wait_for_events(self, *, last_event_id: int, timeout_s: float) -> Tuple[List[Dict[str, Any]], int]:
+        with self._event_cond:
+            if not any(int(e.get("id", 0)) > last_event_id for e in self._events):
+                self._event_cond.wait(timeout=timeout_s)
+            events = [e for e in self._events if int(e.get("id", 0)) > last_event_id]
+            if events:
+                last_event_id = int(events[-1].get("id", last_event_id))
+            return events, last_event_id
 
 
 class JobStore:
@@ -80,18 +103,7 @@ class JobStore:
             return self._jobs.get(job_id)
 
     def _emit(self, job: Job, event: str, data: Dict[str, Any]) -> None:
-        payload = {"event": event, "data": data, "ts": time.time()}
-        try:
-            job.events.put_nowait(payload)
-        except Full:
-            try:
-                job.events.get_nowait()
-            except Exception:
-                return
-            try:
-                job.events.put_nowait(payload)
-            except Full:
-                return
+        job.add_event(event, data)
 
     def start_generation(
         self,

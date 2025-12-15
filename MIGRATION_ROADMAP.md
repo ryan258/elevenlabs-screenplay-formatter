@@ -170,7 +170,10 @@ One repo, one Python environment, clear import direction:
 - [x] `GET /api/exports/{job_id}.zip` → export bundle download
 
 #### 4.2 Jobs model (v1)
-- In-memory job registry (good enough for local single-user; explicitly documented)
+- In-memory job registry (local-only; not durable across restarts)
+- SSE semantics:
+  - Per-job event ring buffer (bounded; supports reconnect via `Last-Event-ID`)
+  - Snapshot is emitted immediately on connect
 - Job state:
   - requested config hash
   - current chunk index

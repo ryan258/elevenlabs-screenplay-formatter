@@ -142,6 +142,8 @@ python3 -m pip install -e ".[dev]"
 cp .env.example .env
 ```
 
+Security note: never commit `.env` (it is gitignored). If an API key is ever pasted into logs/chat/screenshots, rotate it immediately in ElevenLabs and update your local `.env`.
+
 Run the combined app (FastAPI mounting Flask):
 
 ```bash
