@@ -164,10 +164,10 @@ One repo, one Python environment, clear import direction:
 #### 4.1 API Surface (minimum)
 - [x] `POST /api/parse` → parsed chunks + diagnostics
 - [x] `POST /api/projects/validate` → config validation errors (typed)
-- [ ] `POST /api/generate` → returns `job_id` (async jobs)
-- [ ] `GET /api/jobs/{job_id}` → status/progress snapshot
-- [ ] `GET /api/jobs/{job_id}/events` → SSE progress stream
-- [ ] `GET /api/exports/{job_id}.zip` → export bundle download
+- [x] `POST /api/generate` → returns `job_id` (async jobs)
+- [x] `GET /api/jobs/{job_id}` → status/progress snapshot
+- [x] `GET /api/jobs/{job_id}/events` → SSE progress stream
+- [x] `GET /api/exports/{job_id}.zip` → export bundle download
 
 #### 4.2 Jobs model (v1)
 - In-memory job registry (good enough for local single-user; explicitly documented)

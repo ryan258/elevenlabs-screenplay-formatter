@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Callable, Dict, Iterator, List, Optional, Tuple
 
 from lib.elevenlabs.client import ElevenLabsClient, _adjust_delay_based_on_rate_limit
+from lib.filenames import safe_basename
 from lib.manifest import estimate_duration_ms
 from lib.models import CharacterConfig, DialogueChunk, WordTimestamp
 
@@ -54,7 +55,7 @@ def _get_format_details(output_format: str) -> Tuple[str, str]:
     return OUTPUT_FORMAT_DETAILS.get(output_format, OUTPUT_FORMAT_DETAILS["mp3_44100_128"])
 
 
-def generate_all_audio(
+def generate_all_audio_iter(
     *,
     client: ElevenLabsClient,
     dialogue_chunks: List[DialogueChunk],
@@ -66,7 +67,7 @@ def generate_all_audio(
     speak_parentheticals: bool = False,
     fetch_alignment: bool = True,
     on_progress: Optional[Callable[[GenerationProgress], None]] = None,
-) -> List[GeneratedAudio]:
+) -> Iterator[GeneratedAudio]:
     total = len(dialogue_chunks)
     extension, accept = _get_format_details(output_format)
 
@@ -74,7 +75,7 @@ def generate_all_audio(
     adaptive_delay = base_delay
 
     timeline_cursor = 0
-    generated: List[GeneratedAudio] = []
+    completed: List[GeneratedAudio] = []
 
     for index, chunk in enumerate(dialogue_chunks):
         cfg = character_configs.get(chunk.character)
@@ -83,20 +84,21 @@ def generate_all_audio(
                 f"No voice configuration found for character: {chunk.character}",
                 failed_index=index,
                 failed_character=chunk.character,
-                completed=generated,
+                completed=completed,
             )
 
         snippet = (chunk.text or "").strip()[:80]
-        on_progress and on_progress(
-            GenerationProgress(
-                current=index + 1,
-                total=total,
-                current_character=chunk.character,
-                status="generating",
-                message=f"Generating audio for {chunk.character}...",
-                snippet=snippet,
+        if on_progress:
+            on_progress(
+                GenerationProgress(
+                    current=index + 1,
+                    total=total,
+                    current_character=chunk.character,
+                    status="generating",
+                    message=f"Generating audio for {chunk.character}...",
+                    snippet=snippet,
+                )
             )
-        )
 
         try:
             text = chunk.original_text if (speak_parentheticals and chunk.original_text) else chunk.text
@@ -112,11 +114,7 @@ def generate_all_audio(
 
             alignment: Optional[List[WordTimestamp]] = None
             if fetch_alignment:
-                alignment = client.fetch_alignment(
-                    voice_id=cfg.voice_id,
-                    text=chunk.text,
-                    model_id=model_id,
-                )
+                alignment = client.fetch_alignment(voice_id=cfg.voice_id, text=chunk.text, model_id=model_id)
 
             if alignment:
                 offset_alignment = [
@@ -139,49 +137,78 @@ def generate_all_audio(
                 final_alignment = None
 
             base_filename = f"{index:04d}_{chunk.character.replace(' ', '_')}.{extension}"
-            filename = f"{filename_prefix}_{base_filename}" if filename_prefix else base_filename
+            raw_name = f"{filename_prefix}_{base_filename}" if filename_prefix else base_filename
+            filename = safe_basename(raw_name, default=base_filename)
 
-            generated.append(
-                GeneratedAudio(
-                    filename=filename,
-                    audio_bytes=audio_bytes,
-                    start_time_ms=start_time_ms,
-                    end_time_ms=end_time_ms,
-                    alignment=final_alignment,
-                )
+            generated = GeneratedAudio(
+                filename=filename,
+                audio_bytes=audio_bytes,
+                start_time_ms=start_time_ms,
+                end_time_ms=end_time_ms,
+                alignment=final_alignment,
             )
+            completed.append(generated)
+            yield generated
 
-            on_progress and on_progress(
-                GenerationProgress(
-                    current=index + 1,
-                    total=total,
-                    current_character=chunk.character,
-                    status="complete",
-                    message=f"✓ Completed {chunk.character}",
-                    snippet=snippet,
+            if on_progress:
+                on_progress(
+                    GenerationProgress(
+                        current=index + 1,
+                        total=total,
+                        current_character=chunk.character,
+                        status="complete",
+                        message=f"✓ Completed {chunk.character}",
+                        snippet=snippet,
+                    )
                 )
-            )
 
             adaptive_delay = _adjust_delay_based_on_rate_limit(remaining, adaptive_delay, base_delay)
             if index < total - 1 and adaptive_delay > 0:
                 time.sleep(adaptive_delay / 1000)
         except Exception as exc:
-            on_progress and on_progress(
-                GenerationProgress(
-                    current=index + 1,
-                    total=total,
-                    current_character=chunk.character,
-                    status="error",
-                    message=f"✗ Failed: {exc}",
-                    snippet=snippet,
+            if on_progress:
+                on_progress(
+                    GenerationProgress(
+                        current=index + 1,
+                        total=total,
+                        current_character=chunk.character,
+                        status="error",
+                        message=f"✗ Failed: {exc}",
+                        snippet=snippet,
+                    )
                 )
-            )
             raise GenerationError(
                 str(exc),
                 failed_index=index,
                 failed_character=chunk.character,
-                completed=generated,
+                completed=completed,
             ) from exc
 
-    return generated
 
+def generate_all_audio(
+    *,
+    client: ElevenLabsClient,
+    dialogue_chunks: List[DialogueChunk],
+    character_configs: Dict[str, CharacterConfig],
+    model_id: str,
+    output_format: str,
+    filename_prefix: str = "",
+    delay_ms: int = 500,
+    speak_parentheticals: bool = False,
+    fetch_alignment: bool = True,
+    on_progress: Optional[Callable[[GenerationProgress], None]] = None,
+) -> List[GeneratedAudio]:
+    return list(
+        generate_all_audio_iter(
+            client=client,
+            dialogue_chunks=dialogue_chunks,
+            character_configs=character_configs,
+            model_id=model_id,
+            output_format=output_format,
+            filename_prefix=filename_prefix,
+            delay_ms=delay_ms,
+            speak_parentheticals=speak_parentheticals,
+            fetch_alignment=fetch_alignment,
+            on_progress=on_progress,
+        )
+    )

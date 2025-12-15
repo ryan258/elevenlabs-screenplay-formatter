@@ -8,39 +8,22 @@ except ModuleNotFoundError as exc:  # pragma: no cover
         "FastAPI is not installed. Install Python deps (see pyproject.toml) to run the API."
     ) from exc
 
-from typing import Dict, Union
+from typing import Union
 
 from apps.api.config import AppConfig
 from apps.api.deps import get_config
+from apps.api.limits import MAX_DIALOGUE_CHUNKS, MAX_SCRIPT_CHARS
 from apps.api.schemas import ErrorResponse, GenerateZipRequest, ValidateProjectResponse
+from apps.api.character_configs import build_character_configs
 from lib.elevenlabs.client import ElevenLabsClient
 from lib.exports.zip_bundle import build_zip_bundle
 from lib.generation import generate_all_audio
 from lib.manifest import build_manifest_entries
-from lib.models import CharacterConfig, VoiceSettings
 from lib.parser import parse_script
 from lib.validation import validate_character_configs
 
 
 router = APIRouter(prefix="/api")
-
-MAX_SCRIPT_CHARS = 2_000_000
-MAX_DIALOGUE_CHUNKS = 5_000
-
-
-def _build_character_configs(body: GenerateZipRequest) -> Dict[str, CharacterConfig]:
-    character_configs: Dict[str, CharacterConfig] = {}
-    for name, raw in body.character_configs.items():
-        character_configs[name] = CharacterConfig(
-            voice_id=raw.voice_id,
-            voice_settings=VoiceSettings(
-                stability=raw.voice_settings.stability,
-                similarity_boost=raw.voice_settings.similarity_boost,
-                style=raw.voice_settings.style,
-                speed=raw.voice_settings.speed,
-            ),
-        )
-    return character_configs
 
 
 @router.post("/projects/validate", response_model=ValidateProjectResponse)
@@ -53,7 +36,7 @@ def api_validate_project(
         preserve_stage_directions=body.project_settings.preserve_stage_directions,
     )
 
-    character_configs = _build_character_configs(body)
+    character_configs = build_character_configs(body)
 
     errors = validate_character_configs(parsed.dialogue_chunks, character_configs)
     if not body.project_settings.model:
@@ -92,7 +75,7 @@ def api_generate_zip(
             content=ErrorResponse(error="Too many dialogue chunks").model_dump(),
         )
 
-    character_configs = _build_character_configs(body)
+    character_configs = build_character_configs(body)
 
     errors = validate_character_configs(parsed.dialogue_chunks, character_configs)
     if not body.project_settings.model:
@@ -142,4 +125,3 @@ def api_generate_zip(
             status_code=500,
             content=ErrorResponse(error="Generation failed", details=str(exc)).model_dump(),
         )
-

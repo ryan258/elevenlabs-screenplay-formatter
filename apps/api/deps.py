@@ -8,6 +8,7 @@ except ModuleNotFoundError as exc:  # pragma: no cover
     ) from exc
 
 from apps.api.config import AppConfig
+from apps.api.jobs import JobStore
 
 
 def get_config(request: Request) -> AppConfig:
@@ -16,3 +17,9 @@ def get_config(request: Request) -> AppConfig:
         raise RuntimeError("AppConfig is not initialized")
     return cfg
 
+
+def get_job_store(request: Request) -> JobStore:
+    store = getattr(request.app.state, "job_store", None)
+    if store is None:
+        raise RuntimeError("JobStore is not initialized")
+    return store

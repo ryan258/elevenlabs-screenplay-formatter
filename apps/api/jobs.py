@@ -1,0 +1,240 @@
+from __future__ import annotations
+
+import threading
+import time
+import uuid
+from dataclasses import dataclass, field
+from pathlib import Path
+from queue import Full, Queue
+from typing import Any, Dict, List, Optional
+
+from apps.api.config import AppConfig
+from lib.elevenlabs.client import ElevenLabsClient
+from lib.exports.zip_bundle import build_zip_bundle_to_path
+from lib.generation import GeneratedAudio, GenerationProgress, generate_all_audio_iter
+from lib.manifest import build_manifest_entries
+from lib.models import CharacterConfig, WordTimestamp
+from lib.parser import parse_script
+from lib.validation import validate_character_configs
+
+
+@dataclass
+class JobSnapshot:
+    job_id: str
+    status: str
+    created_at_s: float
+    updated_at_s: float
+    current: int
+    total: int
+    message: str
+    error: Optional[str]
+    export_ready: bool
+
+
+@dataclass
+class Job:
+    job_id: str
+    created_at_s: float
+    updated_at_s: float
+    status: str = "queued"  # queued | running | complete | error
+    current: int = 0
+    total: int = 0
+    message: str = ""
+    error: Optional[str] = None
+    export_path: Optional[Path] = None
+    work_dir: Path = field(default_factory=Path)
+    events: "Queue[Dict[str, Any]]" = field(default_factory=lambda: Queue(maxsize=2000))
+
+    def snapshot(self) -> JobSnapshot:
+        return JobSnapshot(
+            job_id=self.job_id,
+            status=self.status,
+            created_at_s=self.created_at_s,
+            updated_at_s=self.updated_at_s,
+            current=self.current,
+            total=self.total,
+            message=self.message,
+            error=self.error,
+            export_ready=self.export_path is not None and self.export_path.exists(),
+        )
+
+
+class JobStore:
+    def __init__(self, root_dir: Path) -> None:
+        self._root_dir = root_dir
+        self._lock = threading.Lock()
+        self._jobs: Dict[str, Job] = {}
+
+    def create(self) -> Job:
+        job_id = uuid.uuid4().hex
+        now = time.time()
+        work_dir = (self._root_dir / "jobs" / job_id).resolve()
+        work_dir.mkdir(parents=True, exist_ok=True)
+        job = Job(job_id=job_id, created_at_s=now, updated_at_s=now, work_dir=work_dir)
+        with self._lock:
+            self._jobs[job_id] = job
+        return job
+
+    def get(self, job_id: str) -> Optional[Job]:
+        with self._lock:
+            return self._jobs.get(job_id)
+
+    def _emit(self, job: Job, event: str, data: Dict[str, Any]) -> None:
+        payload = {"event": event, "data": data, "ts": time.time()}
+        try:
+            job.events.put_nowait(payload)
+        except Full:
+            try:
+                job.events.get_nowait()
+            except Exception:
+                return
+            try:
+                job.events.put_nowait(payload)
+            except Full:
+                return
+
+    def start_generation(
+        self,
+        *,
+        cfg: AppConfig,
+        job: Job,
+        script_text: str,
+        preserve_stage_directions: bool,
+        model: str,
+        output_format: str,
+        request_delay_ms: int,
+        speak_parentheticals: bool,
+        filename_prefix: str,
+        character_configs: Dict[str, CharacterConfig],
+    ) -> None:
+        thread = threading.Thread(
+            target=self._run_generation,
+            daemon=True,
+            kwargs={
+                "cfg": cfg,
+                "job": job,
+                "script_text": script_text,
+                "preserve_stage_directions": preserve_stage_directions,
+                "model": model,
+                "output_format": output_format,
+                "request_delay_ms": request_delay_ms,
+                "speak_parentheticals": speak_parentheticals,
+                "filename_prefix": filename_prefix,
+                "character_configs": character_configs,
+            },
+        )
+        thread.start()
+
+    def _run_generation(
+        self,
+        *,
+        cfg: AppConfig,
+        job: Job,
+        script_text: str,
+        preserve_stage_directions: bool,
+        model: str,
+        output_format: str,
+        request_delay_ms: int,
+        speak_parentheticals: bool,
+        filename_prefix: str,
+        character_configs: Dict[str, CharacterConfig],
+    ) -> None:
+        job.status = "running"
+        job.updated_at_s = time.time()
+        self._emit(job, "status", {"status": "running"})
+
+        try:
+            if not cfg.elevenlabs.api_key:
+                raise RuntimeError("Missing ELEVENLABS_API_KEY")
+            if not model:
+                raise RuntimeError("Missing model id")
+            if not output_format:
+                raise RuntimeError("Missing output format")
+
+            parsed = parse_script(script_text, preserve_stage_directions=preserve_stage_directions)
+            job.total = len(parsed.dialogue_chunks)
+            job.updated_at_s = time.time()
+            errors = validate_character_configs(parsed.dialogue_chunks, character_configs)
+            if errors:
+                raise RuntimeError("; ".join(errors))
+
+            audio_dir = (job.work_dir / "audio").resolve()
+            audio_dir.mkdir(parents=True, exist_ok=True)
+
+            generated_files: List[str] = []
+            start_times: List[int] = []
+            end_times: List[int] = []
+            alignments: List[Optional[List[WordTimestamp]]] = []
+
+            def on_progress(p: GenerationProgress) -> None:
+                job.current = p.current
+                job.total = p.total
+                job.message = p.message
+                job.updated_at_s = time.time()
+                self._emit(
+                    job,
+                    "progress",
+                    {
+                        "current": p.current,
+                        "total": p.total,
+                        "current_character": p.current_character,
+                        "status": p.status,
+                        "message": p.message,
+                        "snippet": p.snippet,
+                    },
+                )
+
+            client = ElevenLabsClient(cfg.elevenlabs)
+
+            for generated in generate_all_audio_iter(
+                client=client,
+                dialogue_chunks=parsed.dialogue_chunks,
+                character_configs=character_configs,
+                model_id=model,
+                output_format=output_format,
+                filename_prefix=filename_prefix,
+                delay_ms=request_delay_ms,
+                speak_parentheticals=speak_parentheticals,
+                fetch_alignment=True,
+                on_progress=on_progress,
+            ):
+                self._write_generated_audio(audio_dir, generated)
+                generated_files.append(generated.filename)
+                start_times.append(generated.start_time_ms)
+                end_times.append(generated.end_time_ms)
+                alignments.append(generated.alignment)
+
+            entries = build_manifest_entries(
+                parsed.dialogue_chunks,
+                generated_files,
+                start_times_ms=start_times,
+                end_times_ms=end_times,
+                alignments=alignments,
+            )
+
+            export_path = (job.work_dir / "bundle.zip").resolve()
+            audio_paths = [(name, (audio_dir / name).resolve()) for name in generated_files]
+            build_zip_bundle_to_path(audio_files=audio_paths, manifest_entries=entries, output_path=export_path)
+            job.export_path = export_path
+            job.status = "complete"
+            job.message = "Complete"
+            job.updated_at_s = time.time()
+            self._emit(job, "complete", {"export_ready": True})
+        except Exception as exc:
+            job.status = "error"
+            job.error = str(exc)
+            job.message = "Error"
+            job.updated_at_s = time.time()
+            self._emit(job, "error", {"error": str(exc)})
+        finally:
+            self._emit(job, "done", {"status": job.status})
+
+    def _write_generated_audio(self, audio_dir: Path, generated: GeneratedAudio) -> None:
+        target = (audio_dir / generated.filename).resolve()
+        audio_dir_resolved = audio_dir.resolve()
+        try:
+            target.relative_to(audio_dir_resolved)
+        except ValueError as exc:
+            raise ValueError("Invalid output filename") from exc
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(generated.audio_bytes)
