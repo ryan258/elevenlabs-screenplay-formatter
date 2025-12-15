@@ -28,6 +28,20 @@ def _ensure_dir(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
 
 
+def _cleanup_dir(path: Path) -> None:
+    if not path.exists():
+        return
+    try:
+        for p in path.glob("*"):
+            try:
+                p.unlink()
+            except OSError:
+                pass
+        path.rmdir()
+    except OSError:
+        pass
+
+
 def _parse_mix_config_allowlist(
     payload: str,
     *,
@@ -80,17 +94,20 @@ async def api_concatenate(
     request: Request,
     cfg: AppConfig = Depends(get_config),
 ) -> Union[StreamingResponse, JSONResponse]:
+    request_dir: Optional[Path] = None
     try:
         upload_root = Path(cfg.upload_dir)
         _ensure_dir(upload_root)
-        request_dir = upload_root / f"req_{uuid.uuid4().hex}"
-        _ensure_dir(request_dir)
+        request_dir_path = upload_root / f"req_{uuid.uuid4().hex}"
+        request_dir = request_dir_path
+        _ensure_dir(request_dir_path)
 
         form = await request.form()
 
         audio_paths: List[Path] = []
         aux_files: Dict[str, Path] = {}
         mix_config_raw: Optional[str] = None
+        parsed_mix: Optional[MixConfig] = None
 
         for key, value in form.multi_items():
             if key == "mixConfig" and isinstance(value, str):
@@ -108,6 +125,7 @@ async def api_concatenate(
             else:
                 safe_key = sanitize_fieldname(key)
                 if not safe_key or safe_key != key:
+                    _cleanup_dir(request_dir_path)
                     return JSONResponse(
                         status_code=400,
                         content=ErrorResponse(error="Invalid upload field name").model_dump(),
@@ -123,51 +141,48 @@ async def api_concatenate(
                     f.write(chunk)
 
         if not audio_paths:
+            _cleanup_dir(request_dir_path)
             return JSONResponse(
                 status_code=400,
                 content=ErrorResponse(error="No audio files provided").model_dump(),
             )
 
-        out_path = request_dir / "concatenated_audio.mp3"
-        concat_audio(cfg.ffmpeg, audio_paths, out_path)
-
-        final_path = out_path
         if mix_config_raw:
             try:
-                mix = _parse_mix_config_allowlist(mix_config_raw, allowed=aux_files)
+                parsed_mix = _parse_mix_config_allowlist(mix_config_raw, allowed=aux_files)
             except Exception as exc:
+                _cleanup_dir(request_dir_path)
                 return JSONResponse(
                     status_code=400,
                     content=ErrorResponse(error="Invalid mixConfig", details=str(exc)).model_dump(),
                 )
 
-            if mix.background or mix.sound_effects:
-                mixed_path = request_dir / "concatenated_audio_mixed.mp3"
-                apply_mix(cfg.ffmpeg, out_path, mix, mixed_path)
-                final_path = mixed_path
+        out_path = request_dir_path / "concatenated_audio.mp3"
+        concat_audio(cfg.ffmpeg, audio_paths, out_path)
+
+        final_path = out_path
+        if parsed_mix and (parsed_mix.background or parsed_mix.sound_effects):
+            mixed_path = request_dir_path / "concatenated_audio_mixed.mp3"
+            apply_mix(cfg.ffmpeg, out_path, parsed_mix, mixed_path)
+            final_path = mixed_path
 
         def iter_once_and_cleanup() -> bytes:
             data = final_path.read_bytes()
-            try:
-                for p in request_dir.glob("*"):
-                    try:
-                        p.unlink()
-                    except OSError:
-                        pass
-                request_dir.rmdir()
-            except OSError:
-                pass
+            _cleanup_dir(request_dir_path)
             return data
 
         return StreamingResponse(iter([iter_once_and_cleanup()]), media_type="audio/mpeg")
     except subprocess.CalledProcessError as exc:
+        if request_dir is not None:
+            _cleanup_dir(request_dir)
         return JSONResponse(
             status_code=500,
             content=ErrorResponse(error="FFmpeg failed", details=str(exc)).model_dump(),
         )
     except Exception as exc:
+        if request_dir is not None:
+            _cleanup_dir(request_dir)
         return JSONResponse(
             status_code=500,
             content=ErrorResponse(error="Failed to concatenate audio files", details=str(exc)).model_dump(),
         )
-
