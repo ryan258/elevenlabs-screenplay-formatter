@@ -19,6 +19,68 @@ This roadmap focuses on future enhancements and remaining quality-of-life improv
 
 ---
 
+## Strategic Pivot: Python-First (FastAPI + Flask) — v1.0 Track
+
+We are sunsetting the Node.js/Vite/React implementation and rebuilding as a full Python project: **Flask + Jinja2 + HTMX** renders the HTML UI (progressive enhancement), while **FastAPI** serves JSON endpoints and job/progress execution (no HTML rendering). The shared core lives in `lib/` as a reusable, typed library with no web/framework imports.
+
+For the step-by-step execution plan, see [MIGRATION_ROADMAP.md](./MIGRATION_ROADMAP.md).
+
+### Constraints (Non-Negotiable)
+
+- **No-Bloat:** Jinja2 templates + HTMX for interactivity; simple cookie/session auth; local/bare-metal assumptions (no Docker/K8s/Terraform).
+- **Arsenal portability:** `lib/` must not import from app entrypoints, routers/views, or framework modules; use typed config objects (env-backed) and pass config into operations.
+- **Type safety:** public functions fully typed; validate external inputs at boundaries (HTTP, files, env, model output).
+- **Candlelight UI palette:** only `#121212`, `#EBD2BE`, `#A6ACCD`, `#98C379`, `#E06C75` in user-facing styles.
+
+### Target Architecture
+
+- `lib/` (pure, reusable): Fountain/parser, project model, ElevenLabs client, export builders (ZIP, SRT/VTT, Reaper), audio pipeline helpers, and validation.
+- `apps/api/` (FastAPI): REST endpoints for parsing, generation, exports, health; background job execution; file upload/download boundaries; typed request/response models.
+- `apps/web/` (Flask): SSR UI (Jinja2) + HTMX actions that call into `lib/` directly (or via internal API if we choose to isolate); cookie/session; Candlelight theme.
+- `cli/` (Python): batch processing CLI that reuses `lib/` (feature-parity with current TS CLI).
+
+### Migration Plan (Plotted)
+
+```mermaid
+gantt
+  title Python Rewrite (v1.0) — Node/React Sunset
+  dateFormat  YYYY-MM-DD
+  axisFormat  %b %d
+
+  section Freeze & Inventory
+  Lock Node features (bugfix-only)              :a1, 2025-12-16, 7d
+  Feature parity checklist (UI/CLI/exports)     :a2, after a1, 7d
+
+  section Python Foundation
+  Packaging + toolchain (ruff/mypy/pytest)      :b1, after a2, 10d
+  Typed env-backed Config + secrets hygiene     :b2, after b1, 5d
+
+  section Core Port (lib/)
+  Parser + diagnostics parity                    :c1, after b2, 14d
+  ElevenLabs client + retries/rate limits         :c2, after c1, 10d
+  Exporters (ZIP, SRT/VTT, Reaper)               :c3, after c2, 10d
+  Audio concat pipeline (ffmpeg wrapper)          :c4, after c3, 7d
+
+  section Services
+  FastAPI endpoints + job orchestration           :d1, after c2, 14d
+  Flask SSR UI + HTMX flows                       :d2, after c1, 21d
+
+  section Cutover
+  CLI parity + docs                               :e1, after c3, 10d
+  Data migration plan (projects/presets)          :e2, after d2, 7d
+  Remove Node build + archive legacy app          :e3, after e1, 7d
+```
+
+### Acceptance Criteria (Definition of Done)
+
+- [ ] A single `python -m ...` (or `uv run ...`) starts the Flask UI and FastAPI API in local dev without Node.
+- [ ] Parser + diagnostics match current behavior on existing example scripts (`EXAMPLE_*.md`/`*.txt`).
+- [ ] CLI supports multi-script batch generation and local concatenation.
+- [ ] Export formats (ZIP, Reaper, SRT/VTT) match current outputs for the same inputs.
+- [ ] No secrets committed; `.env` remains ignored; `.env.example` documents required values.
+
+---
+
 ## Future Enhancements
 
 ### Testing & Quality Assurance
@@ -35,7 +97,7 @@ This roadmap focuses on future enhancements and remaining quality-of-life improv
   - [ ] Test retry logic and rate limiting
   - [ ] Validate error handling and recovery
 
-- [ ] **End-to-end tests** (Playwright/Cypress)
+- [ ] **End-to-end tests** (Playwright for Python)
   - [ ] Load test script and assign voices
   - [ ] Mock API responses and verify UI flow
   - [ ] Test project save/load cycle
@@ -75,10 +137,10 @@ This roadmap focuses on future enhancements and remaining quality-of-life improv
 
 ### Developer Experience
 
-- [ ] **Server package.json**
-  - [ ] Create `server/package.json` with proper dependencies
-  - [ ] Document express, cors, multer, fluent-ffmpeg versions
-  - [ ] Add server-specific scripts
+- [ ] **Python packaging & dev ergonomics**
+  - [ ] Standardize tooling (`ruff`, `mypy`, `pytest`) and a single-run dev command
+  - [ ] Document local ffmpeg requirements and supported OSes
+  - [ ] Add pre-commit hooks (optional, non-blocking)
 
 ### Integrations & Export Formats
 
