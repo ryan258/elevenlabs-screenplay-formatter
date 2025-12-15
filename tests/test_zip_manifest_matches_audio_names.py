@@ -66,3 +66,16 @@ def test_zip_manifest_out_of_bounds_uses_safe_default() -> None:
     with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zf:
         manifest_data = json.loads(zf.read("manifest.json").decode("utf-8"))
         assert manifest_data[0]["filename"] == "clip.mp3"
+
+
+def test_zip_bundle_writes_extra_files() -> None:
+    zip_bytes = build_zip_bundle(
+        audio_files=[("a.mp3", b"a")],
+        manifest_entries=[],
+        extra_files=[("subtitles.srt", b"srt"), ("reaper.rpp", b"rpp")],
+    )
+
+    with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zf:
+        names = set(zf.namelist())
+        assert "subtitles.srt" in names
+        assert "reaper.rpp" in names

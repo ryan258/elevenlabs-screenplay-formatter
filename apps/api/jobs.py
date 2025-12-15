@@ -9,12 +9,14 @@ from pathlib import Path
 from typing import Any, Deque, Dict, List, Optional, Tuple
 
 from apps.api.config import AppConfig
+from lib.audio.ffmpeg import concat_audio
 from lib.elevenlabs.client import ElevenLabsClient
 from lib.exports.zip_bundle import build_zip_bundle_to_path
 from lib.generation import GeneratedAudio, GenerationProgress, generate_all_audio_iter
-from lib.manifest import build_manifest_entries
+from lib.manifest import build_manifest_entries, manifest_to_srt, manifest_to_vtt
 from lib.models import CharacterConfig, WordTimestamp
 from lib.parser import parse_script
+from lib.reaper_export import build_reaper_project
 from lib.validation import validate_character_configs
 
 
@@ -116,6 +118,7 @@ class JobStore:
         output_format: str,
         request_delay_ms: int,
         speak_parentheticals: bool,
+        concatenate: bool,
         filename_prefix: str,
         character_configs: Dict[str, CharacterConfig],
     ) -> None:
@@ -131,6 +134,7 @@ class JobStore:
                 "output_format": output_format,
                 "request_delay_ms": request_delay_ms,
                 "speak_parentheticals": speak_parentheticals,
+                "concatenate": concatenate,
                 "filename_prefix": filename_prefix,
                 "character_configs": character_configs,
             },
@@ -148,6 +152,7 @@ class JobStore:
         output_format: str,
         request_delay_ms: int,
         speak_parentheticals: bool,
+        concatenate: bool,
         filename_prefix: str,
         character_configs: Dict[str, CharacterConfig],
     ) -> None:
@@ -224,9 +229,36 @@ class JobStore:
                 alignments=alignments,
             )
 
+            srt_path = (job.work_dir / "subtitles.srt").resolve()
+            srt_path.write_text(manifest_to_srt(entries), encoding="utf-8")
+
+            vtt_path = (job.work_dir / "subtitles.vtt").resolve()
+            vtt_path.write_text(manifest_to_vtt(entries), encoding="utf-8")
+
+            rpp_path = (job.work_dir / "reaper.rpp").resolve()
+            rpp_path.write_text(build_reaper_project(entries), encoding="utf-8")
+
+            extra_paths: List[Tuple[str, Path]] = [
+                ("subtitles.srt", srt_path),
+                ("subtitles.vtt", vtt_path),
+                ("reaper.rpp", rpp_path),
+            ]
+
+            if concatenate:
+                # Use the already-written per-line clips and build a single timeline render.
+                ext = "wav" if str(output_format).startswith("pcm_") else "mp3"
+                concat_path = (job.work_dir / f"concatenated_audio.{ext}").resolve()
+                concat_audio(cfg.ffmpeg, [(audio_dir / name).resolve() for name in generated_files], concat_path)
+                extra_paths.append((concat_path.name, concat_path))
+
             export_path = (job.work_dir / "bundle.zip").resolve()
             audio_paths = [(name, (audio_dir / name).resolve()) for name in generated_files]
-            build_zip_bundle_to_path(audio_files=audio_paths, manifest_entries=entries, output_path=export_path)
+            build_zip_bundle_to_path(
+                audio_files=audio_paths,
+                manifest_entries=entries,
+                output_path=export_path,
+                extra_files=extra_paths,
+            )
             job.export_path = export_path
             job.status = "complete"
             job.message = "Complete"
@@ -237,7 +269,7 @@ class JobStore:
             job.error = str(exc)
             job.message = "Error"
             job.updated_at_s = time.time()
-            self._emit(job, "error", {"error": str(exc)})
+            self._emit(job, "job_error", {"error": str(exc)})
         finally:
             self._emit(job, "done", {"status": job.status})
 

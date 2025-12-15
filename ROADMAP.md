@@ -17,6 +17,11 @@ This roadmap focuses on future enhancements and remaining quality-of-life improv
 - ✅ Shareable project URLs
 - ✅ Core stability fixes (IndexedDB migration, memory leaks, error handling)
 
+**Python rewrite status (v1.0 track):**
+- ✅ `lib/` core port (parser, ElevenLabs client, generation, exports, ffmpeg wrapper) with pytest coverage
+- ✅ FastAPI API + async jobs + SSE progress
+- 🚧 Flask UI (Jinja2 + HTMX) is in progress; current “happy path” works end-to-end
+
 ---
 
 ## Strategic Pivot: Python-First (FastAPI + Flask) — v1.0 Track
@@ -76,7 +81,7 @@ gantt
 - [x] A single `python -m ...` (or `uv run ...`) starts the Flask UI and FastAPI API in local dev without Node (after installing Python deps).
 - [x] Parser + diagnostics match current behavior on existing example scripts (`EXAMPLE_*.md`/`*.txt`).
 - [/] CLI supports multi-script batch generation and local concatenation.
-- [x] Export formats (ZIP, Reaper, SRT/VTT) match current outputs for the same inputs.
+- [/] Export formats (ZIP/manifest, SRT/VTT, Reaper) are implemented in `lib/`; parity verification is ongoing.
 - [x] No secrets committed; `.env` remains ignored; `.env.example` documents required values.
 
 ---
@@ -87,15 +92,15 @@ gantt
 
 **Goal:** Improve reliability and prevent regressions through automated testing.
 
-- [ ] **Parser unit tests**
-  - [ ] Test various real-world edge cases (unusual formatting, mixed case, special characters)
-  - [ ] Validate Fountain parsing corner cases
-  - [ ] Test character alias resolution
+- [x] **Parser unit tests**
+  - [x] Standard + Fountain parsing coverage (`tests/`)
+  - [x] Share link encode/decode tests
+  - [x] ZIP/manifest safety tests
 
-- [ ] **API client tests**
-  - [ ] Mock ElevenLabs API responses
-  - [ ] Test retry logic and rate limiting
-  - [ ] Validate error handling and recovery
+- [/] **API client tests**
+  - [x] HTTP safety + input boundary tests
+  - [ ] Mock ElevenLabs API responses (no-network CI-safe)
+  - [ ] Retry/rate-limit behavior tests
 
 - [ ] **End-to-end tests** (Playwright for Python)
   - [ ] Load test script and assign voices

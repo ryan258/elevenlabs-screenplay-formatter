@@ -55,6 +55,21 @@ def _get_format_details(output_format: str) -> Tuple[str, str]:
     return OUTPUT_FORMAT_DETAILS.get(output_format, OUTPUT_FORMAT_DETAILS["mp3_44100_128"])
 
 
+def _clip_context(text: Optional[str], *, max_chars: int) -> Optional[str]:
+    if not text:
+        return None
+    clipped = text.strip()
+    if not clipped:
+        return None
+    if len(clipped) <= max_chars:
+        return clipped
+    return clipped[: max(0, max_chars)].rstrip()
+
+
+def _get_spoken_text(chunk: DialogueChunk, *, speak_parentheticals: bool) -> str:
+    return chunk.original_text if (speak_parentheticals and chunk.original_text) else chunk.text
+
+
 def generate_all_audio_iter(
     *,
     client: ElevenLabsClient,
@@ -101,13 +116,27 @@ def generate_all_audio_iter(
             )
 
         try:
-            text = chunk.original_text if (speak_parentheticals and chunk.original_text) else chunk.text
+            text = _get_spoken_text(chunk, speak_parentheticals=speak_parentheticals)
+            previous_text = _clip_context(
+                _get_spoken_text(dialogue_chunks[index - 1], speak_parentheticals=speak_parentheticals)
+                if index > 0
+                else None,
+                max_chars=500,
+            )
+            next_text = _clip_context(
+                _get_spoken_text(dialogue_chunks[index + 1], speak_parentheticals=speak_parentheticals)
+                if index + 1 < len(dialogue_chunks)
+                else None,
+                max_chars=500,
+            )
             audio_bytes, remaining = client.generate_audio(
                 voice_id=cfg.voice_id,
                 text=text,
                 model_id=model_id,
                 output_format=output_format,
                 voice_settings=cfg.voice_settings,
+                previous_text=previous_text,
+                next_text=next_text,
                 accept=accept,
                 base_delay_ms=base_delay,
             )

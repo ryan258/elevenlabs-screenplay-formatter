@@ -17,6 +17,9 @@ body {
 .container { max-width: 980px; margin: 0 auto; padding: 16px; }
 .site-header { border-bottom: 1px solid var(--muted); }
 .subtitle { color: var(--muted); margin-top: 4px; }
+.nav { display: flex; gap: 12px; margin-top: 12px; }
+.nav a { color: var(--text); text-decoration: none; border-bottom: 1px solid transparent; }
+.nav a:hover { border-bottom-color: var(--muted); }
 
 .card {
   border: 1px solid var(--muted);
@@ -71,8 +74,19 @@ textarea {
 }
 .btn.secondary { background: var(--text); }
 .meta { color: var(--muted); }
+.error { color: var(--err); }
+.ok { color: var(--ok); }
 .details summary { cursor: pointer; color: var(--text); }
 .chunks { padding-left: 18px; }
 .chunk-header { color: var(--ok); font-weight: 700; }
 .chunk-text { color: var(--text); margin: 6px 0 14px; }
 .muted { color: var(--muted); }
+.strong { font-weight: 700; color: var(--ok); }
+.status { font-weight: 700; }
+.status--queued { color: var(--muted); }
+.status--running { color: var(--ok); }
+.status--generating { color: var(--ok); }
+.status--downloading { color: var(--ok); }
+.status--complete { color: var(--ok); }
+.status--error { color: var(--err); }
+.status--disconnected { color: var(--err); }

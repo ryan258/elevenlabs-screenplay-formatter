@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import tempfile
+from pathlib import Path
+from typing import Union
+
 try:
     from fastapi import APIRouter, Depends
     from fastapi.responses import JSONResponse, StreamingResponse
@@ -8,17 +12,17 @@ except ModuleNotFoundError as exc:  # pragma: no cover
         "FastAPI is not installed. Install Python deps (see pyproject.toml) to run the API."
     ) from exc
 
-from typing import Union
-
 from apps.api.config import AppConfig
+from apps.api.character_configs import build_character_configs
 from apps.api.deps import get_config
 from apps.api.limits import MAX_DIALOGUE_CHUNKS, MAX_SCRIPT_CHARS
 from apps.api.schemas import ErrorResponse, GenerateZipRequest, ValidateProjectResponse
-from apps.api.character_configs import build_character_configs
+from lib.audio.ffmpeg import concat_audio
 from lib.elevenlabs.client import ElevenLabsClient
 from lib.exports.zip_bundle import build_zip_bundle
 from lib.generation import generate_all_audio
-from lib.manifest import build_manifest_entries
+from lib.manifest import build_manifest_entries, manifest_to_srt, manifest_to_vtt
+from lib.reaper_export import build_reaper_project
 from lib.parser import parse_script
 from lib.validation import validate_character_configs
 
@@ -110,9 +114,28 @@ def api_generate_zip(
             alignments=[g.alignment for g in generated],
         )
 
+        audio_files = [(g.filename, g.audio_bytes) for g in generated]
+        if body.project_settings.concatenate:
+            extension = "wav" if str(body.project_settings.output_format).startswith("pcm_") else "mp3"
+            with tempfile.TemporaryDirectory(prefix="esf_api_generate_") as tmpdir:
+                tmp = Path(tmpdir)
+                paths = []
+                for name, data in audio_files:
+                    p = tmp / name
+                    p.write_bytes(data)
+                    paths.append(p)
+                out_path = tmp / f"concatenated_audio.{extension}"
+                concat_audio(cfg.ffmpeg, paths, out_path)
+                audio_files.append((out_path.name, out_path.read_bytes()))
+
         zip_bytes = build_zip_bundle(
-            audio_files=[(g.filename, g.audio_bytes) for g in generated],
+            audio_files=audio_files,
             manifest_entries=entries,
+            extra_files=[
+                ("subtitles.srt", manifest_to_srt(entries).encode("utf-8")),
+                ("subtitles.vtt", manifest_to_vtt(entries).encode("utf-8")),
+                ("reaper.rpp", build_reaper_project(entries).encode("utf-8")),
+            ],
         )
 
         return StreamingResponse(

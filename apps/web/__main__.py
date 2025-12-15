@@ -2,19 +2,19 @@ from __future__ import annotations
 
 import os
 
-from apps.api.config import load_config_from_env
-from apps.web.app import app
+try:
+    import uvicorn
+except ModuleNotFoundError as exc:  # pragma: no cover
+    raise ModuleNotFoundError(
+        "uvicorn is not installed. Install deps (e.g. `python3 -m pip install -e \".[dev]\"`) to run the app."
+    ) from exc
 
 
 def main() -> None:
-    cfg = load_config_from_env()
-    app.secret_key = cfg.flask_secret_key
-    app.config["APP_CONFIG"] = cfg
-
     host = os.environ.get("HOST", "127.0.0.1")
     port = int(os.environ.get("PORT", "8000"))
-    debug = os.environ.get("FLASK_DEBUG", "0").strip() == "1"
-    app.run(host=host, port=port, debug=debug)
+    reload = os.environ.get("UVICORN_RELOAD", "0").strip() == "1"
+    uvicorn.run("apps.api.main:app", host=host, port=port, reload=reload)
 
 
 if __name__ == "__main__":

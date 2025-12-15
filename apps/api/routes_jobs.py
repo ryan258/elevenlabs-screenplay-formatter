@@ -67,6 +67,7 @@ def api_generate_job(
         output_format=body.project_settings.output_format,
         request_delay_ms=body.project_settings.request_delay_ms or 500,
         speak_parentheticals=body.project_settings.speak_parentheticals,
+        concatenate=body.project_settings.concatenate,
         filename_prefix=body.filename_prefix or "",
         character_configs=character_configs,
     )
@@ -77,6 +78,9 @@ def api_generate_job(
             "status_url": f"/api/jobs/{job.job_id}",
             "events_url": f"/api/jobs/{job.job_id}/events",
             "export_url": f"/api/exports/{job.job_id}.zip",
+            "srt_url": f"/api/exports/{job.job_id}.srt",
+            "vtt_url": f"/api/exports/{job.job_id}.vtt",
+            "rpp_url": f"/api/exports/{job.job_id}.rpp",
         }
     )
 
@@ -95,6 +99,39 @@ def api_job_export(job_id: str, store: JobStore = Depends(get_job_store)) -> Uni
     if job is None or job.export_path is None or not job.export_path.exists():
         return JSONResponse(status_code=404, content=ErrorResponse(error="Export not ready").model_dump())
     return FileResponse(job.export_path, media_type="application/zip", filename="bundle.zip")
+
+
+@router.get("/exports/{job_id}.srt")
+def api_job_srt(job_id: str, store: JobStore = Depends(get_job_store)) -> Union[FileResponse, JSONResponse]:
+    job = store.get(job_id)
+    if job is None:
+        return JSONResponse(status_code=404, content=ErrorResponse(error="Job not found").model_dump())
+    path = (job.work_dir / "subtitles.srt").resolve()
+    if not path.exists():
+        return JSONResponse(status_code=404, content=ErrorResponse(error="SRT not ready").model_dump())
+    return FileResponse(path, media_type="text/plain; charset=utf-8", filename="subtitles.srt")
+
+
+@router.get("/exports/{job_id}.vtt")
+def api_job_vtt(job_id: str, store: JobStore = Depends(get_job_store)) -> Union[FileResponse, JSONResponse]:
+    job = store.get(job_id)
+    if job is None:
+        return JSONResponse(status_code=404, content=ErrorResponse(error="Job not found").model_dump())
+    path = (job.work_dir / "subtitles.vtt").resolve()
+    if not path.exists():
+        return JSONResponse(status_code=404, content=ErrorResponse(error="VTT not ready").model_dump())
+    return FileResponse(path, media_type="text/vtt; charset=utf-8", filename="subtitles.vtt")
+
+
+@router.get("/exports/{job_id}.rpp")
+def api_job_rpp(job_id: str, store: JobStore = Depends(get_job_store)) -> Union[FileResponse, JSONResponse]:
+    job = store.get(job_id)
+    if job is None:
+        return JSONResponse(status_code=404, content=ErrorResponse(error="Job not found").model_dump())
+    path = (job.work_dir / "reaper.rpp").resolve()
+    if not path.exists():
+        return JSONResponse(status_code=404, content=ErrorResponse(error="RPP not ready").model_dump())
+    return FileResponse(path, media_type="text/plain; charset=utf-8", filename="reaper.rpp")
 
 
 @router.get("/jobs/{job_id}/events")

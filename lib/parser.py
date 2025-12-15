@@ -30,6 +30,10 @@ def clean_dialogue(text: str, preserve_brackets: bool = False) -> str:
     return cleaned.strip()
 
 
+def strip_brackets(text: str) -> str:
+    return re.sub(r"\[[^\]]+\]", "", text)
+
+
 def normalize_character_name(value: str) -> str:
     normalized = re.sub(r"\([^)]*\)", "", value)
     normalized = re.sub(r"\bCONT'D\b", "", normalized, flags=re.I)
@@ -115,11 +119,12 @@ def parse_script(script_text: str, preserve_stage_directions: bool = False) -> P
             raw = " ".join(current_dialogue).strip()
             text = clean_dialogue(raw, preserve_stage_directions)
             if text:
+                original_text = raw if preserve_stage_directions else strip_brackets(raw)
                 chunks.append(
                     DialogueChunk(
                         character=current_character_full_name,
                         text=text,
-                        original_text=raw,
+                        original_text=original_text,
                     )
                 )
         current_dialogue = []
@@ -153,8 +158,9 @@ def parse_script(script_text: str, preserve_stage_directions: bool = False) -> P
                 raw_line = dialogue_part.strip()
                 text = clean_dialogue(raw_line, preserve_stage_directions)
                 if text:
+                    original_text = raw_line if preserve_stage_directions else strip_brackets(raw_line)
                     chunks.append(
-                        DialogueChunk(character=found.full_name, text=text, original_text=raw_line)
+                        DialogueChunk(character=found.full_name, text=text, original_text=original_text)
                     )
                 current_character_full_name = None
                 return
@@ -218,4 +224,3 @@ def parse_script(script_text: str, preserve_stage_directions: bool = False) -> P
         dialogue_chunks=chunks,
         diagnostics=ParserDiagnostics(unmatched_lines=unmatched_lines),
     )
-

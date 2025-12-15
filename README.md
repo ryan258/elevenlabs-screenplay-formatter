@@ -1,6 +1,6 @@
 # ElevenLabs Screenplay Formatter
 
-A React-based web application that converts screenplay dialogue into AI-generated audio files using the ElevenLabs text-to-speech API. Perfect for creating audio drafts, voice demos, or bringing your scripts to life.
+A Python modular monolith that converts screenplay dialogue into AI-generated audio files using the ElevenLabs text-to-speech API.
 
 ## Python Migration (v1.0 in progress)
 
@@ -11,140 +11,55 @@ This repo is actively migrating to a Python modular monolith:
 
 See `ROADMAP.md` and `MIGRATION_ROADMAP.md` for the execution plan.
 
-## Features
+## Current Status (Python)
 
-- **Intelligent Script Parsing** - Automatically detects characters and extracts dialogue from screenplay format
-- **Character Voice Mapping** - Assign unique ElevenLabs voice IDs to each character
-- **Auto-fill Voice IDs** - Extract Voice IDs directly from character lists in format `- CHARACTER (Voice ID: abc123...)`
-- **Fine-Tuned Voice Control** - Adjust stability, similarity boost, style, and speed per character
-- **Context-Aware Audio Generation** - Sends previous and next dialogue to ElevenLabs for improved continuity and natural transitions
-- **Stage Direction Preservation** - Use brackets `[whispering]`, `[shouting]` to give performance instructions to Turbo v2.5+ models
-- **Audio Concatenation** - Option to merge all dialogue into a single audio file (requires backend server)
-- **Real-Time Progress Tracking** - Live progress bar, character previews, and copyable logs
-- **Fountain-Style Support** - Paste Fountain scripts (no `Characters:` list required) and let the parser auto-detect speakers
-- **Resumable Generation** - Inline error surfaces, automatic retries, and a one-click "Resume from failed chunk" flow
-- **Timeline Preview** - Per-line preview buttons, cached audio snippets, and estimated runtimes
-- **Generation Profiles & Exports** - One-click profiles, manifest/zip exports, and CLI automation for batch workflows
-- **Parser Diagnostics Panel** - See detected characters, parsed lines, and any lines the parser skipped
-- **Batch Generation** - Processes entire screenplays automatically with rate limiting
-- **Concatenation Health Check** - Built-in status card to ping the backend server and show connectivity
-- **Multiple Model Support** - Choose between multilingual, Monolingual v1, Turbo, or Flash models directly from the dropdown
-- **Format Options** - Select output format (MP3 128kbps, 192kbps, or PCM 24kHz)
-- **Language Selector & Voice Suggestions** - Pick the dialogue language and apply curated role-based voice recommendations per locale
-- **Subtitle & Timing Exports** - Generate manifests plus SRT/VTT subtitle files backed by ElevenLabs word-alignment timestamps
-- **Audio Production Mixing** - Attach a looping background track and timed sound effects that are mixed alongside dialogue during concatenation
-- **Shareable Project Links** - Copy a single URL that encodes your script, settings, and presets for collaborators
-- **Reaper Template Export** - Download a ready-to-open `.rpp` file with each character on its own track and timeline placement derived from the manifest
-- **Project Persistence** - Auto-saves your work to browser storage with cross-session resume capability
+- Flask UI “happy path” works: paste script → parse → configure voices → start async generation → live progress via SSE → download ZIP.
+- FastAPI API + jobs are implemented (`/api/parse`, `/api/projects/validate`, `/api/generate`, `/api/jobs/*`, `/api/exports/*.zip`).
+- Core library exists in `lib/` (parser, ElevenLabs client, generation, ZIP/manifest, ffmpeg concat/mix helpers) with pytest coverage.
 
 ## Prerequisites
 
 ### Required
 
-- **Node.js** (v18 or higher) - [Download here](https://nodejs.org/)
+- **Python** (3.9 or higher)
 - **ElevenLabs API Key** - [Get your key here](https://elevenlabs.io/)
 
-### Optional (for audio concatenation)
+### Optional
 
-- **FFmpeg** - Required only if you want to use the "Concatenate Audio" feature
+- **FFmpeg** - Required for concatenation/mixing features
   - **Windows**: `winget install ffmpeg` or [download manually](https://ffmpeg.org/download.html)
   - **Mac**: `brew install ffmpeg`
   - **Linux**: `sudo apt install ffmpeg` (Ubuntu/Debian) or `sudo yum install ffmpeg` (RHEL/Fedora)
 
 ## Installation
 
-1. **Clone the repository:**
+1. **Clone the repository**
 
    ```bash
    git clone https://github.com/ryan258/elevenlabs-screenplay-formatter.git
    cd elevenlabs-screenplay-formatter
    ```
 
-2. **Install frontend dependencies:**
+2. **Create a venv and install Python deps**
 
    ```bash
-   npm install
+   python3 -m venv .venv
+   source .venv/bin/activate
+   python3 -m pip install -U pip
+   python3 -m pip install -e ".[dev]"
    ```
 
-3. **Configure environment variables (optional):**
+3. **Configure environment variables**
 
    ```bash
    cp .env.example .env
    ```
 
-   Populate `ELEVENLABS_API_KEY` if you want the React app to prefill the key field, and set `VITE_CONCAT_SERVER_URL` if your concatenation server isn’t running at the default `http://localhost:3001/concatenate`.
-
-3. **(Optional) Install backend dependencies for concatenation:**
-   ```bash
-   cd server
-   npm install
-   cd ..
-   ```
+   Set `ELEVENLABS_API_KEY`. Keep `.env` local (it is gitignored).
 
 ## Quick Start
 
-### Basic Usage (Individual Audio Files)
-
-1. **Start the frontend:**
-
-   ```bash
-   npm run dev
-   ```
-
-2. **Open your browser:**
-
-   - Navigate to `http://localhost:3000`
-
-3. **Configure and generate:**
-   - Enter your ElevenLabs API key
-   - Paste your screenplay into the text area
-   - Configure voice IDs for each detected character
-   - Disable "Concatenate Audio" toggle
-   - Click "Generate Audio"
-   - A ZIP archive containing all audio files plus manifests will download to your Downloads folder
-
-### Advanced Usage (Concatenated Audio)
-
-1. **Start the backend server (Terminal 1):**
-
-   ```bash
-   cd server
-   npm start
-   ```
-
-   You should see:
-
-   ```
-   🎵 Audio concatenation server running on http://localhost:3001
-   📋 Health check: http://localhost:3001/health
-   ```
-
-2. **Start the frontend (Terminal 2):**
-
-   ```bash
-   npm run dev
-   ```
-
-3. **Generate concatenated audio:**
-   - Open `http://localhost:3000`
-
----
-
-## Python Quick Start (Early Milestone)
-
-Requires Python 3.9+ and installing dependencies from `pyproject.toml`:
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python3 -m pip install -U pip
-python3 -m pip install -e ".[dev]"
-cp .env.example .env
-```
-
-Security note: never commit `.env` (it is gitignored). If an API key is ever pasted into logs/chat/screenshots, rotate it immediately in ElevenLabs and update your local `.env`.
-
-Run the combined app (FastAPI mounting Flask):
+### Run the combined app (FastAPI mounting Flask)
 
 ```bash
 python3 -m apps.api
@@ -152,485 +67,122 @@ python3 -m apps.api
 
 Open `http://localhost:8000`.
 
+The Flask UI uses HTMX for progressive enhancement. The template tries `/static/htmx.min.js` first and falls back to `https://unpkg.com/` if it’s not present. If HTMX can’t load, you can still use the app via full page loads (no partial swaps).
+
 If you want hot reload during development:
 
 ```bash
 UVICORN_RELOAD=1 python3 -m apps.api
 ```
 
-Python CLI (replacement in progress):
+### Tests
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -q
+```
+
+### Python CLI (replacement in progress)
 
 ```bash
 python3 -m py_cli --script path/to/screenplay.txt --config path/to/elevenlabs_project.json
 ```
-   - Enter your ElevenLabs API key
-   - Paste your screenplay
-   - Configure character voices
-   - Enable "Concatenate Audio" toggle
-   - Use the **Concatenation Status** card to confirm the backend is reachable (click “Run Health Check” if unsure)
-   - Click "Generate Audio"
-   - A single `concatenated_audio.mp3` file will download
 
-## Audio Production Extras
+## API Endpoints (FastAPI)
 
-The **Audio Production** panel lets you attach:
+- `POST /api/parse`
+- `POST /api/projects/validate`
+- `POST /api/generate.zip` (sync ZIP)
+- `POST /api/generate` (async job)
+- `GET /api/jobs/{job_id}`
+- `GET /api/jobs/{job_id}/events` (SSE; supports `Last-Event-ID`)
+- `GET /api/exports/{job_id}.zip`
+- `POST /api/concatenate` (ffmpeg concat + optional mixing; multipart form)
 
-- A looping background music track (upload any audio file and set a mix volume)
-- A list of sound effects with labels, start times (`mm:ss`), individual volumes, and their own audio uploads
+## Concatenation & Mixing (FFmpeg)
 
-When concatenation is enabled, these assets are uploaded with the dialogue clips and mixed server-side via FFmpeg. You can stack multiple sound effects, and each will be delayed according to its start time before being merged with the master track.
+Concatenation/mixing is implemented server-side via FFmpeg:
+- API endpoint: `POST /api/concatenate` (multipart)
+- Core wrapper: `lib/audio/ffmpeg.py`
 
-## Subtitle & Manifest Exports
-
-After a successful generation, the **Exports** card lets you download:
-
-- `manifest.json` / `manifest.csv` – dialogue metadata including start/end timings
-- `elevenlabs_export_<timestamp>.zip` – audio + manifest bundle
-- `subtitles.srt` / `subtitles.vtt` – caption files built from ElevenLabs alignment data (falls back to estimated timing when alignment is unavailable)
-
-These exports pick up the current timing data (including resume runs), so you can feed them directly into video editors or localization pipelines.
-
-## Reaper Template Export
-
-Hit **Download Reaper Template (.rpp)** in the Exports card to grab a project file with:
-
-- One track per character
-- Items positioned according to each line’s start/end time
-- Audio sources pointing to the generated filenames
-
-Workflow tips:
-
-1. If you ran without concatenation, unzip the audio bundle and place the `.rpp` file next to the clips so the relative paths resolve automatically.
-2. For concatenated runs, regenerate without concatenation (or reuse the ZIP) so Reaper can reference individual clips.
-3. Open the `.rpp` in Reaper, confirm the media items line up, and start mixing/FX work from there.
-
-## Language & Voice Suggestions
-
-Use the **Dialogue Language** dropdown in Project Settings to indicate the script's primary language. Non-English languages automatically switch to Eleven Multilingual v2 and unlock curated recommendations in the **Voice Suggestions** panel. Each role (Narrator, Hero, Villain, etc.) lists hand-picked voices per language—select a target character, then click **Apply** to assign that voice ID and starter settings instantly.
-
-If you've added custom voices to your ElevenLabs account, the panel also fetches them (once you enter a valid API key) so you can search, preview, and apply your own creations without juggling IDs manually.
-
-## Sharing Projects
-
-Use **Copy Share Link** inside the Project Manager card to encode your entire configuration (script, presets, production settings) into the current URL. Send that link to a teammate and the app will automatically load the shared project after it hydrates. The link stores only metadata—audio assets such as SFX/background files still need to be reattached locally.
-
-## Error Handling & Resume Flow
-
-- The progress panel now includes a percentage bar, the currently processed character, and a snippet of dialogue.
-- If a chunk fails (bad API key, rate limit, network blip), the UI surfaces the exact line and enables a **Resume** button that continues from that chunk without reprocessing earlier ones.
-- ElevenLabs calls auto-retry up to three times with exponential backoff before surfacing an error.
-- Logs remain copyable for debugging, and the status banner reminds you that keys never leave the browser except for ElevenLabs requests.
-
-## Timeline & Per-Line Preview
-
-- The **Timeline** card lists every parsed dialogue block, its estimated duration (based on words-per-minute), and a preview button.
-- Preview audio plays inline and is cached locally to avoid re-hitting ElevenLabs unless the line or settings change.
-- Use this view to audition critical lines before committing to a full render.
-
-## Generation Profiles & Project Versions
-
-- Use the **Generation Profiles** card to apply ready-made configurations (Fast Draft, High Quality, Concatenated Episode) with one click. Each profile sets model, bitrate, concatenation, and request delay.
-- Set a `Version Label` in Project Settings to tag file names and manifest entries (e.g., `script_v3_0001_CHARACTER.mp3`).
-- Save/load complete project JSONs (script, voices, presets) from the **Projects & Templates** panel or load the included demo config.
-
-## Exports & Manifests
-
-- After generation, use the **Exports** card to download:
-  - `manifest.json`
-  - `manifest.csv`
-  - A `.zip` containing all audio files plus both manifests (handy for DAWs).
-- Progress data feeds the manifest so every entry includes character, filename, text, and estimated duration.
-
-## Parser Diagnostics
-
-- Toggle the **Parser Diagnostics** card (below the output panel) to see a character-by-character breakdown of detected lines.
-- The same panel highlights the first few lines that failed to parse so you can adjust formatting quickly.
-- Use this view alongside `EXAMPLE_SCREENPLAY.md` or `EXAMPLE_FOUNTAIN.md` to compare expected vs. actual parsing behavior.
-
-## CLI Automation
-
-- Export a project config from the UI, then run:
-
-  ```bash
-  npm run cli -- \
-    --script scripts/episode1.txt \
-    --script scripts/episode2.txt \
-    --config my_project.json \
-    --out ./cli_output \
-    --delay 600 \
-    --concat \
-    --api-key $ELEVENLABS_API_KEY
-  ```
-
-- See [CLI.md](./CLI.md) for the full flag reference.
-
-## Project Structure
+## Project Structure (Python)
 
 ```
 elevenlabs-screenplay-formatter/
-├── components/               # React UI components
-│   ├── ApiKeyPanel.tsx      # API key input
-│   ├── CharacterConfigPanel.tsx  # Voice configuration per character
-│   ├── GeneratePanel.tsx    # Generation button
-│   ├── OutputDisplay.tsx    # Progress and results display
-│   ├── ProjectSettingsPanel.tsx  # Model, format, concatenate settings
-│   ├── ScriptInput.tsx      # Screenplay text input
-│   ├── Modal.tsx            # Full-screen editor modal
-│   ├── Slider.tsx           # Voice settings sliders
-│   └── icons.tsx            # SVG icons
-│
-├── hooks/
-│   └── useScriptParser.ts   # Screenplay parsing logic
-│
-├── utils/
-│   ├── elevenLabsApi.ts     # ElevenLabs API integration
-│   └── scriptGenerator.ts   # Legacy bash script generation
-│
-├── server/                  # Backend concatenation server
-│   ├── index.js            # Express server with ffmpeg
-│   ├── package.json        # Server dependencies
-│   └── README.md           # Server documentation
-│
-├── App.tsx                 # Main application component
-├── types.ts                # TypeScript type definitions
-├── index.tsx               # React entry point
-├── index.html              # HTML template
-├── package.json            # Frontend dependencies
-└── vite.config.ts          # Vite build configuration
+├── apps/
+│   ├── api/                  # FastAPI app (JSON + jobs + SSE); mounts Flask
+│   └── web/                  # Flask UI (Jinja2 templates + HTMX)
+├── lib/                      # reusable core (typed; no web/framework imports)
+├── py_cli/                   # Python CLI (replacement in progress)
+├── tests/                    # pytest
+├── pyproject.toml
+└── README.md
 ```
-
-## Developer Setup
-
-- **Requirements**: Node.js v18+ (use `nvm use` or install from [nodejs.org](https://nodejs.org/)).
-- **Install deps**: `npm install` in the repo root. For concatenation, also run `cd server && npm install` once.
-- **Run frontend**: `npm run dev` (Vite at `http://localhost:3000`).
-- **Run backend**: `cd server && npm start` (Express on `http://localhost:3001`). Configure ports/CORS via `server/.env`.
-- **Environment**: copy `.env.example` → `.env` and set `ELEVENLABS_API_KEY` plus optional `VITE_CONCAT_SERVER_URL`.
-- **Tooling**: `npm run lint`, `npm run check`, `npm test`, and `npm run cli` cover linting, type-checking, unit tests, and automation.
-
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for a component/hook map, backend notes, and CLI flow.
-
-## Contributor Guide
-
-For coding standards, testing expectations, and pull request conventions, see [AGENTS.md](./AGENTS.md).
-
-## How It Works
-
-### 1. Script Parsing
-
-The application uses a custom screenplay parser (`useScriptParser.ts`) that:
-
-- Detects character names (all caps followed by dialogue)
-- Extracts dialogue text
-- Splits screenplay into processable chunks
-- Maintains scene and character context
-
-### 2. Audio Generation Flow
-
-**Without Concatenation:**
-
-```
-Parse screenplay → Detect characters → Configure voices → Generate each chunk via ElevenLabs API → Download individual files
-```
-
-**With Concatenation:**
-
-```
-Parse screenplay → Detect characters → Configure voices → Generate each chunk via ElevenLabs API → Store in memory → Send to backend server → FFmpeg concatenates files → Download single file
-```
-
-### 3. Backend Concatenation (Optional)
-
-The backend server (`server/index.js`) provides a REST API endpoint:
-
-- **Endpoint**: `POST /concatenate`
-- **Input**: Multipart form data with audio files
-- **Process**: Uses ffmpeg's concat demuxer to merge files
-- **Output**: Single concatenated MP3 file
-- **Cleanup**: Automatically removes temporary files
-
-## Configuration
-
-### Environment Variables
-
-- `ELEVENLABS_API_KEY` – optional convenience to prefill the API key input in the frontend.
-- `VITE_CONCAT_SERVER_URL` – override the default `http://localhost:3001/concatenate` endpoint if your backend runs elsewhere.
-- `server/.env` (copy from `server/.env.example`):
-  - `PORT` – change the concatenation server port (defaults to `3001`).
-  - `ALLOWED_ORIGIN` – comma-separated list of allowed origins; leave unset locally.
-- Local storage: the browser caches your script, voice settings, and API key for convenience; clear site data to reset.
-- API key handling: your key stays in the browser and is only sent to ElevenLabs (or written to the offline bash script you export); it never goes through the optional concatenation server. Use the “Remember this key on this device” toggle in the UI to control whether it persists across reloads.
-
-### Project Settings
-
-- **Model**:
-
-  - `eleven_multilingual_v2` – Flagship model covering 29+ languages (default)
-  - `eleven_multilingual_v1` – Legacy multilingual model
-  - `eleven_turbo_v2 / v2_5` – Low-latency multilingual models great for previews
-  - `eleven_flash_v2 / v2_5` – Fast draft-quality models
-  - `eleven_monolingual_v1` – Classic English-only model
-
-  > The dropdown auto-populates with the latest models from ElevenLabs once you enter an API key, falling back to the list above if the API is unavailable.
-
-- **Output Format**:
-
-  - `mp3_44100_128` - MP3 at 44.1kHz, 128kbps (default)
-  - `mp3_44100_192` - MP3 at 44.1kHz, 192kbps (higher quality)
-  - `pcm_24000` - PCM at 24kHz (uncompressed)
-
-- **Concatenate Audio**:
-  - `Enabled` - Combines all audio into one file (requires backend server)
-  - `Disabled` - Downloads individual files (e.g., `0000_CHARACTER.mp3`)
-
-- **Preserve Stage Directions [Brackets]**:
-  - `Enabled` - Stage directions in brackets like `[whispering]` or `[shouting]` are preserved and sent to the AI for more expressive audio
-  - `Disabled` - Brackets are removed from dialogue (default)
-  - **Note**: Only works with Turbo v2.5+ and Multilingual v3 models. Older models may read brackets aloud.
-
-### Character Voice Settings
-
-Each character can have custom voice settings:
-
-- **Voice ID**: ElevenLabs voice identifier (get from [ElevenLabs Voice Library](https://elevenlabs.io/voices))
-- **Stability** (0.0-1.0): Controls voice consistency
-- **Similarity Boost** (0.0-1.0): Enhances similarity to original voice
-- **Style** (0.0-1.0): Adds expressiveness
-- **Speed** (0.25-4.0): Playback speed multiplier
-- **Speak Parentheticals** (toggle) – When enabled, inline parentheticals such as `(V.O.)` or `(CONT'D)` remain in the spoken text; otherwise they’re stripped out.
-
-## Advanced Usage & Limitations
-
-- **Rate limiting**: ElevenLabs enforces request quotas, so the app inserts a 500ms delay between chunks. Increase the delay in `utils/elevenLabsApi.ts` if you see throttling.
-- **Browser vs. bash workflows**: The browser path streams audio directly to Downloads, while the generated bash script saves files locally and is better for CI/offline workflows. Use the bash script for extremely long screenplays or when you need resumable retries.
-- **Parsing scope**: The parser matches the documented formats (character list, inline dialogue, alias handling). Scripts that omit the `Characters:` section or mix lowercase names are intentionally ignored to prevent misattribution.
-
-## Screenplay Format
-
-**IMPORTANT**: The parser requires a specific format to work correctly.
-
-### Required Format
-
-```
-Characters:
-- CHARACTER ONE
-- CHARACTER TWO
-- CHARACTER THREE
-
-INT. LOCATION - DAY
-
-CHARACTER ONE
-First line of dialogue here.
-
-CHARACTER TWO
-Response dialogue here.
-This can span multiple lines.
-
-CHARACTER ONE
-(whispering)
-More dialogue with stage direction.
-```
-
-### Quick Rules
-
-**Required:**
-
-1. **Start with `Characters:`** - List all characters at the top
-2. **Use dashes** - Each character name must start with `-`
-3. **ALL CAPS** - Character names must be in ALL CAPS
-4. **Match names** - Names in dialogue must match the Characters list
-
-**Optional:**
-
-- Scene headings: `INT.`, `EXT.`, or `I/E.`
-- Parentheticals: `(whispering)` - automatically removed from audio
-- Inline format: `CHARACTER: dialogue here`
-- Fountain-style scripts (no character list) are also supported—see `EXAMPLE_FOUNTAIN.md` for a ready-to-paste sample.
-
-### Working Example
-
-Copy this into the app to test:
-
-```
-Characters:
-- ALICE
-- BOB
-
-ALICE
-Hello Bob, how are you?
-
-BOB
-I'm great, thanks!
-
-ALICE
-That's wonderful to hear.
-```
-
-**Need more help?** See [EXAMPLE_SCREENPLAY.md](EXAMPLE_SCREENPLAY.md) for detailed formatting guide and examples, or check [example.txt](example.txt) for a ready-to-use template.
-
-## Troubleshooting
-
-### "No dialogue chunks found in script"
-
-**Cause**: The screenplay parser couldn't detect any dialogue in your script
-
-**Solutions**:
-
-1. **Add a Characters section** at the top of your script:
-   ```
-   Characters:
-   - CHARACTER ONE
-   - CHARACTER TWO
-   ```
-2. **Use ALL CAPS** for character names in both the list and dialogue
-3. **Use dashes** (`-`) before each character name in the Characters section
-4. **Test with the example**: Copy the example from [example.txt](example.txt) to verify the app is working
-5. **See the guide**: Check [EXAMPLE_SCREENPLAY.md](EXAMPLE_SCREENPLAY.md) for detailed formatting help
-
-### "Failed to concatenate audio"
-
-**Cause**: Backend server is not running
-
-**Solution**:
-
-```bash
-cd server
-npm start
-```
-
-### "No voice configuration found for character: X"
-
-**Cause**: You haven't assigned a voice ID to one or more characters
-
-**Solution**: In the Character Config panel, assign a voice ID to each character using the dropdown or custom input
-
-### "API Error: 401 - Unauthorized"
-
-**Cause**: Invalid or missing ElevenLabs API key
-
-**Solution**: Verify your API key at https://elevenlabs.io/app/settings/api-keys
-
-### "FFmpeg: command not found"
-
-**Cause**: FFmpeg is not installed
-
-**Solution**:
-
-1. Install ffmpeg (see Prerequisites)
-2. Verify: `ffmpeg -version`
-3. Restart terminal/IDE
-
-### High Memory Usage
-
-**Cause**: Large screenplays with concatenation enabled store all audio in browser memory
-
-**Solution**:
-
-- Disable concatenation for very large scripts
-- Process in smaller sections
-- Increase available RAM
-
-### Rate Limiting Errors
-
-**Cause**: Too many API requests in quick succession
-
-**Solution**: The app includes automatic 500ms delays between requests. If you still see rate limits, you may need to upgrade your ElevenLabs plan.
-
-## Tech Stack
-
-**Frontend:**
-
-- React 19.2.0
-- TypeScript 5.8.2
-- Vite 6.2.0
-
-**Backend:**
-
-- Node.js (ESM)
-- Express 4.18.2
-- Multer 1.4.5 (file uploads)
-- Fluent-FFmpeg 2.1.2 (audio processing)
-
-**APIs:**
-
-- ElevenLabs Text-to-Speech API v1
 
 ## Environment Variables
 
-Create a `.env.local` file in the root directory (optional):
+Use `.env` in the repo root (copy from `.env.example`):
 
 ```bash
-ELEVENLABS_API_KEY=your_api_key_here
+ELEVENLABS_API_KEY=...
+ELEVENLABS_BASE_URL=https://api.elevenlabs.io
+ELEVENLABS_TIMEOUT_S=30
+FLASK_SECRET_KEY=dev
+UPLOAD_DIR=uploads
+FFMPEG_BIN=ffmpeg
 ```
 
-If not set, you'll be prompted to enter it in the UI.
+Never commit `.env` (gitignored). If a key is ever exposed in logs/chat/screenshots, rotate it immediately in ElevenLabs.
 
-## Development
+## Screenplay Formats
 
-### Run in development mode:
+The parser supports:
+- Standard “Characters:” list + dialogue blocks
+- Fountain-style scripts (no character list required)
+
+See `EXAMPLE_SCREENPLAY.md`, `EXAMPLE_FOUNTAIN.md`, and `example_screenplay.txt`.
+
+## Troubleshooting
+
+### `ModuleNotFoundError: No module named 'uvicorn'` (or `fastapi`)
+
+Install Python deps:
 
 ```bash
+python3 -m pip install -e ".[dev]"
+```
+
+### `Missing ELEVENLABS_API_KEY`
+
+Set `ELEVENLABS_API_KEY` in `.env` (copy from `.env.example`).
+
+### `FFmpeg failed` or `ffmpeg: command not found`
+
+Install ffmpeg and verify `ffmpeg -version`.
+
+## Tech Stack
+
+### Current (Python)
+
+- Flask + Jinja2 + HTMX (UI)
+- FastAPI + Uvicorn (API + jobs + SSE)
+- pytest + ruff + mypy (tooling)
+
+### Legacy (Node, deprecated)
+
+- React + Vite (legacy UI)
+- Express (legacy server)
+
+## Legacy Node/React App (deprecated)
+
+The Node/React app and the Node concatenation server remain in the repo for reference during the migration, but are being sunset and will be removed in Phase 6. Prefer the Python app above.
+
+If you need the legacy app temporarily:
+
+```bash
+npm install
 npm run dev
 ```
-
-### Build for production:
-
-```bash
-npm run build
-```
-
-### Preview production build:
-
-```bash
-npm run preview
-```
-
-## API Rate Limits
-
-ElevenLabs API has rate limits based on your subscription tier:
-
-- **Free**: 10,000 characters/month
-- **Starter**: 30,000 characters/month
-- **Creator**: 100,000 characters/month
-- **Pro**: 500,000 characters/month
-
-The app includes automatic rate limiting (500ms delay between requests) to avoid hitting API limits.
-
-## Known Limitations
-
-1. **Browser-based**: Audio generation happens client-side, so large scripts may consume significant bandwidth
-2. **Concatenation requires backend**: Cannot concatenate audio files purely in the browser without significant performance impact
-3. **ElevenLabs only**: Currently only supports ElevenLabs API (no other TTS providers)
-4. **Sequential generation**: Audio files are generated one at a time to respect rate limits
-5. **Audio assets not persisted**: Background music and SFX files are stored in browser memory only and need to be reattached after refresh
-
-## Future Enhancements
-
-See [ROADMAP.md](./ROADMAP.md) for the complete roadmap and planned features.
-
-Priority items include:
-- [ ] Comprehensive test coverage (parser, API client, end-to-end)
-- [ ] Parser diagnostics mode with confidence scores
-- [ ] Batch processing improvements for multiple screenplay files
-- [ ] Enhanced error recovery and validation
-- [ ] Additional DAW exports (Pro Tools, Logic Pro, Studio One)
-- [ ] Support for other TTS providers
-- [ ] Audio waveform visualization
 
 ## License
 
 MIT License - Feel free to use this project for personal or commercial purposes.
-
-## Credits
-
-- **ElevenLabs** - AI text-to-speech API
-- **FFmpeg** - Audio processing
-- Built with React + Vite
-
-## Support
-
-For issues, questions, or feature requests, please open an issue on GitHub.
-
----
-
-**Happy voice acting!** 🎙️

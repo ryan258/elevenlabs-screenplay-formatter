@@ -1,0 +1,10 @@
+<section class="card" data-job-id="{{ job_id }}" data-sse-url="/api/jobs/{{ job_id }}/events">
+  <h3>Generation Job</h3>
+  <p class="meta">
+    Status: <span class="status status--{{ status }}" data-role="job-status">{{ status }}</span>
+    · Progress: <span data-role="job-progress">{{ current }} / {{ total }}</span>
+  </p>
+  <p data-role="job-message">{{ message }}</p>
+  <div class="actions" data-role="job-export"></div>
+  <p class="meta">Job ID: <code>{{ job_id }}</code></p>
+</section>

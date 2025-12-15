@@ -29,4 +29,5 @@ app.state.job_store = JobStore(Path(app.state.config.upload_dir).resolve())
 
 flask_app.secret_key = app.state.config.flask_secret_key
 flask_app.config["APP_CONFIG"] = app.state.config
+flask_app.config["JOB_STORE"] = app.state.job_store
 app.mount("/", WSGIMiddleware(flask_app))

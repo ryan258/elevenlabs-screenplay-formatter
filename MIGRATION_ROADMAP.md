@@ -190,17 +190,19 @@ One repo, one Python environment, clear import direction:
 ### Phase 5 — Flask UI (Jinja2 + HTMX) (1–3 weeks)
 **Goal:** Replace React UI with SSR screens while keeping workflows.
 
+**Status (in progress):** `/` script input → HTMX parse → start async job → live progress via SSE → download ZIP.
+
 #### 5.1 Pages (minimum parity)
-- `/` Script editor + upload/load project + share link load
-- `/characters` character list + voice assignment + presets
-- `/generation` start job + live progress (HTMX + SSE)
-- `/timeline` per-line preview (server-rendered list + audio tags; paginate/virtualize later)
-- `/exports` download ZIP/manifest/subtitles/Reaper
+- [x] `/` Script editor + share link load + HTMX parse
+- [ ] `/characters` character list + voice assignment + presets
+- [/] `/generation` start job + live progress (implemented via parse page; dedicated page pending)
+- [ ] `/timeline` per-line preview (server-rendered list + audio tags; paginate/virtualize later)
+- [ ] `/exports` download ZIP/manifest/subtitles/Reaper (dedicated UI pending; ZIP download works)
 
 #### 5.2 HTMX interactions
-- Validate config inline before starting generation
-- Start job and subscribe to SSE for progress updates
-- Trigger per-line preview generation (one-off calls)
+- [/] Validate config inline before starting generation (server-side validation is enforced; inline UX pending)
+- [x] Start job and subscribe to SSE for progress updates (non-HTMX fallback uses full page load)
+- [ ] Trigger per-line preview generation (one-off calls)
 
 #### 5.3 Candlelight theme enforcement
 - Single CSS file with only allowed hex colors:
@@ -213,7 +215,7 @@ One repo, one Python environment, clear import direction:
 ### Phase 6 — Cutover & Node Removal (2–5 days)
 **Goal:** Finish cleanly: Python is the product; Node is archived.
 
-- [ ] Update `README.md` to make Python the default
+- [x] Update `README.md` to make Python the default
 - [ ] Remove/retire:
   - Vite/React entrypoints and build scripts
   - Node server (`server/`) and Node CLI (`cli/generate.ts`)
