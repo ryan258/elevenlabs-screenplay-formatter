@@ -88,13 +88,13 @@ One repo, one Python environment, clear import direction:
 ### Phase 1 — Python Project Skeleton (2–4 days)
 **Goal:** Create the modular monolith scaffolding and tooling before porting logic.
 
-- [ ] Add `pyproject.toml` (minimal deps), `ruff`, `mypy`, `pytest`
-- [ ] Establish module layout (`lib/`, `apps/api/`, `apps/web/`, `cli/`, `tests/`)
-- [ ] Add typed config objects in `lib/config.py`:
+- [x] Add `pyproject.toml` (minimal deps), `ruff`, `mypy`, `pytest`
+- [x] Establish module layout (`lib/`, `apps/api/`, `apps/web/`, `cli/`, `tests/`)
+- [x] Add typed config objects in `lib/config.py`:
   - `@dataclass ElevenLabsConfig`
   - `@dataclass AppConfig`
   - Env-reading function lives in app boundary (e.g., `apps/api/config.py`) and returns `AppConfig`
-- [ ] Define a single local dev command:
+- [x] Define a single local dev command:
   - Runs one ASGI server that mounts Flask under FastAPI (one port)
 
 **Exit criteria:** `python -m apps.api` boots and serves a placeholder page from Flask.
@@ -105,39 +105,39 @@ One repo, one Python environment, clear import direction:
 **Goal:** Rebuild all non-UI functionality in `lib/` with strong typing and tests.
 
 #### 2.1 Parser + Diagnostics (port `utils/parser.ts`)
-- [ ] Port parsing semantics (standard + Fountain)
-- [ ] Preserve diagnostics: unmatched lines, detected characters, confidence/flags (as currently implemented)
-- [ ] Unit tests: golden JSON outputs from Phase 0 fixtures
+- [x] Port parsing semantics (standard + Fountain)
+- [x] Preserve diagnostics: unmatched lines, detected characters, confidence/flags (as currently implemented)
+- [x] Unit tests: golden JSON outputs from Phase 0 fixtures
 
 **Exit criteria:** fixture scripts produce the same parsed structure as TS.
 
 #### 2.2 Voice extraction + alias helpers (port `utils/voiceExtraction.ts`)
-- [ ] Auto-fill voice IDs from character lists
-- [ ] Tests ported from `utils/voiceExtraction.test.ts`
+- [x] Auto-fill voice IDs from character lists
+- [x] Tests ported from `utils/voiceExtraction.test.ts`
 
 #### 2.3 ElevenLabs integration (port `utils/elevenLabsApi.ts` + `utils/elevenLabsClient.ts`)
-- [ ] Implement a typed client:
+- [x] Implement a typed client:
   - `Client(config: ElevenLabsConfig)` with `generate_audio(...)`, `list_voices()`, `list_models()`
-- [ ] Retry logic (429 backoff), network error handling, and rate-limit-aware pacing
-- [ ] Validate external responses (status codes, JSON shape) at boundary
+- [x] Retry logic (429 backoff), network error handling, and rate-limit-aware pacing
+- [x] Validate external responses (status codes, JSON shape) at boundary
 
 **Exit criteria:** mocked responses + “dry-run” mode prove parity without network calls.
 
 #### 2.4 Exporters (port `utils/manifest.ts`, `utils/downloads.ts`, `utils/reaperExport.ts`)
-- [ ] Manifest JSON/CSV builder
-- [ ] SRT/VTT generation (timestamp formatting parity)
-- [ ] ZIP bundling with stable filenames
-- [ ] Reaper `.rpp` generator (tracks/placement parity)
+- [x] Manifest JSON/CSV builder
+- [x] SRT/VTT generation (timestamp formatting parity)
+- [x] ZIP bundling with stable filenames
+- [x] Reaper `.rpp` generator (tracks/placement parity)
 
 **Exit criteria:** fixture outputs match (or are structurally equivalent with documented diffs).
 
 #### 2.5 Audio concat + production mixing (port `server/index.js`)
-- [ ] Implement `lib/audio/ffmpeg.py` wrapper using `subprocess` (no shell=True)
-- [ ] Implement:
+- [x] Implement `lib/audio/ffmpeg.py` wrapper using `subprocess` (no shell=True)
+- [x] Implement:
   - Concat N files (safe temp filelist)
   - Optional background mix (volume)
   - Optional SFX overlays (start time + volume)
-- [ ] Use safe temp directories and deterministic cleanup
+- [x] Use safe temp directories and deterministic cleanup
 
 **Exit criteria:** produces a playable MP3 for a known fixture set, with expected ordering and approximate duration.
 
@@ -148,11 +148,11 @@ One repo, one Python environment, clear import direction:
 
 - [ ] CLI commands:
   - Parse-only (outputs JSON diagnostics)
-  - Generate audio (per-chunk files)
-  - Concat/mix via ffmpeg wrapper
+  - [x] Generate audio (per-chunk files)
+  - [x] Concat/mix via ffmpeg wrapper
   - Export bundle generation
-- [ ] Input validation (file paths, config shape)
-- [ ] Document environment vars; no secrets in args by default
+- [x] Input validation (file paths, config shape)
+- [x] Document environment vars; no secrets in args by default
 
 **Exit criteria:** CLI can reproduce fixture exports end-to-end on local machine.
 
@@ -162,9 +162,9 @@ One repo, one Python environment, clear import direction:
 **Goal:** Provide stable programmatic endpoints and background execution.
 
 #### 4.1 API Surface (minimum)
-- [ ] `POST /api/parse` → parsed chunks + diagnostics
-- [ ] `POST /api/projects/validate` → config validation errors (typed)
-- [ ] `POST /api/generate` → returns `job_id`
+- [x] `POST /api/parse` → parsed chunks + diagnostics
+- [x] `POST /api/projects/validate` → config validation errors (typed)
+- [ ] `POST /api/generate` → returns `job_id` (async jobs)
 - [ ] `GET /api/jobs/{job_id}` → status/progress snapshot
 - [ ] `GET /api/jobs/{job_id}/events` → SSE progress stream
 - [ ] `GET /api/exports/{job_id}.zip` → export bundle download
@@ -258,4 +258,3 @@ One repo, one Python environment, clear import direction:
 - [ ] Fixtures pass in CI (pytest) without network access
 - [ ] No Node required for build/run/test
 - [ ] Documentation updated (setup, env vars, troubleshooting, ffmpeg requirement)
-

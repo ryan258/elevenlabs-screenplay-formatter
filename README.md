@@ -137,7 +137,8 @@ Requires Python 3.9+ and installing dependencies from `pyproject.toml`:
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -e ".[dev]"
+python3 -m pip install -U pip
+python3 -m pip install -e ".[dev]"
 cp .env.example .env
 ```
 
@@ -148,6 +149,12 @@ python3 -m apps.api
 ```
 
 Open `http://localhost:8000`.
+
+If you want hot reload during development:
+
+```bash
+UVICORN_RELOAD=1 python3 -m apps.api
+```
 
 Python CLI (replacement in progress):
 

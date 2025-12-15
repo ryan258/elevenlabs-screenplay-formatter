@@ -4,6 +4,7 @@ import json
 import subprocess
 import tempfile
 from dataclasses import dataclass
+from dataclasses import field
 from pathlib import Path
 from typing import List, Optional
 
@@ -27,11 +28,21 @@ class SoundEffectOverlay:
 @dataclass(frozen=True)
 class MixConfig:
     background: Optional[BackgroundMix] = None
-    sound_effects: List[SoundEffectOverlay] = None  # type: ignore[assignment]
+    sound_effects: List[SoundEffectOverlay] = field(default_factory=list)
 
-    def __post_init__(self) -> None:
-        if self.sound_effects is None:
-            object.__setattr__(self, "sound_effects", [])
+
+def _safe_child_path(parent: Path, name: str) -> Path:
+    if not name or "/" in name or "\\" in name or "\x00" in name:
+        raise ValueError("Invalid file reference")
+    if name in {".", ".."} or ".." in name:
+        raise ValueError("Invalid file reference")
+    candidate = (parent / name).resolve()
+    parent_resolved = parent.resolve()
+    try:
+        candidate.relative_to(parent_resolved)
+    except ValueError as exc:
+        raise ValueError("Invalid file reference") from exc
+    return candidate
 
 
 def _run(args: List[str]) -> None:
@@ -157,7 +168,9 @@ def parse_mix_config_json(payload: str, *, upload_dir: Path) -> MixConfig:
         ref = bg.get("ref")
         vol = bg.get("volume")
         if isinstance(ref, str) and isinstance(vol, (int, float)):
-            background = BackgroundMix(path=(upload_dir / ref), volume=float(vol))
+            path = _safe_child_path(upload_dir, ref)
+            if path.exists() and path.is_file():
+                background = BackgroundMix(path=path, volume=float(vol))
 
     sound_effects: List[SoundEffectOverlay] = []
     sfx_raw = raw.get("soundEffects")
@@ -170,14 +183,15 @@ def parse_mix_config_json(payload: str, *, upload_dir: Path) -> MixConfig:
             vol = entry.get("volume")
             label = entry.get("label") or ""
             if isinstance(ref, str) and isinstance(start, (int, float)) and isinstance(vol, (int, float)):
-                sound_effects.append(
-                    SoundEffectOverlay(
-                        path=(upload_dir / ref),
-                        start_time_ms=int(start),
-                        volume=float(vol),
-                        label=str(label),
+                path = _safe_child_path(upload_dir, ref)
+                if path.exists() and path.is_file():
+                    sound_effects.append(
+                        SoundEffectOverlay(
+                            path=path,
+                            start_time_ms=int(start),
+                            volume=float(vol),
+                            label=str(label),
+                        )
                     )
-                )
 
     return MixConfig(background=background, sound_effects=sound_effects)
-

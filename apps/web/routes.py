@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 from typing import Optional
 
-from flask import Response, render_template, request
+from flask import Response, current_app, render_template, request
 
 from apps.web.app import app
 from lib.config import FfmpegConfig
@@ -43,9 +43,16 @@ def parse() -> str:
 
 @app.post("/generate.zip")
 def generate_zip() -> Response:
-    from apps.api.main import app as fastapi_app  # FastAPI owns env-backed config
+    cfg = current_app.config.get("APP_CONFIG")
+    if cfg is None:
+        try:
+            from apps.api.config import load_config_from_env
 
-    cfg = fastapi_app.state.config  # type: ignore[attr-defined]
+            cfg = load_config_from_env()
+            current_app.config["APP_CONFIG"] = cfg
+            current_app.secret_key = cfg.flask_secret_key
+        except Exception:
+            return Response("App config is not initialized", status=500)
     if not cfg.elevenlabs.api_key:
         return Response("Missing ELEVENLABS_API_KEY", status=400)
 

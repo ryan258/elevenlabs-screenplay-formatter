@@ -73,3 +73,7 @@ class GenerateZipRequest(BaseModel):
     character_configs: Dict[str, CharacterConfigIn] = Field(alias="characterConfigs")
     filename_prefix: Optional[str] = None
 
+
+class ValidateProjectResponse(BaseModel):
+    ok: bool
+    errors: List[str]

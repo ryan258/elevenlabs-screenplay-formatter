@@ -21,6 +21,20 @@ dev = [
   "mypy>=1.8",
 ]
 
+
+[tool.setuptools.packages.find]
+include = ["apps*", "lib*", "py_cli*"]
+namespaces = false
+exclude = [
+  "node_modules*",
+  "dist*",
+  "server*",
+  "components*",
+  "hooks*",
+  "utils*",
+  "store*",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
@@ -34,4 +48,3 @@ warn_unreachable = true
 disallow_any_generics = true
 no_implicit_optional = true
 show_error_codes = true
-

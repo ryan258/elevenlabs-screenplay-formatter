@@ -10,6 +10,14 @@ from lib.manifest import manifest_to_csv
 from lib.models import ManifestEntry
 
 
+def _safe_zip_name(value: str) -> str:
+    name = (value or "").replace("\\", "/")
+    name = name.split("/")[-1]
+    if not name or name in {".", ".."} or ".." in name:
+        return "file"
+    return name
+
+
 def build_zip_bundle(
     audio_files: Iterable[Tuple[str, bytes]],
     manifest_entries: List[ManifestEntry],
@@ -22,7 +30,7 @@ def build_zip_bundle(
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
         for filename, data in audio_files:
-            safe_name = filename or "clip.mp3"
+            safe_name = _safe_zip_name(filename) or "clip.mp3"
             zf.writestr(safe_name, data)
 
         if manifest_entries:

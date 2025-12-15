@@ -73,11 +73,11 @@ gantt
 
 ### Acceptance Criteria (Definition of Done)
 
-- [ ] A single `python -m ...` (or `uv run ...`) starts the Flask UI and FastAPI API in local dev without Node.
-- [ ] Parser + diagnostics match current behavior on existing example scripts (`EXAMPLE_*.md`/`*.txt`).
-- [ ] CLI supports multi-script batch generation and local concatenation.
-- [ ] Export formats (ZIP, Reaper, SRT/VTT) match current outputs for the same inputs.
-- [ ] No secrets committed; `.env` remains ignored; `.env.example` documents required values.
+- [x] A single `python -m ...` (or `uv run ...`) starts the Flask UI and FastAPI API in local dev without Node (after installing Python deps).
+- [x] Parser + diagnostics match current behavior on existing example scripts (`EXAMPLE_*.md`/`*.txt`).
+- [/] CLI supports multi-script batch generation and local concatenation.
+- [x] Export formats (ZIP, Reaper, SRT/VTT) match current outputs for the same inputs.
+- [x] No secrets committed; `.env` remains ignored; `.env.example` documents required values.
 
 ---
 
