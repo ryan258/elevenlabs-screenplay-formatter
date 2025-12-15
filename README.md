@@ -2,6 +2,15 @@
 
 A React-based web application that converts screenplay dialogue into AI-generated audio files using the ElevenLabs text-to-speech API. Perfect for creating audio drafts, voice demos, or bringing your scripts to life.
 
+## Python Migration (v1.0 in progress)
+
+This repo is actively migrating to a Python modular monolith:
+- UI: Flask + Jinja2 + HTMX
+- API/jobs: FastAPI
+- Core logic: `lib/` (portable, typed)
+
+See `ROADMAP.md` and `MIGRATION_ROADMAP.md` for the execution plan.
+
 ## Features
 
 - **Intelligent Script Parsing** - Automatically detects characters and extracts dialogue from screenplay format
@@ -118,6 +127,33 @@ A React-based web application that converts screenplay dialogue into AI-generate
 
 3. **Generate concatenated audio:**
    - Open `http://localhost:3000`
+
+---
+
+## Python Quick Start (Early Milestone)
+
+Requires Python 3.9+ and installing dependencies from `pyproject.toml`:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+cp .env.example .env
+```
+
+Run the combined app (FastAPI mounting Flask):
+
+```bash
+python3 -m apps.api
+```
+
+Open `http://localhost:8000`.
+
+Python CLI (replacement in progress):
+
+```bash
+python3 -m py_cli --script path/to/screenplay.txt --config path/to/elevenlabs_project.json
+```
    - Enter your ElevenLabs API key
    - Paste your screenplay
    - Configure character voices

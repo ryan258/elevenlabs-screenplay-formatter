@@ -1,0 +1,18 @@
+{% extends "layout.html" %}
+{% block content %}
+  <section class="card">
+    <h2>Script Input</h2>
+    <form method="post" action="/parse">
+      <label class="label" for="script_text">Paste screenplay text</label>
+      <textarea id="script_text" name="script_text" rows="16">{{ script_text }}</textarea>
+      <label class="checkbox">
+        <input type="checkbox" name="preserve_stage_directions" />
+        Preserve stage directions in [brackets]
+      </label>
+      <div class="actions">
+        <button class="btn" type="submit">Parse</button>
+      </div>
+    </form>
+  </section>
+{% endblock %}
+

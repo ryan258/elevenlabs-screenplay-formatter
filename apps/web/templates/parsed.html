@@ -1,0 +1,95 @@
+{% extends "layout.html" %}
+{% block content %}
+  <section class="card">
+    <h2>Parsed Output</h2>
+    <p class="meta">Characters detected: {{ parsed.characters|length }} · Dialogue chunks: {{ parsed.dialogue_chunks|length }}</p>
+
+    <details class="details" open>
+      <summary>Generation Settings</summary>
+      <form method="post" action="/generate.zip">
+        <input type="hidden" name="script_text" value="{{ script_text|e }}" />
+        {% if preserve %}
+          <input type="hidden" name="preserve_stage_directions" value="on" />
+        {% endif %}
+
+        <div class="grid">
+          <label class="label">
+            Model ID
+            <input class="input" type="text" name="model" placeholder="eleven_multilingual_v2" />
+          </label>
+          <label class="label">
+            Output format
+            <select class="input" name="output_format">
+              <option value="mp3_44100_128">mp3_44100_128</option>
+              <option value="mp3_44100_192">mp3_44100_192</option>
+              <option value="pcm_24000">pcm_24000</option>
+            </select>
+          </label>
+          <label class="label">
+            Request delay (ms)
+            <input class="input" type="number" name="request_delay_ms" value="500" min="0" />
+          </label>
+        </div>
+
+        <label class="checkbox">
+          <input type="checkbox" name="speak_parentheticals" />
+          Speak parentheticals (use raw/original text)
+        </label>
+        <label class="checkbox">
+          <input type="checkbox" name="concatenate" />
+          Concatenate output (server-side ffmpeg)
+        </label>
+
+        <h3>Character Voices</h3>
+        <div class="table">
+          <div class="row header">
+            <div>Character</div>
+            <div>Voice ID</div>
+            <div>Stability</div>
+            <div>Similarity</div>
+            <div>Style</div>
+            <div>Speed</div>
+          </div>
+          {% for character in parsed.characters %}
+            {% set i = loop.index0 %}
+            <div class="row">
+              <div class="cell strong">{{ character }}</div>
+              <div class="cell"><input class="input" type="text" name="voice_id__{{ i }}" required /></div>
+              <div class="cell"><input class="input" type="number" step="0.01" min="0" max="1" name="stability__{{ i }}" value="0.5" /></div>
+              <div class="cell"><input class="input" type="number" step="0.01" min="0" max="1" name="similarity_boost__{{ i }}" value="0.75" /></div>
+              <div class="cell"><input class="input" type="number" step="0.01" min="0" max="1" name="style__{{ i }}" value="0.1" /></div>
+              <div class="cell"><input class="input" type="number" step="0.01" min="0" max="2" name="speed__{{ i }}" value="1" /></div>
+            </div>
+          {% endfor %}
+        </div>
+
+        <div class="actions">
+          <button class="btn" type="submit">Generate ZIP</button>
+          <a class="btn secondary" href="/">Back</a>
+        </div>
+      </form>
+    </details>
+
+    {% if parsed.diagnostics.unmatched_lines %}
+      <details class="details">
+        <summary>Unmatched lines ({{ parsed.diagnostics.unmatched_lines|length }})</summary>
+        <ul>
+          {% for item in parsed.diagnostics.unmatched_lines %}
+            <li><span class="muted">Line {{ item.line_number }}:</span> {{ item.content }}</li>
+          {% endfor %}
+        </ul>
+      </details>
+    {% endif %}
+    <details class="details">
+      <summary>Dialogue (preview)</summary>
+      <ol class="chunks">
+        {% for chunk in parsed.dialogue_chunks %}
+          <li>
+            <div class="chunk-header">{{ chunk.character }}</div>
+            <div class="chunk-text">{{ chunk.text }}</div>
+          </li>
+        {% endfor %}
+      </ol>
+    </details>
+  </section>
+{% endblock %}
