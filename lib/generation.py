@@ -55,6 +55,11 @@ def _get_format_details(output_format: str) -> Tuple[str, str]:
     return OUTPUT_FORMAT_DETAILS.get(output_format, OUTPUT_FORMAT_DETAILS["mp3_44100_128"])
 
 
+def output_format_extension(output_format: str) -> str:
+    extension, _ = _get_format_details(output_format)
+    return extension
+
+
 def _clip_context(text: Optional[str], *, max_chars: int) -> Optional[str]:
     if not text:
         return None
@@ -212,6 +217,78 @@ def generate_all_audio_iter(
                 failed_character=chunk.character,
                 completed=completed,
             ) from exc
+
+
+def generate_one_audio(
+    *,
+    client: ElevenLabsClient,
+    dialogue_chunks: List[DialogueChunk],
+    character_configs: Dict[str, CharacterConfig],
+    model_id: str,
+    output_format: str,
+    index: int,
+    filename_prefix: str = "",
+    speak_parentheticals: bool = False,
+    fetch_alignment: bool = True,
+) -> GeneratedAudio:
+    """
+    Generate a single chunk (for previews) while still sending previous/next context.
+    """
+    if index < 0 or index >= len(dialogue_chunks):
+        raise IndexError("chunk index out of range")
+
+    chunk = dialogue_chunks[index]
+    cfg = character_configs.get(chunk.character)
+    if cfg is None or not cfg.voice_id:
+        raise RuntimeError(f"No voice configuration found for character: {chunk.character}")
+
+    extension, accept = _get_format_details(output_format)
+
+    text = _get_spoken_text(chunk, speak_parentheticals=speak_parentheticals)
+    previous_text = _clip_context(
+        _get_spoken_text(dialogue_chunks[index - 1], speak_parentheticals=speak_parentheticals) if index > 0 else None,
+        max_chars=500,
+    )
+    next_text = _clip_context(
+        _get_spoken_text(dialogue_chunks[index + 1], speak_parentheticals=speak_parentheticals)
+        if index + 1 < len(dialogue_chunks)
+        else None,
+        max_chars=500,
+    )
+    audio_bytes, _remaining = client.generate_audio(
+        voice_id=cfg.voice_id,
+        text=text,
+        model_id=model_id,
+        output_format=output_format,
+        voice_settings=cfg.voice_settings,
+        previous_text=previous_text,
+        next_text=next_text,
+        accept=accept,
+        base_delay_ms=0,
+    )
+
+    alignment: Optional[List[WordTimestamp]] = None
+    if fetch_alignment:
+        alignment = client.fetch_alignment(voice_id=cfg.voice_id, text=chunk.text, model_id=model_id)
+
+    if alignment:
+        start_time_ms = alignment[0].start_ms
+        end_time_ms = alignment[-1].end_ms
+    else:
+        start_time_ms = 0
+        end_time_ms = estimate_duration_ms(chunk.text)
+
+    base_filename = f"{index:04d}_{chunk.character.replace(' ', '_')}.{extension}"
+    raw_name = f"{filename_prefix}_{base_filename}" if filename_prefix else base_filename
+    filename = safe_basename(raw_name, default=base_filename)
+
+    return GeneratedAudio(
+        filename=filename,
+        audio_bytes=audio_bytes,
+        start_time_ms=start_time_ms,
+        end_time_ms=end_time_ms,
+        alignment=alignment,
+    )
 
 
 def generate_all_audio(

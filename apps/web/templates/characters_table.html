@@ -1,0 +1,33 @@
+<div class="table">
+  <div class="row header">
+    <div>Character</div>
+    <div>Voice ID</div>
+    <div>Stability</div>
+    <div>Similarity</div>
+    <div>Style</div>
+    <div>Speed</div>
+  </div>
+  {% for character in parsed.characters %}
+    {% set i = loop.index0 %}
+    {% set row = voice_rows[i] if voice_rows and (voice_rows|length > i) else None %}
+    <div class="row">
+      <div class="cell strong">{{ character }}</div>
+      <div class="cell">
+        <input class="input" type="text" name="voice_id__{{ i }}" value="{{ row['voice_id'] if row else '' }}" />
+      </div>
+      <div class="cell">
+        <input class="input" type="number" step="0.01" min="0" max="1" name="stability__{{ i }}" value="{{ row['stability'] if row else 0.5 }}" />
+      </div>
+      <div class="cell">
+        <input class="input" type="number" step="0.01" min="0" max="1" name="similarity_boost__{{ i }}" value="{{ row['similarity_boost'] if row else 0.75 }}" />
+      </div>
+      <div class="cell">
+        <input class="input" type="number" step="0.01" min="0" max="1" name="style__{{ i }}" value="{{ row['style'] if row else 0.1 }}" />
+      </div>
+      <div class="cell">
+        <input class="input" type="number" step="0.01" min="0" max="2" name="speed__{{ i }}" value="{{ row['speed'] if row else 1.0 }}" />
+      </div>
+    </div>
+  {% endfor %}
+</div>
+

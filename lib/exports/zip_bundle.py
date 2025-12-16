@@ -65,7 +65,7 @@ def build_zip_bundle(
             sanitized_entries = _sanitize_manifest_entries(manifest_entries, safe_audio_names=safe_audio_names)
             zf.writestr(
                 "manifest.json",
-                json.dumps([asdict(e) for e in sanitized_entries], indent=2),
+                json.dumps([asdict(e) for e in sanitized_entries], indent=2, ensure_ascii=False),
             )
             zf.writestr("manifest.csv", manifest_to_csv(sanitized_entries))
 
@@ -99,7 +99,7 @@ def build_zip_bundle_to_path(
 
         if manifest_entries:
             sanitized_entries = _sanitize_manifest_entries(manifest_entries, safe_audio_names=safe_audio_names)
-            zf.writestr("manifest.json", json.dumps([asdict(e) for e in sanitized_entries], indent=2))
+            zf.writestr("manifest.json", json.dumps([asdict(e) for e in sanitized_entries], indent=2, ensure_ascii=False))
             zf.writestr("manifest.csv", manifest_to_csv(sanitized_entries))
 
         if extra_files:

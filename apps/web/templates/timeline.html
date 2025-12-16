@@ -1,0 +1,45 @@
+{% extends "layout.html" %}
+{% block content %}
+  <section class="card">
+    <h2>Timeline</h2>
+    <p class="meta">
+      Dialogue chunks: {{ total_chunks }} · Page {{ page }} / {{ total_pages }}
+    </p>
+
+    {% if errors %}
+      {% include "error_box.html" %}
+    {% endif %}
+
+    <div class="actions">
+      <a class="btn secondary" href="/generation">Back</a>
+      {% if job_id %}
+        <a class="btn secondary" href="/exports?job_id={{ job_id }}">Exports</a>
+      {% else %}
+        <a class="btn secondary" href="/exports">Exports</a>
+      {% endif %}
+    </div>
+
+    <ol class="chunks" start="{{ start_index + 1 }}">
+      {% for item in chunks %}
+        {% include "timeline_chunk.html" %}
+      {% endfor %}
+    </ol>
+
+    <div class="actions">
+      {% if page > 1 %}
+        {% if job_id %}
+          <a class="btn secondary" href="/timeline?job_id={{ job_id }}&page={{ page - 1 }}">Prev</a>
+        {% else %}
+          <a class="btn secondary" href="/timeline?page={{ page - 1 }}">Prev</a>
+        {% endif %}
+      {% endif %}
+      {% if page < total_pages %}
+        {% if job_id %}
+          <a class="btn secondary" href="/timeline?job_id={{ job_id }}&page={{ page + 1 }}">Next</a>
+        {% else %}
+          <a class="btn secondary" href="/timeline?page={{ page + 1 }}">Next</a>
+        {% endif %}
+      {% endif %}
+    </div>
+  </section>
+{% endblock %}

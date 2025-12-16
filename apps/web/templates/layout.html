@@ -20,6 +20,7 @@
           <a href="/">Script</a>
           <a href="/characters">Characters</a>
           <a href="/generation">Generation</a>
+          <a href="/timeline">Timeline</a>
           <a href="/exports">Exports</a>
         </nav>
       </div>
@@ -49,9 +50,12 @@
               if (!exportEl) return;
               exportEl.innerHTML =
                 '<a class="btn" href="/api/exports/' + jobId + '.zip">Download ZIP</a>' +
+                '<a class="btn secondary" href="/api/exports/' + jobId + '.json">manifest.json</a>' +
+                '<a class="btn secondary" href="/api/exports/' + jobId + '.csv">manifest.csv</a>' +
                 '<a class="btn secondary" href="/api/exports/' + jobId + '.srt">SRT</a>' +
                 '<a class="btn secondary" href="/api/exports/' + jobId + '.vtt">VTT</a>' +
-                '<a class="btn secondary" href="/api/exports/' + jobId + '.rpp">Reaper (.rpp)</a>';
+                '<a class="btn secondary" href="/api/exports/' + jobId + '.rpp">Reaper (.rpp)</a>' +
+                '<a class="btn secondary" href="/timeline?job_id=' + jobId + '">Timeline</a>';
             }
 
             function setStatus(text) {

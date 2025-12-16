@@ -95,7 +95,10 @@ python3 -m py_cli --script path/to/screenplay.txt --config path/to/elevenlabs_pr
 - `POST /api/generate` (async job)
 - `GET /api/jobs/{job_id}`
 - `GET /api/jobs/{job_id}/events` (SSE; supports `Last-Event-ID`)
+- `GET /api/jobs/{job_id}/audio/{filename}` (per-line clips)
 - `GET /api/exports/{job_id}.zip`
+- `GET /api/exports/{job_id}.json` (manifest)
+- `GET /api/exports/{job_id}.csv` (manifest)
 - `POST /api/concatenate` (ffmpeg concat + optional mixing; multipart form)
 
 ## Concatenation & Mixing (FFmpeg)

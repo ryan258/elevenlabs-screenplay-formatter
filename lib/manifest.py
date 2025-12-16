@@ -75,13 +75,19 @@ def build_manifest_entries(
 
 def manifest_to_csv(entries: List[ManifestEntry]) -> str:
     header = "index,character,filename,text,estimatedDurationMs,startTimeMs,endTimeMs"
+
+    def csv_quote(value: str) -> str:
+        return '"' + value.replace('"', '""') + '"'
+
     rows: List[str] = []
     for entry in entries:
-        escaped_text = '"' + entry.text.replace('"', '""') + '"'
+        escaped_character = csv_quote(entry.character)
+        escaped_filename = csv_quote(entry.filename)
+        escaped_text = csv_quote(entry.text)
         start = "" if entry.start_time_ms is None else str(entry.start_time_ms)
         end = "" if entry.end_time_ms is None else str(entry.end_time_ms)
         rows.append(
-            f"{entry.index + 1},{entry.character},{entry.filename},{escaped_text},"
+            f"{entry.index + 1},{escaped_character},{escaped_filename},{escaped_text},"
             f"{entry.estimated_duration_ms},{start},{end}"
         )
     return "\n".join([header, *rows])
@@ -105,4 +111,3 @@ def manifest_to_vtt(entries: List[ManifestEntry]) -> str:
         end = _format_timestamp(entry.end_time_ms or 0, "vtt")
         cues.append(f"{start} --> {end}\n{entry.text}\n")
     return ("WEBVTT\n\n" + "\n".join(cues)).strip()
-

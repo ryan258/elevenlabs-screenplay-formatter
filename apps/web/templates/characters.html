@@ -1,0 +1,57 @@
+{% extends "layout.html" %}
+{% block content %}
+  <section class="card">
+    <h2>Characters</h2>
+    <p class="meta">
+      Characters: {{ parsed.characters|length }} · Dialogue chunks: {{ parsed.dialogue_chunks|length }}
+    </p>
+
+    {% if errors %}
+      <div class="error">
+        <p><strong>Validation errors</strong></p>
+        <ul>
+          {% for e in errors %}
+            <li>{{ e }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+
+    <form method="post" action="/characters/save" hx-post="/characters/save" hx-target="#save-result" hx-swap="innerHTML">
+      <div class="actions">
+        <select class="input" name="preset" style="max-width: 240px">
+          <option value="balanced">Preset: Balanced</option>
+          <option value="stable">Preset: Stable</option>
+          <option value="expressive">Preset: Expressive</option>
+          <option value="fast">Preset: Faster</option>
+        </select>
+        <button class="btn secondary" type="submit" formaction="/characters/apply_preset" formmethod="post" hx-post="/characters/apply_preset" hx-target="#characters-table" hx-swap="innerHTML">
+          Apply Preset
+        </button>
+        <button class="btn secondary" type="submit" formaction="/characters/autofill" formmethod="post" hx-post="/characters/autofill" hx-target="#characters-table" hx-swap="innerHTML">
+          Auto-fill Voice IDs
+        </button>
+        <button class="btn" type="submit">Save & Continue</button>
+        <a class="btn secondary" href="/">Back</a>
+      </div>
+
+      <h3>Voice Assignment</h3>
+      <div id="characters-table">
+        {% include "characters_table.html" %}
+      </div>
+
+      <div id="save-result"></div>
+    </form>
+
+    {% if parsed.diagnostics.unmatched_lines %}
+      <details class="details">
+        <summary>Unmatched lines ({{ parsed.diagnostics.unmatched_lines|length }})</summary>
+        <ul>
+          {% for item in parsed.diagnostics.unmatched_lines %}
+            <li><span class="muted">Line {{ item.line_number }}:</span> {{ item.content }}</li>
+          {% endfor %}
+        </ul>
+      </details>
+    {% endif %}
+  </section>
+{% endblock %}

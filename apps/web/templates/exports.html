@@ -1,0 +1,27 @@
+{% extends "layout.html" %}
+{% block content %}
+  <section class="card">
+    <h2>Exports</h2>
+
+    {% if not job_id %}
+      <p class="meta">Start a generation job to enable exports.</p>
+      <div class="actions">
+        <a class="btn" href="/generation">Go to Generation</a>
+      </div>
+    {% else %}
+      <p class="meta">Job ID: <code>{{ job_id }}</code></p>
+      <div class="actions">
+        <a class="btn" href="/api/exports/{{ job_id }}.zip">Download ZIP</a>
+        <a class="btn secondary" href="/api/exports/{{ job_id }}.json">manifest.json</a>
+        <a class="btn secondary" href="/api/exports/{{ job_id }}.csv">manifest.csv</a>
+        <a class="btn secondary" href="/api/exports/{{ job_id }}.srt">SRT</a>
+        <a class="btn secondary" href="/api/exports/{{ job_id }}.vtt">VTT</a>
+        <a class="btn secondary" href="/api/exports/{{ job_id }}.rpp">Reaper (.rpp)</a>
+      </div>
+      <p class="meta">
+        Need a different job? Add <code>?job_id=...</code> to the URL.
+      </p>
+    {% endif %}
+  </section>
+{% endblock %}
+

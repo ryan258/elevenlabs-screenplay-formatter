@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import deque
+from dataclasses import asdict
 import threading
 import time
 import uuid
@@ -13,7 +14,7 @@ from lib.audio.ffmpeg import concat_audio
 from lib.elevenlabs.client import ElevenLabsClient
 from lib.exports.zip_bundle import build_zip_bundle_to_path
 from lib.generation import GeneratedAudio, GenerationProgress, generate_all_audio_iter
-from lib.manifest import build_manifest_entries, manifest_to_srt, manifest_to_vtt
+from lib.manifest import build_manifest_entries, manifest_to_csv, manifest_to_srt, manifest_to_vtt
 from lib.models import CharacterConfig, WordTimestamp
 from lib.parser import parse_script
 from lib.reaper_export import build_reaper_project
@@ -228,6 +229,15 @@ class JobStore:
                 end_times_ms=end_times,
                 alignments=alignments,
             )
+
+            manifest_json_path = (job.work_dir / "manifest.json").resolve()
+            manifest_json_path.write_text(
+                json.dumps([asdict(e) for e in entries], indent=2, ensure_ascii=False),
+                encoding="utf-8",
+            )
+
+            manifest_csv_path = (job.work_dir / "manifest.csv").resolve()
+            manifest_csv_path.write_text(manifest_to_csv(entries), encoding="utf-8")
 
             srt_path = (job.work_dir / "subtitles.srt").resolve()
             srt_path.write_text(manifest_to_srt(entries), encoding="utf-8")

@@ -2,17 +2,19 @@
 {% block content %}
   <section class="card">
     <h2>Script Input</h2>
-    <form method="post" action="/parse" hx-post="/parse" hx-target="#parsed" hx-swap="innerHTML">
+    <form method="post" action="/parse" hx-post="/parse" hx-swap="none">
       <label class="label" for="script_text">Paste screenplay text</label>
       <textarea id="script_text" name="script_text" rows="16">{{ script_text }}</textarea>
       <label class="checkbox">
-        <input type="checkbox" name="preserve_stage_directions" />
+        <input type="checkbox" name="preserve_stage_directions" {% if preserve %}checked{% endif %} />
         Preserve stage directions in [brackets]
       </label>
       <div class="actions">
         <button class="btn" type="submit">Parse</button>
+        {% if has_session %}
+          <a class="btn secondary" href="/characters">Continue</a>
+        {% endif %}
       </div>
     </form>
   </section>
-  <div id="parsed"></div>
 {% endblock %}

@@ -19,6 +19,7 @@ from apps.api.deps import get_config, get_job_store
 from apps.api.jobs import JobStore
 from apps.api.limits import MAX_DIALOGUE_CHUNKS, MAX_SCRIPT_CHARS
 from apps.api.schemas import ErrorResponse, GenerateZipRequest
+from lib.filenames import safe_basename
 from lib.parser import parse_script
 from lib.validation import validate_character_configs
 
@@ -101,6 +102,28 @@ def api_job_export(job_id: str, store: JobStore = Depends(get_job_store)) -> Uni
     return FileResponse(job.export_path, media_type="application/zip", filename="bundle.zip")
 
 
+@router.get("/exports/{job_id}.json")
+def api_job_manifest_json(job_id: str, store: JobStore = Depends(get_job_store)) -> Union[FileResponse, JSONResponse]:
+    job = store.get(job_id)
+    if job is None:
+        return JSONResponse(status_code=404, content=ErrorResponse(error="Job not found").model_dump())
+    path = (job.work_dir / "manifest.json").resolve()
+    if not path.exists():
+        return JSONResponse(status_code=404, content=ErrorResponse(error="manifest.json not ready").model_dump())
+    return FileResponse(path, media_type="application/json", filename="manifest.json")
+
+
+@router.get("/exports/{job_id}.csv")
+def api_job_manifest_csv(job_id: str, store: JobStore = Depends(get_job_store)) -> Union[FileResponse, JSONResponse]:
+    job = store.get(job_id)
+    if job is None:
+        return JSONResponse(status_code=404, content=ErrorResponse(error="Job not found").model_dump())
+    path = (job.work_dir / "manifest.csv").resolve()
+    if not path.exists():
+        return JSONResponse(status_code=404, content=ErrorResponse(error="manifest.csv not ready").model_dump())
+    return FileResponse(path, media_type="text/csv; charset=utf-8", filename="manifest.csv")
+
+
 @router.get("/exports/{job_id}.srt")
 def api_job_srt(job_id: str, store: JobStore = Depends(get_job_store)) -> Union[FileResponse, JSONResponse]:
     job = store.get(job_id)
@@ -132,6 +155,36 @@ def api_job_rpp(job_id: str, store: JobStore = Depends(get_job_store)) -> Union[
     if not path.exists():
         return JSONResponse(status_code=404, content=ErrorResponse(error="RPP not ready").model_dump())
     return FileResponse(path, media_type="text/plain; charset=utf-8", filename="reaper.rpp")
+
+
+@router.get("/jobs/{job_id}/audio/{filename}")
+def api_job_audio_clip(
+    job_id: str,
+    filename: str,
+    store: JobStore = Depends(get_job_store),
+) -> Union[FileResponse, JSONResponse]:
+    job = store.get(job_id)
+    if job is None:
+        return JSONResponse(status_code=404, content=ErrorResponse(error="Job not found").model_dump())
+    safe_name = safe_basename(filename, default="")
+    if not safe_name:
+        return JSONResponse(status_code=400, content=ErrorResponse(error="Invalid filename").model_dump())
+
+    audio_dir = (job.work_dir / "audio").resolve()
+    path = (audio_dir / safe_name).resolve()
+    try:
+        path.relative_to(audio_dir)
+    except ValueError:
+        return JSONResponse(status_code=400, content=ErrorResponse(error="Invalid filename").model_dump())
+    if not path.exists():
+        return JSONResponse(status_code=404, content=ErrorResponse(error="Audio not found").model_dump())
+
+    media_type = "application/octet-stream"
+    if safe_name.lower().endswith(".mp3"):
+        media_type = "audio/mpeg"
+    elif safe_name.lower().endswith(".wav"):
+        media_type = "audio/wav"
+    return FileResponse(path, media_type=media_type, filename=safe_name, content_disposition_type="inline")
 
 
 @router.get("/jobs/{job_id}/events")

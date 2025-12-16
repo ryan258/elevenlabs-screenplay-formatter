@@ -1,0 +1,16 @@
+<li id="chunk-{{ item.index }}">
+  <div class="chunk-header">{{ item.character }}</div>
+  <div class="chunk-text">{{ item.text }}</div>
+
+  {% if item.preview_url %}
+    <audio controls preload="none" src="{{ item.preview_url }}"></audio>
+  {% else %}
+    <form method="post" action="/timeline/preview" hx-post="/timeline/preview" hx-target="#chunk-{{ item.index }}" hx-swap="outerHTML">
+      <input type="hidden" name="chunk_index" value="{{ item.index }}" />
+      <div class="actions">
+        <button class="btn secondary" type="submit">Generate Preview</button>
+      </div>
+    </form>
+  {% endif %}
+</li>
+

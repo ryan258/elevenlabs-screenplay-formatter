@@ -19,6 +19,8 @@ def test_manifest_csv_quotes_text() -> None:
         ]
     )
     assert '"He said ""hi"""' in csv
+    assert '"A"' in csv
+    assert '"a.mp3"' in csv
 
 
 def test_manifest_srt_and_vtt_format() -> None:
@@ -35,4 +37,3 @@ def test_manifest_srt_and_vtt_format() -> None:
     vtt = manifest_to_vtt(entries)
     assert "1" in srt
     assert "WEBVTT" in vtt
-

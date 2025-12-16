@@ -3,20 +3,21 @@ from __future__ import annotations
 import json
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from flask import Response, current_app, redirect, render_template, request
+from flask import Response, current_app, redirect, render_template, request, send_file, session, url_for
 
+from apps.api.character_configs import build_character_configs
 from apps.api.config import AppConfig
-from apps.web.app import app
 from apps.api.jobs import JobStore
 from apps.api.limits import MAX_DIALOGUE_CHUNKS, MAX_SCRIPT_CHARS
 from apps.api.schemas import GenerateZipRequest
-from apps.api.character_configs import build_character_configs
+from apps.web.app import app
+from apps.web.session_store import WebSessionStore
 from lib.config import FfmpegConfig
 from lib.elevenlabs.client import ElevenLabsClient
 from lib.exports.zip_bundle import build_zip_bundle
-from lib.generation import generate_all_audio
+from lib.generation import generate_all_audio, generate_one_audio, output_format_extension
 from lib.manifest import build_manifest_entries, manifest_to_srt, manifest_to_vtt
 from lib.models import CharacterConfig, VoiceSettings
 from lib.parser import parse_script
@@ -49,18 +50,14 @@ def _get_store(cfg: AppConfig) -> JobStore:
     return store
 
 
-def _default_voice_rows(characters: List[str], voice_ids: Optional[Dict[str, str]] = None) -> List[Dict[str, Any]]:
-    voice_ids = voice_ids or {}
-    return [
-        {
-            "voice_id": voice_ids.get(character, ""),
-            "stability": 0.5,
-            "similarity_boost": 0.75,
-            "style": 0.1,
-            "speed": 1.0,
-        }
-        for character in characters
-    ]
+def _get_web_store(cfg: AppConfig) -> WebSessionStore:
+    store = current_app.config.get("WEB_SESSION_STORE")
+    if store is None:
+        store = WebSessionStore((Path(cfg.upload_dir) / "web_sessions").resolve())
+        current_app.config["WEB_SESSION_STORE"] = store
+    if not isinstance(store, WebSessionStore):
+        raise RuntimeError("WEB_SESSION_STORE is not initialized")
+    return store
 
 
 def _parse_int(value: str, *, default: int) -> int:
@@ -82,100 +79,516 @@ def _is_hx_request() -> bool:
 
 
 def _error_response(errors: Sequence[str], *, status: int, hx_retarget: str = "#job-panel") -> Response:
-    # HTMX does not always swap non-2xx responses into the target by default.
-    # For HTMX requests, return a 200 with HTML so validation errors reliably render.
     effective_status = 200 if _is_hx_request() else status
     if not _is_hx_request():
         body = "; ".join([e for e in errors if e])
         return Response(render_template("simple_page.html", title="Error", body=body), status=status)
 
     resp = Response(render_template("error_box.html", errors=list(errors)), status=effective_status)
-    if _is_hx_request():
-        resp.headers["HX-Retarget"] = hx_retarget
-        resp.headers["HX-Reswap"] = "innerHTML"
+    resp.headers["HX-Retarget"] = hx_retarget
+    resp.headers["HX-Reswap"] = "innerHTML"
     return resp
+
+
+def _get_session_id() -> Optional[str]:
+    sid = request.args.get("sid") or session.get("sid")
+    if isinstance(sid, str) and sid:
+        session["sid"] = sid
+        return sid
+    return None
+
+
+def _payload_from_session(cfg: AppConfig) -> Optional[Dict[str, Any]]:
+    sid = _get_session_id()
+    if not sid:
+        return None
+    store = _get_web_store(cfg)
+    data = store.get(sid)
+    if data is None:
+        return None
+    return data.payload
+
+
+def _build_default_payload(
+    *,
+    script_text: str,
+    preserve_stage_directions: bool,
+) -> Tuple[Dict[str, Any], List[str]]:
+    parsed = parse_script(script_text, preserve_stage_directions=preserve_stage_directions)
+    extracted_voice_ids = extract_voice_ids_from_script(script_text)
+
+    character_configs_payload: Dict[str, Dict[str, Any]] = {}
+    for character in parsed.characters:
+        voice_id = extracted_voice_ids.get(character, "")
+        character_configs_payload[character] = {
+            "voiceId": voice_id,
+            "voiceSettings": {
+                "stability": 0.5,
+                "similarity_boost": 0.75,
+                "style": 0.1,
+                "speed": 1.0,
+            },
+        }
+
+    payload: Dict[str, Any] = {
+        "scriptText": script_text,
+        "projectSettings": {
+            "model": "",
+            "outputFormat": "mp3_44100_128",
+            "concatenate": False,
+            "speakParentheticals": False,
+            "preserveStageDirections": preserve_stage_directions,
+            "requestDelayMs": 500,
+        },
+        "characterConfigs": character_configs_payload,
+        "filename_prefix": "",
+        "lastJobId": None,
+    }
+    return payload, parsed.characters
+
+
+def _voice_rows_from_payload(parsed_characters: List[str], payload: Dict[str, Any]) -> List[Dict[str, Any]]:
+    cfgs: Dict[str, Any] = payload.get("characterConfigs") or {}
+    rows: List[Dict[str, Any]] = []
+    for character in parsed_characters:
+        item = cfgs.get(character) or {}
+        vs = item.get("voiceSettings") or {}
+        rows.append(
+            {
+                "voice_id": str(item.get("voiceId") or ""),
+                "stability": float(vs.get("stability") or 0.5),
+                "similarity_boost": float(vs.get("similarity_boost") or 0.75),
+                "style": float(vs.get("style") or 0.1),
+                "speed": float(vs.get("speed") or 1.0),
+            }
+        )
+    return rows
+
+
+def _validate_payload(cfg: AppConfig, payload: Dict[str, Any]) -> List[str]:
+    try:
+        body = GenerateZipRequest.model_validate(payload)
+    except Exception as exc:
+        return [str(exc)]
+
+    if len(body.script_text) > MAX_SCRIPT_CHARS:
+        return ["Script is too large"]
+    try:
+        parsed = parse_script(
+            body.script_text,
+            preserve_stage_directions=body.project_settings.preserve_stage_directions,
+        )
+    except Exception as exc:
+        return [f"Failed to parse script: {exc}"]
+    if len(parsed.dialogue_chunks) > MAX_DIALOGUE_CHUNKS:
+        return ["Too many dialogue chunks"]
+
+    character_configs = build_character_configs(body)
+    errors = validate_character_configs(parsed.dialogue_chunks, character_configs)
+    if not body.project_settings.model:
+        errors.insert(0, "Missing projectSettings.model")
+    if not body.project_settings.output_format:
+        errors.insert(0, "Missing projectSettings.outputFormat")
+    if not cfg.elevenlabs.api_key:
+        errors.insert(0, "Missing ELEVENLABS_API_KEY")
+    return errors
+
+
+def _share_normalized_payload(share_payload: Dict[str, Any]) -> Dict[str, Any]:
+    script_text = str(share_payload.get("scriptText") or share_payload.get("script_text") or "").strip()
+    project_settings = share_payload.get("projectSettings") or {}
+    if not isinstance(project_settings, dict):
+        project_settings = {}
+    character_configs = share_payload.get("characterConfigs") or {}
+    if not isinstance(character_configs, dict):
+        character_configs = {}
+    filename_prefix = share_payload.get("filename_prefix") or share_payload.get("filenamePrefix") or ""
+
+    return {
+        "scriptText": script_text,
+        "projectSettings": project_settings,
+        "characterConfigs": character_configs,
+        "filename_prefix": str(filename_prefix),
+    }
+
+
+def _session_share_view(payload: Dict[str, Any]) -> Dict[str, Any]:
+    project_settings = payload.get("projectSettings") or {}
+    if not isinstance(project_settings, dict):
+        project_settings = {}
+    character_configs = payload.get("characterConfigs") or {}
+    if not isinstance(character_configs, dict):
+        character_configs = {}
+    return {
+        "scriptText": str(payload.get("scriptText") or "").strip(),
+        "projectSettings": project_settings,
+        "characterConfigs": character_configs,
+        "filename_prefix": str(payload.get("filename_prefix") or ""),
+    }
+
+
+def _find_preview_path(preview_dir: Path, chunk_index: int) -> Optional[Path]:
+    candidates = [
+        (preview_dir / f"preview_{chunk_index:04d}.mp3").resolve(),
+        (preview_dir / f"preview_{chunk_index:04d}.wav").resolve(),
+    ]
+    for path in candidates:
+        try:
+            path.relative_to(preview_dir)
+        except ValueError:
+            continue
+        if path.exists():
+            return path
+    return None
 
 
 @app.get("/")
 def index() -> str:
     shared_project: Optional[str] = request.args.get("project")
-    script_text = ""
+
+    cfg = _get_cfg()
+    stored_payload = _payload_from_session(cfg)
+    stored = stored_payload or {}
+    script_text = str(stored.get("scriptText") or "")
+    preserve = bool(stored.get("projectSettings", {}).get("preserveStageDirections"))
+
     if shared_project:
         try:
             decoded = decode_share_payload(shared_project)
-            payload = json.loads(decoded)
-            script_text = str(payload.get("scriptText") or payload.get("script_text") or "")
+            share_payload_raw = json.loads(decoded)
+            share_norm = _share_normalized_payload(share_payload_raw)
+            share_script_text = str(share_norm["scriptText"] or "").strip()
+            if share_script_text:
+                share_project_settings = share_norm["projectSettings"]
+                preserve_stage_directions = bool(
+                    share_project_settings.get("preserveStageDirections") or share_payload_raw.get("preserve_stage_directions")
+                )
+
+                share_effective, _characters = _build_default_payload(
+                    script_text=share_script_text,
+                    preserve_stage_directions=preserve_stage_directions,
+                )
+                if isinstance(share_project_settings, dict) and share_project_settings:
+                    share_effective["projectSettings"] = {**share_effective.get("projectSettings", {}), **share_project_settings}
+                share_character_configs = share_norm["characterConfigs"]
+                if isinstance(share_character_configs, dict) and share_character_configs:
+                    share_effective["characterConfigs"] = share_character_configs
+                filename_prefix = share_norm.get("filename_prefix") or ""
+                if filename_prefix:
+                    share_effective["filename_prefix"] = str(filename_prefix)
+
+                needs_new_session = True
+                if stored_payload and _session_share_view(stored_payload) == _session_share_view(share_effective):
+                    needs_new_session = False
+
+                if needs_new_session:
+                    data = _get_web_store(cfg).create(payload=share_effective)
+                    session["sid"] = data.session_id
+                    stored_payload = data.payload
+
+                stored = stored_payload or {}
+                script_text = str(stored.get("scriptText") or "")
+                preserve = bool(stored.get("projectSettings", {}).get("preserveStageDirections"))
         except Exception:
             script_text = ""
-    return render_template("index.html", script_text=script_text)
 
-
-@app.get("/generation")
-def generation() -> Response:
-    return redirect("/")
+    return render_template("index.html", script_text=script_text, preserve=preserve, has_session=stored_payload is not None)
 
 
 @app.get("/characters")
 def characters() -> str:
-    return render_template("simple_page.html", title="Characters", body="Coming soon.")
+    cfg = _get_cfg()
+    payload = _payload_from_session(cfg)
+    if not payload:
+        return render_template("simple_page.html", title="Characters", body="Paste a script first.")
+
+    script_text = str(payload.get("scriptText") or "")
+    preserve = bool(payload.get("projectSettings", {}).get("preserveStageDirections"))
+    try:
+        parsed = parse_script(script_text, preserve_stage_directions=preserve)
+    except Exception as exc:
+        return render_template("simple_page.html", title="Characters", body=f"Failed to parse script: {exc}")
+    voice_rows = _voice_rows_from_payload(parsed.characters, payload)
+    return render_template("characters.html", parsed=parsed, voice_rows=voice_rows, errors=[])
+
+
+@app.get("/generation")
+def generation() -> Response:
+    cfg = _get_cfg()
+    payload = _payload_from_session(cfg)
+    if not payload:
+        return redirect("/")
+
+    script_text = str(payload.get("scriptText") or "")
+    preserve = bool(payload.get("projectSettings", {}).get("preserveStageDirections"))
+    try:
+        parsed = parse_script(script_text, preserve_stage_directions=preserve)
+    except Exception as exc:
+        return Response(
+            render_template("simple_page.html", title="Generation", body=f"Failed to parse script: {exc}"),
+            status=400,
+        )
+    project_settings = payload.get("projectSettings") or {}
+
+    job_id = request.args.get("job_id") or payload.get("lastJobId")
+    context: Dict[str, Any] = {
+        "parsed": parsed,
+        "errors": [],
+        "model": str(project_settings.get("model") or ""),
+        "output_format": str(project_settings.get("outputFormat") or "mp3_44100_128"),
+        "request_delay_ms": int(project_settings.get("requestDelayMs") or 500),
+        "speak_parentheticals": bool(project_settings.get("speakParentheticals")),
+        "concatenate": bool(project_settings.get("concatenate")),
+        "filename_prefix": str(payload.get("filename_prefix") or ""),
+        "job_id": job_id,
+    }
+
+    if job_id:
+        store = _get_store(cfg)
+        job = store.get(str(job_id))
+        if job is None:
+            context.update(
+                {
+                    "status": "unknown",
+                    "current": 0,
+                    "total": len(parsed.dialogue_chunks),
+                    "message": "Job not found (restart generation).",
+                }
+            )
+        else:
+            snap = job.snapshot()
+            context.update(
+                {
+                    "status": snap.status,
+                    "current": snap.current,
+                    "total": max(snap.total, len(parsed.dialogue_chunks)),
+                    "message": snap.message or "",
+                }
+            )
+
+    return Response(render_template("generation.html", **context), status=200)
+
+
+@app.get("/timeline")
+def timeline() -> Response:
+    cfg = _get_cfg()
+    store = _get_store(cfg)
+
+    job_id = request.args.get("job_id")
+    page = max(1, _parse_int(request.args.get("page", "1") or "1", default=1))
+    per_page = 50
+
+    if job_id:
+        job = store.get(str(job_id))
+        if job is None:
+            return Response(render_template("simple_page.html", title="Timeline", body="Job not found."), status=404)
+        manifest_path = (job.work_dir / "manifest.json").resolve()
+        if not manifest_path.exists():
+            return Response(
+                render_template("simple_page.html", title="Timeline", body="manifest.json not ready."),
+                status=404,
+            )
+        entries = json.loads(manifest_path.read_text(encoding="utf-8"))
+        total_chunks = len(entries)
+        total_pages = max(1, (total_chunks + per_page - 1) // per_page)
+        page = min(page, total_pages)
+        start_index = (page - 1) * per_page
+        items = []
+        for entry in entries[start_index : start_index + per_page]:
+            items.append(
+                {
+                    "index": int(entry.get("index") or 0),
+                    "character": str(entry.get("character") or ""),
+                    "text": str(entry.get("text") or ""),
+                    "preview_url": f"/api/jobs/{job.job_id}/audio/{entry.get('filename')}",
+                }
+            )
+
+        return Response(
+            render_template(
+                "timeline.html",
+                chunks=items,
+                total_chunks=total_chunks,
+                page=page,
+                total_pages=total_pages,
+                start_index=start_index,
+                job_id=str(job.job_id),
+                errors=[],
+            ),
+            status=200,
+        )
+
+    payload = _payload_from_session(cfg)
+    if not payload:
+        return redirect("/")
+
+    script_text = str(payload.get("scriptText") or "")
+    preserve = bool(payload.get("projectSettings", {}).get("preserveStageDirections"))
+    try:
+        parsed = parse_script(script_text, preserve_stage_directions=preserve)
+    except Exception as exc:
+        return Response(render_template("simple_page.html", title="Timeline", body=f"Failed to parse script: {exc}"), status=400)
+
+    total_chunks = len(parsed.dialogue_chunks)
+    total_pages = max(1, (total_chunks + per_page - 1) // per_page)
+    page = min(page, total_pages)
+    start_index = (page - 1) * per_page
+
+    sid = _get_session_id()
+    if not sid:
+        return redirect("/")
+    web_store = _get_web_store(cfg)
+    preview_dir = web_store.preview_dir(sid)
+
+    items = []
+    for idx, chunk in enumerate(parsed.dialogue_chunks[start_index : start_index + per_page], start=start_index):
+        preview_path = _find_preview_path(preview_dir, idx)
+        items.append(
+            {
+                "index": idx,
+                "character": chunk.character,
+                "text": chunk.text,
+                "preview_url": f"/timeline/previews/{idx}" if preview_path is not None else None,
+            }
+        )
+
+    return Response(
+        render_template(
+            "timeline.html",
+            chunks=items,
+            total_chunks=total_chunks,
+            page=page,
+            total_pages=total_pages,
+            start_index=start_index,
+            job_id=None,
+            errors=[],
+        ),
+        status=200,
+    )
 
 
 @app.get("/exports")
 def exports() -> str:
-    return render_template("simple_page.html", title="Exports", body="Start a job to enable exports.")
+    cfg = _get_cfg()
+    payload = _payload_from_session(cfg) or {}
+    job_id = request.args.get("job_id") or payload.get("lastJobId")
+    return render_template("exports.html", job_id=job_id)
 
 
 @app.post("/parse")
 def parse() -> Response:
     script_text = request.form.get("script_text", "")
     if len(script_text) > MAX_SCRIPT_CHARS:
-        return _error_response(["Script is too large"], status=413, hx_retarget="#parsed")
+        return _error_response(["Script is too large"], status=413, hx_retarget="#job-panel")
     preserve = request.form.get("preserve_stage_directions") == "on"
-    parsed = parse_script(script_text, preserve_stage_directions=preserve)
-    extracted_voice_ids = extract_voice_ids_from_script(script_text)
-    template = "parsed_partial.html" if request.headers.get("HX-Request") == "true" else "parsed.html"
-    html = render_template(
-        template,
-        parsed=parsed,
-        script_text=script_text,
-        preserve=preserve,
-        errors=[],
-        model="",
-        output_format="mp3_44100_128",
-        request_delay_ms=500,
-        speak_parentheticals=False,
-        concatenate=False,
-        filename_prefix="",
-        voice_rows=_default_voice_rows(parsed.characters, extracted_voice_ids),
-    )
+
+    cfg = _get_cfg()
+    web_store = _get_web_store(cfg)
+    try:
+        payload, _characters = _build_default_payload(script_text=script_text, preserve_stage_directions=preserve)
+    except Exception as exc:
+        return _error_response([f"Failed to parse script: {exc}"], status=400, hx_retarget="#job-panel")
+    data = web_store.create(payload=payload)
+    session["sid"] = data.session_id
+
+    if _is_hx_request():
+        resp = Response("", status=200)
+        resp.headers["HX-Redirect"] = url_for("characters")
+        return resp
+    return redirect(url_for("characters"))
+
+
+@app.post("/characters/autofill")
+def characters_autofill() -> Response:
+    cfg = _get_cfg()
+    payload = _payload_from_session(cfg)
+    if not payload:
+        return redirect("/")
+
+    script_text = str(payload.get("scriptText") or "")
+    preserve = bool(payload.get("projectSettings", {}).get("preserveStageDirections"))
+    try:
+        parsed = parse_script(script_text, preserve_stage_directions=preserve)
+    except Exception as exc:
+        return _error_response([f"Failed to parse script: {exc}"], status=400, hx_retarget="#characters-table")
+    extracted = extract_voice_ids_from_script(script_text)
+    cfgs: Dict[str, Any] = payload.get("characterConfigs") or {}
+    for character in parsed.characters:
+        voice_id = extracted.get(character)
+        if voice_id:
+            item = cfgs.get(character) or {}
+            item["voiceId"] = voice_id
+            cfgs[character] = item
+
+    payload["characterConfigs"] = cfgs
+    sid = _get_session_id()
+    if sid:
+        _get_web_store(cfg).patch(sid, payload)
+
+    if not _is_hx_request():
+        return redirect(url_for("characters"))
+
+    voice_rows = _voice_rows_from_payload(parsed.characters, payload)
+    html = render_template("characters_table.html", parsed=parsed, voice_rows=voice_rows)
     return Response(html, status=200, content_type="text/html")
 
 
-@app.post("/generation/start")
-def generation_start() -> Response:
+@app.post("/characters/apply_preset")
+def characters_apply_preset() -> Response:
     cfg = _get_cfg()
-    store = _get_store(cfg)
+    payload = _payload_from_session(cfg)
+    if not payload:
+        return redirect("/")
 
-    script_text = request.form.get("script_text", "")
-    preserve = request.form.get("preserve_stage_directions") == "on"
-    model = request.form.get("model", "")
-    output_format = request.form.get("output_format", "mp3_44100_128")
-    speak_parentheticals = request.form.get("speak_parentheticals") == "on"
-    concatenate = request.form.get("concatenate") == "on"
-    filename_prefix = request.form.get("filename_prefix", "").strip()
-    delay_ms = _parse_int(request.form.get("request_delay_ms", "500") or "500", default=500)
+    preset = (request.form.get("preset") or "balanced").strip().lower()
+    presets: Dict[str, Dict[str, float]] = {
+        "balanced": {"stability": 0.5, "similarity_boost": 0.75, "style": 0.1, "speed": 1.0},
+        "stable": {"stability": 0.75, "similarity_boost": 0.75, "style": 0.0, "speed": 1.0},
+        "expressive": {"stability": 0.35, "similarity_boost": 0.75, "style": 0.35, "speed": 1.0},
+        "fast": {"stability": 0.5, "similarity_boost": 0.75, "style": 0.1, "speed": 1.2},
+    }
+    selected = presets.get(preset) or presets["balanced"]
 
-    if len(script_text) > MAX_SCRIPT_CHARS:
-        return _error_response(["Script is too large"], status=413)
-    if not cfg.elevenlabs.api_key:
-        return _error_response(["Missing ELEVENLABS_API_KEY"], status=400)
+    cfgs: Dict[str, Any] = payload.get("characterConfigs") or {}
+    for character in list(cfgs.keys()):
+        item = cfgs.get(character) or {}
+        item["voiceSettings"] = dict(selected)
+        cfgs[character] = item
+    payload["characterConfigs"] = cfgs
 
-    parsed = parse_script(script_text, preserve_stage_directions=preserve)
-    if len(parsed.dialogue_chunks) > MAX_DIALOGUE_CHUNKS:
-        return _error_response(["Too many dialogue chunks"], status=413)
+    sid = _get_session_id()
+    if sid:
+        _get_web_store(cfg).patch(sid, payload)
+
+    if not _is_hx_request():
+        return redirect(url_for("characters"))
+
+    script_text = str(payload.get("scriptText") or "")
+    preserve = bool(payload.get("projectSettings", {}).get("preserveStageDirections"))
+    try:
+        parsed = parse_script(script_text, preserve_stage_directions=preserve)
+    except Exception as exc:
+        return _error_response([f"Failed to parse script: {exc}"], status=400, hx_retarget="#characters-table")
+    voice_rows = _voice_rows_from_payload(parsed.characters, payload)
+    html = render_template("characters_table.html", parsed=parsed, voice_rows=voice_rows)
+    return Response(html, status=200, content_type="text/html")
+
+
+@app.post("/characters/save")
+def characters_save() -> Response:
+    cfg = _get_cfg()
+    payload = _payload_from_session(cfg)
+    if not payload:
+        return redirect("/")
+
+    script_text = str(payload.get("scriptText") or "")
+    preserve = bool(payload.get("projectSettings", {}).get("preserveStageDirections"))
+    try:
+        parsed = parse_script(script_text, preserve_stage_directions=preserve)
+    except Exception as exc:
+        return _error_response([f"Failed to parse script: {exc}"], status=400, hx_retarget="#save-result")
 
     character_configs_payload: Dict[str, Dict[str, Any]] = {}
-    voice_rows: List[Dict[str, Any]] = []
     for idx, character in enumerate(parsed.characters):
         voice_id = request.form.get(f"voice_id__{idx}", "").strip()
         stability = _parse_float(request.form.get(f"stability__{idx}", "0.5") or "0.5", default=0.5)
@@ -185,15 +598,6 @@ def generation_start() -> Response:
         )
         style = _parse_float(request.form.get(f"style__{idx}", "0.1") or "0.1", default=0.1)
         speed = _parse_float(request.form.get(f"speed__{idx}", "1") or "1", default=1.0)
-        voice_rows.append(
-            {
-                "voice_id": voice_id,
-                "stability": stability,
-                "similarity_boost": similarity_boost,
-                "style": style,
-                "speed": speed,
-            }
-        )
         character_configs_payload[character] = {
             "voiceId": voice_id,
             "voiceSettings": {
@@ -204,76 +608,105 @@ def generation_start() -> Response:
             },
         }
 
-    payload: Dict[str, Any] = {
-        "scriptText": script_text,
-        "projectSettings": {
-            "model": model,
-            "outputFormat": output_format,
-            "concatenate": concatenate,
-            "speakParentheticals": speak_parentheticals,
-            "preserveStageDirections": preserve,
-            "requestDelayMs": delay_ms,
-        },
-        "characterConfigs": character_configs_payload,
-        "filename_prefix": filename_prefix or None,
-    }
+    payload["characterConfigs"] = character_configs_payload
+    sid = _get_session_id()
+    if sid:
+        _get_web_store(cfg).patch(sid, payload)
 
+    if _is_hx_request():
+        resp = Response(render_template("ok_box.html", message="Saved."), status=200, content_type="text/html")
+        resp.headers["HX-Redirect"] = url_for("generation")
+        return resp
+    return redirect(url_for("generation"))
+
+
+@app.post("/generation/validate")
+def generation_validate() -> Response:
+    cfg = _get_cfg()
+    payload = _payload_from_session(cfg)
+    if not payload:
+        return redirect("/")
+
+    project_settings = payload.get("projectSettings") or {}
+    project_settings["model"] = request.form.get("model", "").strip()
+    project_settings["outputFormat"] = request.form.get("output_format", "mp3_44100_128").strip()
+    project_settings["requestDelayMs"] = _parse_int(request.form.get("request_delay_ms", "500") or "500", default=500)
+    project_settings["speakParentheticals"] = request.form.get("speak_parentheticals") == "on"
+    project_settings["concatenate"] = request.form.get("concatenate") == "on"
+    payload["projectSettings"] = project_settings
+    payload["filename_prefix"] = request.form.get("filename_prefix", "").strip()
+
+    sid = _get_session_id()
+    if sid:
+        _get_web_store(cfg).patch(sid, payload)
+
+    errors = _validate_payload(cfg, payload)
+    if _is_hx_request():
+        if errors:
+            return _error_response(errors, status=400, hx_retarget="#validation")
+        return Response(render_template("ok_box.html", message="Looks good."), status=200, content_type="text/html")
+
+    script_text = str(payload.get("scriptText") or "")
+    preserve = bool(payload.get("projectSettings", {}).get("preserveStageDirections"))
     try:
-        body = GenerateZipRequest.model_validate(payload)
+        parsed = parse_script(script_text, preserve_stage_directions=preserve)
     except Exception as exc:
-        if _is_hx_request():
-            return _error_response([str(exc)], status=400)
-        return Response(
-            render_template(
-                "parsed.html",
-                parsed=parsed,
-                script_text=script_text,
-                preserve=preserve,
-                errors=[str(exc)],
-                model=model,
-                output_format=output_format,
-                request_delay_ms=delay_ms,
-                speak_parentheticals=speak_parentheticals,
-                concatenate=concatenate,
-                filename_prefix=filename_prefix,
-                voice_rows=voice_rows,
-            ),
-            status=400,
-        )
+        return Response(render_template("simple_page.html", title="Generation", body=f"Failed to parse script: {exc}"), status=400)
+    return Response(
+        render_template(
+            "generation.html",
+            parsed=parsed,
+            errors=errors,
+            model=project_settings.get("model", ""),
+            output_format=project_settings.get("outputFormat", "mp3_44100_128"),
+            request_delay_ms=project_settings.get("requestDelayMs", 500),
+            speak_parentheticals=project_settings.get("speakParentheticals", False),
+            concatenate=project_settings.get("concatenate", False),
+            filename_prefix=payload.get("filename_prefix", ""),
+            job_id=None,
+        ),
+        status=400 if errors else 200,
+    )
 
-    character_configs = build_character_configs(body)
-    errors = validate_character_configs(parsed.dialogue_chunks, character_configs)
-    if not body.project_settings.model:
-        errors = ["Missing projectSettings.model", *errors]
-    if not body.project_settings.output_format:
-        errors = ["Missing projectSettings.outputFormat", *errors]
+
+@app.post("/generation/start")
+def generation_start() -> Response:
+    cfg = _get_cfg()
+    store = _get_store(cfg)
+    payload = _payload_from_session(cfg)
+    if not payload:
+        return _error_response(["Paste a script first."], status=400)
+
+    project_settings = payload.get("projectSettings") or {}
+    project_settings["model"] = request.form.get("model", "").strip()
+    project_settings["outputFormat"] = request.form.get("output_format", "mp3_44100_128").strip()
+    project_settings["requestDelayMs"] = _parse_int(request.form.get("request_delay_ms", "500") or "500", default=500)
+    project_settings["speakParentheticals"] = request.form.get("speak_parentheticals") == "on"
+    project_settings["concatenate"] = request.form.get("concatenate") == "on"
+    payload["projectSettings"] = project_settings
+    payload["filename_prefix"] = request.form.get("filename_prefix", "").strip()
+
+    sid = _get_session_id()
+    if sid:
+        _get_web_store(cfg).patch(sid, payload)
+
+    errors = _validate_payload(cfg, payload)
     if errors:
-        if _is_hx_request():
-            return _error_response(errors, status=400)
-        return Response(
-            render_template(
-                "parsed.html",
-                parsed=parsed,
-                script_text=script_text,
-                preserve=preserve,
-                errors=errors,
-                model=model,
-                output_format=output_format,
-                request_delay_ms=delay_ms,
-                speak_parentheticals=speak_parentheticals,
-                concatenate=concatenate,
-                filename_prefix=filename_prefix,
-                voice_rows=voice_rows,
-            ),
-            status=400,
-        )
+        return _error_response(errors, status=400, hx_retarget="#job-panel")
+
+    body = GenerateZipRequest.model_validate(payload)
+    try:
+        parsed = parse_script(body.script_text, preserve_stage_directions=body.project_settings.preserve_stage_directions)
+    except Exception as exc:
+        return _error_response([f"Failed to parse script: {exc}"], status=400, hx_retarget="#job-panel")
+    character_configs = build_character_configs(body)
 
     job = store.create()
     store.start_generation(
         cfg=cfg,
         job=job,
-        script_text=script_text,
-        preserve_stage_directions=preserve,
+        script_text=body.script_text,
+        preserve_stage_directions=body.project_settings.preserve_stage_directions,
         model=body.project_settings.model,
         output_format=body.project_settings.output_format,
         request_delay_ms=body.project_settings.request_delay_ms or 500,
@@ -282,6 +715,10 @@ def generation_start() -> Response:
         filename_prefix=body.filename_prefix or "",
         character_configs=character_configs,
     )
+
+    if sid:
+        payload["lastJobId"] = job.job_id
+        _get_web_store(cfg).patch(sid, payload)
 
     snap = job.snapshot()
     context = {
@@ -292,12 +729,85 @@ def generation_start() -> Response:
         "message": snap.message or "Queued",
     }
 
-    template = "job_panel.html" if request.headers.get("HX-Request") == "true" else "job_started.html"
-    return Response(
-        render_template(template, **context),
-        status=200,
-        content_type="text/html",
+    template = "job_panel.html" if _is_hx_request() else "job_started.html"
+    return Response(render_template(template, **context), status=200, content_type="text/html")
+
+
+@app.post("/timeline/preview")
+def timeline_preview() -> Response:
+    cfg = _get_cfg()
+    payload = _payload_from_session(cfg)
+    if not payload:
+        return redirect("/")
+
+    sid = _get_session_id()
+    if not sid:
+        return redirect("/")
+
+    index = _parse_int(request.form.get("chunk_index", "0") or "0", default=0)
+    errors = _validate_payload(cfg, payload)
+    if errors:
+        return _error_response(errors, status=400, hx_retarget=f"#chunk-{index}")
+
+    body = GenerateZipRequest.model_validate(payload)
+    try:
+        parsed = parse_script(body.script_text, preserve_stage_directions=body.project_settings.preserve_stage_directions)
+    except Exception as exc:
+        return _error_response([f"Failed to parse script: {exc}"], status=400, hx_retarget=f"#chunk-{index}")
+    if index < 0 or index >= len(parsed.dialogue_chunks):
+        return _error_response(["Chunk not found"], status=404, hx_retarget=f"#chunk-{index}")
+    character_configs = build_character_configs(body)
+
+    client = ElevenLabsClient(cfg.elevenlabs)
+    generated = generate_one_audio(
+        client=client,
+        dialogue_chunks=parsed.dialogue_chunks,
+        character_configs=character_configs,
+        model_id=body.project_settings.model,
+        output_format=body.project_settings.output_format,
+        index=index,
+        filename_prefix=body.filename_prefix or "",
+        speak_parentheticals=body.project_settings.speak_parentheticals,
+        fetch_alignment=False,
     )
+
+    ext = output_format_extension(body.project_settings.output_format)
+    preview_dir = _get_web_store(cfg).preview_dir(sid)
+    out_path = (preview_dir / f"preview_{index:04d}.{ext}").resolve()
+    out_path.write_bytes(generated.audio_bytes)
+
+    item = {
+        "index": index,
+        "character": parsed.dialogue_chunks[index].character,
+        "text": parsed.dialogue_chunks[index].text,
+        "preview_url": f"/timeline/previews/{index}",
+    }
+    if not _is_hx_request():
+        page = (index // 50) + 1
+        return redirect(url_for("timeline", page=page))
+
+    html = render_template("timeline_chunk.html", item=item)
+    return Response(html, status=200, content_type="text/html")
+
+
+@app.get("/timeline/previews/<int:chunk_index>")
+def timeline_preview_file(chunk_index: int) -> Response:
+    cfg = _get_cfg()
+    payload = _payload_from_session(cfg)
+    if not payload:
+        return Response("Not found", status=404)
+
+    sid = _get_session_id()
+    if not sid:
+        return Response("Not found", status=404)
+
+    preview_dir = _get_web_store(cfg).preview_dir(sid)
+    path = _find_preview_path(preview_dir, chunk_index)
+    if path is None:
+        return Response("Not found", status=404)
+
+    mimetype = "audio/mpeg" if path.name.lower().endswith(".mp3") else "audio/wav"
+    return send_file(path, mimetype=mimetype, as_attachment=False, download_name=path.name)
 
 
 @app.post("/generate.zip")
@@ -324,7 +834,10 @@ def generate_zip() -> Response:
     for idx, character in enumerate(parsed.characters):
         voice_id = request.form.get(f"voice_id__{idx}", "").strip()
         stability = _parse_float(request.form.get(f"stability__{idx}", "0.5") or "0.5", default=0.5)
-        similarity_boost = _parse_float(request.form.get(f"similarity_boost__{idx}", "0.75") or "0.75", default=0.75)
+        similarity_boost = _parse_float(
+            request.form.get(f"similarity_boost__{idx}", "0.75") or "0.75",
+            default=0.75,
+        )
         style = _parse_float(request.form.get(f"style__{idx}", "0.1") or "0.1", default=0.1)
         speed = _parse_float(request.form.get(f"speed__{idx}", "1") or "1", default=1.0)
         character_configs[character] = CharacterConfig(

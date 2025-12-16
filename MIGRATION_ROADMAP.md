@@ -194,15 +194,15 @@ One repo, one Python environment, clear import direction:
 
 #### 5.1 Pages (minimum parity)
 - [x] `/` Script editor + share link load + HTMX parse
-- [ ] `/characters` character list + voice assignment + presets
-- [/] `/generation` start job + live progress (implemented via parse page; dedicated page pending)
-- [ ] `/timeline` per-line preview (server-rendered list + audio tags; paginate/virtualize later)
-- [ ] `/exports` download ZIP/manifest/subtitles/Reaper (dedicated UI pending; ZIP download works)
+- [x] `/characters` character list + voice assignment + presets
+- [x] `/generation` start job + live progress
+- [x] `/timeline` per-line preview (server-rendered list + audio tags; paginate/virtualize later)
+- [x] `/exports` download ZIP/manifest/subtitles/Reaper
 
 #### 5.2 HTMX interactions
-- [/] Validate config inline before starting generation (server-side validation is enforced; inline UX pending)
+- [x] Validate config inline before starting generation (server-side validation is enforced)
 - [x] Start job and subscribe to SSE for progress updates (non-HTMX fallback uses full page load)
-- [ ] Trigger per-line preview generation (one-off calls)
+- [x] Trigger per-line preview generation (one-off calls)
 
 #### 5.3 Candlelight theme enforcement
 - Single CSS file with only allowed hex colors:
