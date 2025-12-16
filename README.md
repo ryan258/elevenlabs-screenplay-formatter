@@ -148,7 +148,7 @@ The parser supports:
 - Standard “Characters:” list + dialogue blocks
 - Fountain-style scripts (no character list required)
 
-See `EXAMPLE_SCREENPLAY.md`, `EXAMPLE_FOUNTAIN.md`, and `example_screenplay.txt`.
+See `EXAMPLE_SCREENPLAY.md` and `EXAMPLE_FOUNTAIN.md`.
 
 ## Troubleshooting
 
