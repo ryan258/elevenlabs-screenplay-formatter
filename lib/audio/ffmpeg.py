@@ -49,6 +49,19 @@ def _run(args: List[str]) -> None:
     subprocess.run(args, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 
+def _escape_ffmpeg_concat_filelist_path(path: Path) -> str:
+    """
+    Escape a path for use in an ffmpeg concat demuxer filelist line:
+      file '<path>'
+
+    ffmpeg treats backslash escapes inside quoted strings.
+    """
+    value = str(path.resolve())
+    if any(ch in value for ch in ("\n", "\r", "\x00")):
+        raise ValueError("Invalid path for ffmpeg concat filelist")
+    return value.replace("\\", "\\\\").replace("'", "\\'")
+
+
 def concat_audio(config: FfmpegConfig, files: List[Path], output_path: Path) -> None:
     if not files:
         raise ValueError("No files provided")
@@ -58,7 +71,8 @@ def concat_audio(config: FfmpegConfig, files: List[Path], output_path: Path) -> 
 
     with tempfile.TemporaryDirectory(prefix="esf_concat_") as tmpdir:
         filelist = Path(tmpdir) / "filelist.txt"
-        filelist.write_text("\n".join([f"file '{str(p.resolve())}'" for p in files]), encoding="utf-8")
+        lines = [f"file '{_escape_ffmpeg_concat_filelist_path(p)}'" for p in files]
+        filelist.write_text("\n".join(lines), encoding="utf-8")
         _run(
             [
                 config.ffmpeg_bin,

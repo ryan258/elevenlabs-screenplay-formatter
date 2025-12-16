@@ -8,6 +8,7 @@ import time
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from flask import Response, current_app, redirect, render_template, request, send_file, session, url_for
+from werkzeug.wrappers.response import Response as WerkzeugResponse
 
 from apps.api.character_configs import build_character_configs
 from apps.api.config import AppConfig
@@ -132,7 +133,9 @@ def _is_hx_request() -> bool:
     return request.headers.get("HX-Request") == "true"
 
 
-def _error_response(errors: Sequence[str], *, status: int, hx_retarget: str = "#job-panel") -> Response:
+def _error_response(
+    errors: Sequence[str], *, status: int, hx_retarget: str = "#job-panel"
+) -> WerkzeugResponse:
     effective_status = 200 if _is_hx_request() else status
     if not _is_hx_request():
         body = "; ".join([e for e in errors if e])
@@ -367,7 +370,7 @@ def characters() -> str:
 
 
 @app.get("/generation")
-def generation() -> Response:
+def generation() -> WerkzeugResponse:
     cfg = _get_cfg()
     payload = _payload_from_session(cfg)
     if not payload:
@@ -433,7 +436,7 @@ def generation() -> Response:
 
 
 @app.get("/timeline")
-def timeline() -> Response:
+def timeline() -> WerkzeugResponse:
     cfg = _get_cfg()
     store = _get_store(cfg)
 
@@ -561,7 +564,7 @@ def exports() -> str:
 
 
 @app.post("/parse")
-def parse() -> Response:
+def parse() -> WerkzeugResponse:
     script_text = request.form.get("script_text", "")
     if len(script_text) > MAX_SCRIPT_CHARS:
         return _error_response(["Script is too large"], status=413, hx_retarget="#job-panel")
@@ -584,7 +587,7 @@ def parse() -> Response:
 
 
 @app.post("/characters/autofill")
-def characters_autofill() -> Response:
+def characters_autofill() -> WerkzeugResponse:
     cfg = _get_cfg()
     payload = _payload_from_session(cfg)
     if not payload:
@@ -619,7 +622,7 @@ def characters_autofill() -> Response:
 
 
 @app.get("/characters/voices")
-def characters_voices() -> Response:
+def characters_voices() -> WerkzeugResponse:
     cfg = _get_cfg()
     payload = _payload_from_session(cfg)
     if not payload:
@@ -653,7 +656,7 @@ def characters_voices() -> Response:
 
 
 @app.post("/characters/apply_voice")
-def characters_apply_voice() -> Response:
+def characters_apply_voice() -> WerkzeugResponse:
     cfg = _get_cfg()
     payload = _payload_from_session(cfg)
     if not payload:
@@ -692,7 +695,7 @@ def characters_apply_voice() -> Response:
 
 
 @app.post("/characters/apply_preset")
-def characters_apply_preset() -> Response:
+def characters_apply_preset() -> WerkzeugResponse:
     cfg = _get_cfg()
     payload = _payload_from_session(cfg)
     if not payload:
@@ -733,7 +736,7 @@ def characters_apply_preset() -> Response:
 
 
 @app.post("/characters/save")
-def characters_save() -> Response:
+def characters_save() -> WerkzeugResponse:
     cfg = _get_cfg()
     payload = _payload_from_session(cfg)
     if not payload:
@@ -779,7 +782,7 @@ def characters_save() -> Response:
 
 
 @app.post("/generation/validate")
-def generation_validate() -> Response:
+def generation_validate() -> WerkzeugResponse:
     cfg = _get_cfg()
     payload = _payload_from_session(cfg)
     if not payload:
@@ -828,7 +831,7 @@ def generation_validate() -> Response:
 
 
 @app.post("/generation/start")
-def generation_start() -> Response:
+def generation_start() -> WerkzeugResponse:
     cfg = _get_cfg()
     store = _get_store(cfg)
     payload = _payload_from_session(cfg)
@@ -892,7 +895,7 @@ def generation_start() -> Response:
 
 
 @app.post("/timeline/preview")
-def timeline_preview() -> Response:
+def timeline_preview() -> WerkzeugResponse:
     cfg = _get_cfg()
     payload = _payload_from_session(cfg)
     if not payload:
@@ -949,7 +952,7 @@ def timeline_preview() -> Response:
 
 
 @app.get("/timeline/previews/<int:chunk_index>")
-def timeline_preview_file(chunk_index: int) -> Response:
+def timeline_preview_file(chunk_index: int) -> WerkzeugResponse:
     cfg = _get_cfg()
     payload = _payload_from_session(cfg)
     if not payload:
@@ -969,7 +972,7 @@ def timeline_preview_file(chunk_index: int) -> Response:
 
 
 @app.post("/generate.zip")
-def generate_zip() -> Response:
+def generate_zip() -> WerkzeugResponse:
     cfg = _get_cfg()
     if not cfg.elevenlabs.api_key:
         return Response(render_template("simple_page.html", title="Error", body="Missing ELEVENLABS_API_KEY"), status=400)
@@ -1073,5 +1076,5 @@ def generate_zip() -> Response:
 
 
 @app.get("/health")
-def health() -> Response:
+def health() -> WerkzeugResponse:
     return Response(json.dumps({"status": "ok"}), content_type="application/json")

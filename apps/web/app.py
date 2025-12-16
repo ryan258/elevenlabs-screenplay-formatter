@@ -13,4 +13,4 @@ app.secret_key = (  # replaced by env-backed config during Phase 1 config wiring
     app.config.get("SECRET_KEY") or "dev"
 )
 
-from apps.web import routes  # noqa: E402
+from apps.web import routes  # noqa: F401,E402

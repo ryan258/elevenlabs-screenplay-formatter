@@ -11,7 +11,7 @@ from lib.models import CharacterConfig, DialogueChunk, VoiceSettings
 class _FakeClient:
     seen: list[tuple[Optional[str], Optional[str]]]
 
-    def generate_audio(  # type: ignore[no-untyped-def]
+    def generate_audio(
         self,
         *,
         voice_id: str,

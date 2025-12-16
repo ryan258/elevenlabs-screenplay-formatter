@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, List
+from typing import List
 
 from lib.models import CharacterConfigs, DialogueChunk
 
@@ -15,4 +15,3 @@ def validate_character_configs(
         if cfg is None or not cfg.voice_id:
             errors.append(f"Missing voice configuration for character: {character}")
     return errors
-

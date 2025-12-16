@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 import argparse
+import time
 import json
 import os
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 from lib.audio.ffmpeg import concat_audio
 from lib.config import ElevenLabsConfig, FfmpegConfig
-from lib.elevenlabs.client import ElevenLabsClient
+from lib.elevenlabs.client import ElevenLabsClient, _adjust_delay_based_on_rate_limit
 from lib.models import VoiceSettings
 from lib.parser import parse_script
 
@@ -30,8 +31,11 @@ def _slugify(value: str) -> str:
     return slug or "script"
 
 
-def _load_json(path: Path) -> dict:
-    return json.loads(path.read_text(encoding="utf-8"))
+def _load_json(path: Path) -> Dict[str, Any]:
+    obj = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(obj, dict):
+        raise SystemExit(f"Invalid JSON object in config: {path}")
+    return {str(k): v for k, v in obj.items()}
 
 
 def _get_required_env(name: str) -> str:
@@ -82,6 +86,8 @@ def main() -> None:
         slug = _slugify(script_file.stem)
 
         generated_files: List[Path] = []
+        base_delay_ms = max(0, int(args.delay))
+        adaptive_delay_ms = base_delay_ms
         for index, chunk in enumerate(parsed.dialogue_chunks):
             character_cfg = (config.get("characterConfigs") or {}).get(chunk.character) or {}
             voice_id = str(character_cfg.get("voiceId") or "")
@@ -103,24 +109,27 @@ def main() -> None:
             )
             print(f"[{index + 1}/{len(parsed.dialogue_chunks)}] {chunk.character}")
 
-            audio_bytes, _ = client.generate_audio(
+            audio_bytes, remaining = client.generate_audio(
                 voice_id=voice_id,
                 text=text,
                 model_id=model_id,
                 output_format=output_format,
                 voice_settings=voice_settings,
                 accept=accept,
-                base_delay_ms=args.delay,
+                base_delay_ms=base_delay_ms,
             )
             filename.write_bytes(audio_bytes)
             generated_files.append(filename)
 
+            adaptive_delay_ms = _adjust_delay_based_on_rate_limit(remaining, adaptive_delay_ms, base_delay_ms)
+            if adaptive_delay_ms > 0 and index < len(parsed.dialogue_chunks) - 1:
+                time.sleep(adaptive_delay_ms / 1000)
+
         if args.concat or bool(project_settings.get("concatenate")):
-            output_path = out_dir / "concatenated_audio.mp3"
+            output_path = out_dir / f"concatenated_audio.{extension}"
             concat_audio(ffmpeg, generated_files, output_path)
             print(f"Concatenated audio saved to {output_path}")
 
 
 if __name__ == "__main__":
     main()
-

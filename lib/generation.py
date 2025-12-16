@@ -148,7 +148,7 @@ def generate_all_audio_iter(
 
             alignment: Optional[List[WordTimestamp]] = None
             if fetch_alignment:
-                alignment = client.fetch_alignment(voice_id=cfg.voice_id, text=chunk.text, model_id=model_id)
+                alignment = client.fetch_alignment(voice_id=cfg.voice_id, text=text, model_id=model_id)
 
             if alignment:
                 offset_alignment = [
@@ -165,7 +165,7 @@ def generate_all_audio_iter(
                 final_alignment = offset_alignment
             else:
                 start_time_ms = timeline_cursor
-                duration = estimate_duration_ms(chunk.text)
+                duration = estimate_duration_ms(text)
                 end_time_ms = start_time_ms + duration
                 timeline_cursor = end_time_ms
                 final_alignment = None
@@ -269,14 +269,14 @@ def generate_one_audio(
 
     alignment: Optional[List[WordTimestamp]] = None
     if fetch_alignment:
-        alignment = client.fetch_alignment(voice_id=cfg.voice_id, text=chunk.text, model_id=model_id)
+        alignment = client.fetch_alignment(voice_id=cfg.voice_id, text=text, model_id=model_id)
 
     if alignment:
         start_time_ms = alignment[0].start_ms
         end_time_ms = alignment[-1].end_ms
     else:
         start_time_ms = 0
-        end_time_ms = estimate_duration_ms(chunk.text)
+        end_time_ms = estimate_duration_ms(text)
 
     base_filename = f"{index:04d}_{chunk.character.replace(' ', '_')}.{extension}"
     raw_name = f"{filename_prefix}_{base_filename}" if filename_prefix else base_filename
