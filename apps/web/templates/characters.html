@@ -43,14 +43,14 @@
         {% include "characters_table.html" %}
       </div>
 
-      <h3>Available Voices</h3>
-      <p class="meta">
-        Load voices from your ElevenLabs account (requires <code>ELEVENLABS_API_KEY</code>).
-      </p>
-      <div id="voices-list"></div>
-
       <div id="save-result"></div>
     </form>
+
+    <h3>Available Voices</h3>
+    <p class="meta">
+      Load voices from your ElevenLabs account (requires <code>ELEVENLABS_API_KEY</code>).
+    </p>
+    <div id="voices-list"></div>
 
     {% if parsed.diagnostics.unmatched_lines %}
       <details class="details">

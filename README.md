@@ -176,22 +176,6 @@ Install ffmpeg and verify `ffmpeg -version`.
 - FastAPI + Uvicorn (API + jobs + SSE)
 - pytest + ruff + mypy (tooling)
 
-### Legacy (Node, deprecated)
-
-- React + Vite (legacy UI)
-- Express (legacy server)
-
-## Legacy Node/React App (deprecated)
-
-The Node/React app and the Node concatenation server remain in the repo for reference during the migration, but are being sunset and will be removed in Phase 6. Prefer the Python app above.
-
-If you need the legacy app temporarily:
-
-```bash
-npm install
-npm run dev
-```
-
 ## License
 
 MIT License - Feel free to use this project for personal or commercial purposes.

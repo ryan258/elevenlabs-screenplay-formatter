@@ -1,92 +1,59 @@
 # Roadmap — ElevenLabs Screenplay Formatter
 
-This roadmap focuses on future enhancements and remaining quality-of-life improvements. For completed features, see [CHANGELOG.md](./CHANGELOG.md).
+This roadmap tracks the Python-first implementation on `main`. The legacy Node/React v0.4.0 app is archived in an older branch/tag and is not maintained here.
 
 ---
 
-## Current Status
+## Current Status (Python, `main`)
 
-**Version 0.4.0** has shipped with comprehensive features:
-- ✅ Full screenplay parsing with Fountain support
-- ✅ ElevenLabs integration with all voice models
-- ✅ Project management and voice presets
-- ✅ Timeline view and per-line preview
-- ✅ Export to multiple formats (ZIP, Reaper, SRT/VTT)
-- ✅ CLI for batch processing
-- ✅ Audio production with SFX and background music
-- ✅ Shareable project URLs
-- ✅ Core stability fixes (IndexedDB migration, memory leaks, error handling)
-
-**Python rewrite status (v1.0 track):**
-- ✅ `lib/` core port (parser, ElevenLabs client, generation, exports, ffmpeg wrapper) with pytest coverage
-- ✅ FastAPI API + async jobs + SSE progress
-- ✅ Flask UI wizard (Jinja2 + HTMX) supports the core flow end-to-end, including voice auto-fill + browsing, timeline previews, and exports (ZIP + concatenated audio)
+- ✅ Flask UI wizard (Jinja2 + HTMX): Script → Characters → Generation → Timeline → Exports
+- ✅ Screenplay parsing (standard + Fountain) with diagnostics
+- ✅ Character voice assignment + Voice ID auto-fill from scripts
+- ✅ ElevenLabs voice browsing (cached) + apply-to-character flow
+- ✅ Async generation jobs with SSE progress streaming
+- ✅ Exports: ZIP + manifest JSON/CSV + SRT/VTT + Reaper `.rpp`
+- ✅ Optional FFmpeg concatenated “listen-through” audio (best-effort; per-line clips always generated)
+- ✅ Node/React/Express implementation removed from `main` (archived separately)
 
 ---
 
-## Strategic Pivot: Python-First (FastAPI + Flask) — v1.0 Track
+## Direction: Python-First (FastAPI + Flask)
 
-We are sunsetting the Node.js/Vite/React implementation and rebuilding as a full Python project: **Flask + Jinja2 + HTMX** renders the HTML UI (progressive enhancement), while **FastAPI** serves JSON endpoints and job/progress execution (no HTML rendering). The shared core lives in `lib/` as a reusable, typed library with no web/framework imports.
+The product is intentionally local-only and “no-bloat”: Flask serves HTML (with HTMX for interactivity) while FastAPI runs jobs and streams progress. The shared core lives in `lib/` and must remain framework-free.
 
-For the step-by-step execution plan, see [MIGRATION_ROADMAP.md](./MIGRATION_ROADMAP.md).
-
-### Constraints (Non-Negotiable)
+### Constraints
 
 - **No-Bloat:** Jinja2 templates + HTMX for interactivity; simple cookie/session auth; local/bare-metal assumptions (no Docker/K8s/Terraform).
 - **Arsenal portability:** `lib/` must not import from app entrypoints, routers/views, or framework modules; use typed config objects (env-backed) and pass config into operations.
 - **Type safety:** public functions fully typed; validate external inputs at boundaries (HTTP, files, env, model output).
 - **Candlelight UI palette:** only `#121212`, `#EBD2BE`, `#A6ACCD`, `#98C379`, `#E06C75` in user-facing styles.
 
-### Target Architecture
+### Target Architecture (current)
 
 - `lib/` (pure, reusable): Fountain/parser, project model, ElevenLabs client, export builders (ZIP, SRT/VTT, Reaper), audio pipeline helpers, and validation.
 - `apps/api/` (FastAPI): REST endpoints for parsing, generation, exports, health; background job execution; file upload/download boundaries; typed request/response models.
 - `apps/web/` (Flask): SSR UI (Jinja2) + HTMX actions that call into `lib/` directly (or via internal API if we choose to isolate); cookie/session; Candlelight theme.
-- `cli/` (Python): batch processing CLI that reuses `lib/` (feature-parity with current TS CLI).
+- `py_cli/` (Python): minimal batch generation CLI that reuses `lib/`.
 
-### Migration Plan (Plotted)
-
-```mermaid
-gantt
-  title Python Rewrite (v1.0) — Node/React Sunset
-  dateFormat  YYYY-MM-DD
-  axisFormat  %b %d
-
-  section Freeze & Inventory
-  Lock Node features (bugfix-only)              :a1, 2025-12-16, 7d
-  Feature parity checklist (UI/CLI/exports)     :a2, after a1, 7d
-
-  section Python Foundation
-  Packaging + toolchain (ruff/mypy/pytest)      :b1, after a2, 10d
-  Typed env-backed Config + secrets hygiene     :b2, after b1, 5d
-
-  section Core Port (lib/)
-  Parser + diagnostics parity                    :c1, after b2, 14d
-  ElevenLabs client + retries/rate limits         :c2, after c1, 10d
-  Exporters (ZIP, SRT/VTT, Reaper)               :c3, after c2, 10d
-  Audio concat pipeline (ffmpeg wrapper)          :c4, after c3, 7d
-
-  section Services
-  FastAPI endpoints + job orchestration           :d1, after c2, 14d
-  Flask SSR UI + HTMX flows                       :d2, after c1, 21d
-
-  section Cutover
-  CLI parity + docs                               :e1, after c3, 10d
-  Data migration plan (projects/presets)          :e2, after d2, 7d
-  Remove Node build + archive legacy app          :e3, after e1, 7d
-```
+For historical migration notes, see [MIGRATION_ROADMAP.md](./MIGRATION_ROADMAP.md).
 
 ### Acceptance Criteria (Definition of Done)
 
 - [x] A single `python -m ...` (or `uv run ...`) starts the Flask UI and FastAPI API in local dev without Node (after installing Python deps).
 - [x] Parser + diagnostics match current behavior on existing example scripts (`EXAMPLE_*.md`/`*.txt`).
-- [/] CLI supports multi-script batch generation and local concatenation.
-- [/] Export formats (ZIP/manifest, SRT/VTT, Reaper) are implemented in `lib/`; parity verification is ongoing.
+- [/] CLI supports multi-script batch generation and local concatenation (minimal; ongoing improvements).
+- [x] Export formats (ZIP/manifest, SRT/VTT, Reaper) are implemented in `lib/`.
 - [x] No secrets committed; `.env` remains ignored; `.env.example` documents required values.
 
 ---
 
 ## Future Enhancements
+
+### Docs & UX
+
+- [ ] Add a small “model picker” (cached) instead of a free-text Model ID field.
+- [ ] Detect FFmpeg availability and make concatenate defaults/UX clearer.
+- [ ] Add an explicit UI affordance for share links (currently decode-only).
 
 ### Testing & Quality Assurance
 
@@ -105,12 +72,15 @@ gantt
 - [ ] **End-to-end tests** (Playwright for Python)
   - [ ] Load test script and assign voices
   - [ ] Mock API responses and verify UI flow
-  - [ ] Test project save/load cycle
-  - [ ] Validate resume functionality
 
 - [ ] **Maintenance scripts**
   - [ ] GitHub Actions workflow for lint + tests on push/PR
   - [ ] Automated build verification
+
+### Explicitly Out of Scope (local-only)
+
+- Multi-user auth/roles and enterprise features.
+- “Resume after restart” job durability.
 
 ### Parser Enhancements
 

@@ -2,6 +2,8 @@
 
 All notable changes to the ElevenLabs Screenplay Formatter project.
 
+Note: `main` is now Python-first. The entries below primarily describe the legacy Node/React v0.4.0 app, which is archived in an older branch/tag and removed from `main`.
+
 ## [Unreleased]
 ### Added
 - Auto-fill Voice IDs feature: extracts Voice IDs from character lists in screenplay format `- CHARACTER (Voice ID: <ID>)` with one-click population of character configs.

@@ -1,16 +1,15 @@
 # Audio Concatenation Setup Guide
 
-The concatenate audio toggle now works! This guide will help you set up the backend server required for audio concatenation.
+Concatenation is implemented in the Python app. This guide explains how to enable it and what to expect.
 
 ## What Changed
 
-Previously, the "Concatenate Audio" toggle in the UI was not connected to any functionality. Now:
+When concatenation is enabled:
 
-- ✅ Toggle is fully functional
-- ✅ When enabled, all audio files are sent to a local server
-- ✅ Server uses ffmpeg to concatenate files into a single MP3
-- ✅ You get one `concatenated_audio.mp3` file instead of individual files
-- ✅ Fallback to individual files if server is unavailable
+- ✅ Per-line clips are always generated
+- ✅ The job attempts to create a separate `concatenated_audio.mp3` (or `.wav` for PCM output)
+- ✅ The concatenated file is available via `GET /api/exports/{job_id}/concatenated`
+- ✅ If FFmpeg is missing or concat fails, the job still completes and `concat_error.txt` is included in the ZIP
 
 ## Prerequisites
 
@@ -43,67 +42,24 @@ sudo yum install ffmpeg
 ffmpeg -version
 ```
 
-### 2. Install Node.js Dependencies
-
-Navigate to the server directory and install dependencies:
-
-```bash
-cd server
-npm install
-```
-
 ## Running the Application
 
-You need to run **both** the frontend and backend:
+Run the combined FastAPI + Flask app:
 
-### Configure URLs (optional)
-- Frontend: set `VITE_CONCAT_SERVER_URL` in `.env` if your concatenation server is not at the default `http://localhost:3001/concatenate`.
-- Backend: set `PORT` to move the server off `3001`, and `ALLOWED_ORIGIN` (comma-separated list) to restrict which origins can call the server. Leave both unset for local development.
-
-### Terminal 1 - Backend Server (Port 3001)
 ```bash
-cd server
-npm start
+python3 -m apps.api
 ```
 
-You should see:
-```
-🎵 Audio concatenation server running on http://localhost:3001
-📋 Health check: http://localhost:3001/health
-```
-
-### Terminal 2 - Frontend (Port 3000)
-```bash
-npm run dev
-```
+Open `http://localhost:8000`.
 
 ## Usage
 
-1. Start both servers (backend and frontend)
-2. Open the app in your browser (http://localhost:3000)
-3. Configure your screenplay and voice settings
-4. **Enable or disable** the "Concatenate Audio" toggle in Project Settings
-   - **Enabled**: Generates one `concatenated_audio.mp3` file
-   - **Disabled**: Generates individual files (e.g., `0000_CHARACTER.mp3`)
-5. (Optional) Open the **Audio Production** panel to upload:
-   - A looping background music track (stored locally and sent only when concatenation is enabled)
-   - Timecoded sound effects (`mm:ss` start, volume, audio file) that are layered on top of the master track
-6. Click "Generate Audio"
-7. Use the **Concatenation Status** card in the UI to run on-demand health checks if you suspect the backend is unreachable.
-
-The server now mixes all uploaded assets (dialogue, background music, and per-effect audio) using FFmpeg filters before returning the final `concatenated_audio.mp3`. When audio production assets are omitted the server simply concatenates the dialogue files.
+1. Paste/parse a script, assign voices, and start a job.
+2. When the job completes, go to **Exports**:
+   - Download ZIP (includes all per-line clips and exports).
+   - If concatenation succeeded, use **Concatenated Audio** to listen to a single file in one pass.
 
 ## Troubleshooting
-
-### Error: "Failed to concatenate audio"
-
-**Cause:** Backend server is not running
-
-**Solution:** Make sure the backend server is running on port 3001:
-```bash
-cd server
-npm start
-```
 
 ### Error: "ffmpeg: command not found"
 
@@ -114,62 +70,16 @@ npm start
 2. Verify installation: `ffmpeg -version`
 3. Restart your terminal/IDE after installation
 
-### Port 3001 already in use
-
-**Solution:** Stop any process using port 3001, or modify the port in:
-- `server/index.js` (line 11): Change `PORT = 3001`
-- `utils/elevenLabsApi.ts` (line 86): Update `serverUrl`
-
-### Server crashes during concatenation
-
-**Check logs** in the server terminal. Common issues:
-- Audio format incompatibility: Ensure all files are the same format
-- Insufficient disk space: Check available space in `server/uploads/`
-- FFmpeg errors: Check that ffmpeg is properly installed
-
 ## Architecture
 
 ```
 User generates audio
     ↓
-Frontend: Generate individual audio files via ElevenLabs API
+Python JobStore: Generate per-line clips via ElevenLabs API
     ↓
 If concatenate = true:
     ↓
-Frontend: Send all audio blobs to backend server
+JobStore: Use ffmpeg to concatenate files (best-effort)
     ↓
-Backend: Save files temporarily to disk
-    ↓
-Backend: Use ffmpeg to concatenate files
-    ↓ (optional)
-Backend: Mix background music + SFX with dialogue streams
-    ↓
-Backend: Return concatenated file
-    ↓
-Frontend: Download concatenated_audio.mp3
-    ↓
-Backend: Clean up temporary files
+Exports: ZIP + optional concatenated audio endpoint
 ```
-
-## Development
-
-Run the backend in watch mode (auto-restart on changes):
-```bash
-cd server
-npm run dev
-```
-
-## Files Modified
-
-- `App.tsx:48-69` - Added concatenate parameter to generation flow
-- `utils/elevenLabsApi.ts:82-237` - Added concatenation logic
-- `server/index.js` - New backend server with concatenation endpoint
-- `server/package.json` - Server dependencies
-
-## Notes
-
-- The backend server uses a temporary `uploads/` directory (auto-cleaned after each request)
-- Files are sent from browser memory to the server (no disk writes on frontend)
-- If the server is unavailable, the app gracefully falls back to individual downloads
-- Maximum file size: 50MB per audio file (configurable in `server/index.js:16`)
-- Background and SFX uploads live only in-memory on the client; reattach them if you refresh the app or share a project URL.

@@ -1,33 +1,39 @@
 # Architecture Overview
 
-## Frontend (Vite + React)
-- `App.tsx` orchestrates state: screenplay text, API key, character configs, generation settings, progress, and exports.
-- Panels in `components/` are grouped by function:
-  - Input/editing: `ScriptInput`, `Modal` (fullscreen editor).
-  - Configuration: `ApiKeyPanel`, `ProjectSettingsPanel`, `GenerationProfilesPanel`, `ProjectManagerPanel`, `VoicePresetsPanel`, `CharacterConfigPanel`.
-  - Output/status: `OutputDisplay`, `ParserDiagnosticsPanel`, `TimelinePanel`, `ExportPanel`, `ConcatenationStatus`.
-- Voice presets and project configs live in localStorage (hydrated via `AppStateSnapshot`).
+## Python Modular Monolith (current)
 
-## Parsing & State
-- `utils/parser.ts` performs parsing: alias generation, Fountain support, parenthetical stripping, bracket preservation (controlled by `preserveStageDirections` flag), and unmatched-line diagnostics.
-- `hooks/useScriptParser.ts` wraps the parser with `useMemo` and accepts a `preserveStageDirections` parameter; the UI re-renders when script text or stage direction setting changes.
-- Dialogue chunks carry both `text` (cleaned) and `originalText` so toggles like "Speak Parentheticals" can decide which version to send.
-- Stage directions in brackets `[whispering]` are conditionally preserved based on the "Preserve Stage Directions [Brackets]" toggle for Turbo v2.5+ models.
+This repo is now Python-first and local-only:
+- **UI**: Flask + Jinja2 + HTMX (`apps/web/`)
+- **API/jobs**: FastAPI + SSE (`apps/api/`)
+- **Core library**: pure typed helpers (`lib/`) with no web/framework imports
+
+The app is mounted as a single process: `apps/api/main.py` mounts the Flask UI under the FastAPI app (one port).
+
+## Parsing & Project State
+- Parsing lives in `lib/parser.py` and returns characters, dialogue chunks, and diagnostics (unmatched lines).
+- The Flask UI keeps a lightweight “session payload” in `uploads/web_sessions/` via `apps/web/session_store.py`.
+- Character configs (Voice ID + settings) are stored in that payload and validated via `lib/validation.py`.
 
 ## Generation Flow
-1. `validateConfiguration` ensures every detected character has a voice ID and the API key is present.
-2. `generateAllAudio` iterates through chunks, calling `generateAudioFile` with context-aware parameters (previous and next dialogue text), applying profile-driven delay, and returning a list of `{ blob, filename }` records.
-3. `generateAudioFile` sends the dialogue chunk along with optional `previous_text` and `next_text` to the ElevenLabs API for improved audio continuity and natural transitions.
-4. If concatenation is enabled, blobs are uploaded to the backend (`server/index.js`); otherwise they download immediately.
-5. Manifest data is derived from the chunks + filenames for JSON/CSV/ZIP exports.
-6. Timeline previews reuse `generateAudioFile` for one-off requests and cache the resulting blobs locally.
+1. Flask UI writes config to the session payload.
+2. `POST /api/generate` starts an async JobStore job (`apps/api/jobs.py`).
+3. JobStore iterates chunks and calls ElevenLabs TTS with previous/next context (`lib/generation.py`).
+4. Per-line audio is written under `uploads/jobs/<job_id>/audio/`.
+5. Exports are produced in the job directory:
+   - `manifest.json`, `manifest.csv`
+   - `subtitles.srt`, `subtitles.vtt`
+   - `reaper.rpp`
+   - `bundle.zip`
+   - optional `concatenated_audio.mp3|.wav` (best-effort; requires ffmpeg)
+6. Progress is streamed to the browser via SSE (`GET /api/jobs/{job_id}/events`).
 
-## Backend (optional)
-- `server/index.js` is a minimal Express service:
-  - `/health` responds with a simple JSON payload for the UI status card.
-  - `/concatenate` accepts multipart audio uploads, writes a temporary list, runs ffmpeg concat demuxer, streams the merged file, and cleans up temporary files.
-- CORS and port can be configured via `server/.env` (`PORT`, `ALLOWED_ORIGIN`).
+## Timeline & Exports
+- Timeline view supports per-line preview playback:
+  - Generated job audio: `GET /api/jobs/{job_id}/audio/{filename}`
+  - Local previews: `/timeline/preview` generates a single chunk and serves it from the web session preview directory.
+- Exports:
+  - ZIP: `GET /api/exports/{job_id}.zip`
+  - Concatenated listen-through: `GET /api/exports/{job_id}/concatenated`
 
 ## CLI Automation
-- `cli/generate.ts` reuses the parser and ElevenLabs API to batch-generate audio from project configs.
-- It supports multiple `--script` inputs, configurable delay, and local concatenation through ffmpeg.
+- `python -m py_cli` is a minimal Python CLI for batch generation (replacement in progress).

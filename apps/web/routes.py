@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import tempfile
 from pathlib import Path
+import hashlib
 import time
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -63,26 +64,34 @@ def _get_web_store(cfg: AppConfig) -> WebSessionStore:
     return store
 
 
-def _get_voices_cache() -> Tuple[float, List[Dict[str, Any]]]:
+def _api_key_cache_tag(api_key: str) -> str:
+    if not api_key:
+        return ""
+    return hashlib.sha256(api_key.encode("utf-8")).hexdigest()[:16]
+
+
+def _get_voices_cache() -> Tuple[float, str, List[Dict[str, Any]]]:
     cached = current_app.config.get("ELEVENLABS_VOICES_CACHE")
     if (
         isinstance(cached, tuple)
-        and len(cached) == 2
+        and len(cached) == 3
         and isinstance(cached[0], (int, float))
-        and isinstance(cached[1], list)
+        and isinstance(cached[1], str)
+        and isinstance(cached[2], list)
     ):
-        return float(cached[0]), list(cached[1])
-    return 0.0, []
+        return float(cached[0]), str(cached[1]), list(cached[2])
+    return 0.0, "", []
 
 
-def _set_voices_cache(fetched_at_s: float, voices: List[Dict[str, Any]]) -> None:
-    current_app.config["ELEVENLABS_VOICES_CACHE"] = (float(fetched_at_s), list(voices))
+def _set_voices_cache(fetched_at_s: float, api_key_tag: str, voices: List[Dict[str, Any]]) -> None:
+    current_app.config["ELEVENLABS_VOICES_CACHE"] = (float(fetched_at_s), str(api_key_tag), list(voices))
 
 
 def _list_elevenlabs_voices(cfg: AppConfig, *, force_refresh: bool) -> List[Dict[str, Any]]:
-    fetched_at_s, cached = _get_voices_cache()
+    fetched_at_s, cached_tag, cached = _get_voices_cache()
     now = time.time()
-    if (not force_refresh) and cached and (now - fetched_at_s) < _VOICES_CACHE_TTL_S:
+    key_tag = _api_key_cache_tag(cfg.elevenlabs.api_key)
+    if (not force_refresh) and cached and cached_tag == key_tag and (now - fetched_at_s) < _VOICES_CACHE_TTL_S:
         return cached
 
     if not cfg.elevenlabs.api_key:
@@ -101,7 +110,7 @@ def _list_elevenlabs_voices(cfg: AppConfig, *, force_refresh: bool) -> List[Dict
                 "preview_url": v.preview_url,
             }
         )
-    _set_voices_cache(now, out)
+    _set_voices_cache(now, key_tag, out)
     return out
 
 

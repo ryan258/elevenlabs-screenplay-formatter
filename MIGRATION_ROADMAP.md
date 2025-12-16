@@ -1,12 +1,14 @@
 # Migration Roadmap: Node/React → Python Modular Monolith (v1.0)
 
-**Goal:** Convert this repo into a Python-first modular monolith while maintaining v0.4 functionality (parsing, generation, audio mixing, exports, project management, share links, CLI).
+**Status (current):** The core migration is complete on `main`. The legacy Node/React app is archived in an older branch/tag and removed from `main`.
+
+**Goal:** Track remaining work for the Python-first modular monolith (parsing, character voice assignment, generation, exports, optional ffmpeg concatenation).
 
 **Target Stack (No-Bloat compliant):**
 - HTML UI: **Flask + Jinja2 + HTMX** (progressive enhancement)
 - API + jobs/progress: **FastAPI**
 - Core library: **`lib/`** (pure, reusable, typed; no web/framework imports)
-- Auth: simple cookie/session (if/when multi-user is needed)
+- Auth: none (local-only); cookie/session exists only for local state
 - Infra: local/bare-metal assumptions (no Docker/K8s/Terraform)
 
 ---
@@ -35,14 +37,14 @@ One repo, one Python environment, clear import direction:
 │       ├── routes.py
 │       ├── templates/
 │       └── static/            # candlelight.css, minimal JS (optional)
-├── cli/                       # Python CLI entrypoint package
+├── py_cli/                    # Python CLI entrypoint package
 │   └── __main__.py
 ├── tests/                     # pytest; golden fixtures from v0.4 outputs
 ├── pyproject.toml
 └── README.md
 ```
 
-**Import rule:** `apps/*` and `cli/*` may import `lib/*`. `lib/*` MUST NOT import `apps/*` or web/framework modules.
+**Import rule:** `apps/*` and `py_cli/*` may import `lib/*`. `lib/*` MUST NOT import `apps/*` or web/framework modules.
 
 ---
 
@@ -50,15 +52,18 @@ One repo, one Python environment, clear import direction:
 
 ### Core
 - Screenplay parsing (standard + Fountain), alias resolution, diagnostics
-- Voice assignment per character + presets
-- ElevenLabs generation (models/voices listing; text-to-speech; context previous/next)
+- Voice assignment per character
+- ElevenLabs generation (voices listing; text-to-speech; context previous/next)
 - Retry + rate limiting behavior
 - Timeline-like preview (at least per-line preview playback)
 - Exports: ZIP of audio, manifest JSON/CSV, SRT/VTT, Reaper `.rpp`
-- Audio production: background track + SFX overlay + concatenation
-- Project management: save/load project config; demo load
-- Share links: `?project=...` encodes a project payload
-- CLI batch generation with local concat
+- Optional concatenation via ffmpeg (best-effort; should not fail the job)
+
+### Deferred / not required for local-only v1
+- Full project management UI (save/load presets, demo loading)
+- Resume across restarts and durable job registry
+- Audio production UI (background/SFX mixing). (API support may exist without a UI.)
+- Share-link authoring UI (decode/import support exists; authoring is optional)
 
 ### UX/Behavioral equivalence targets
 - Same default voice settings (stability/similarity/style/speed) semantics
@@ -131,7 +136,7 @@ One repo, one Python environment, clear import direction:
 
 **Exit criteria:** fixture outputs match (or are structurally equivalent with documented diffs).
 
-#### 2.5 Audio concat + production mixing (port `server/index.js`)
+#### 2.5 Audio concat + production mixing (ported from legacy Node concat server)
 - [x] Implement `lib/audio/ffmpeg.py` wrapper using `subprocess` (no shell=True)
 - [x] Implement:
   - Concat N files (safe temp filelist)
@@ -146,11 +151,11 @@ One repo, one Python environment, clear import direction:
 ### Phase 3 — Python CLI Parity (3–7 days)
 **Goal:** Replace `cli/generate.ts` with a Python CLI that uses `lib/`.
 
-- [ ] CLI commands:
+- [ ] CLI commands (minimal parity):
   - Parse-only (outputs JSON diagnostics)
   - [x] Generate audio (per-chunk files)
   - [x] Concat/mix via ffmpeg wrapper
-  - Export bundle generation
+  - [ ] Export bundle generation (ZIP/manifest/subtitles/Reaper)
 - [x] Input validation (file paths, config shape)
 - [x] Document environment vars; no secrets in args by default
 
@@ -222,10 +227,10 @@ One repo, one Python environment, clear import direction:
 **Goal:** Finish cleanly: Python is the product; Node is archived.
 
 - [x] Update `README.md` to make Python the default
-- [ ] Remove/retire:
+- [x] Remove/retire:
   - Vite/React entrypoints and build scripts
   - Node server (`server/`) and Node CLI (`cli/generate.ts`)
-  - `package.json`/`package-lock.json` if no longer needed
+  - `package.json`/`package-lock.json`
 - [ ] Keep a permanent archive reference:
   - git tag for v0.4 final Node version
   - optional `legacy/` folder only if you must keep source in-tree (prefer tag-only)
@@ -264,8 +269,8 @@ One repo, one Python environment, clear import direction:
 
 ## 6) Definition of Done (v1.0)
 
-- [ ] One Python command starts the app (Flask UI + FastAPI API mounted together)
+- [x] One Python command starts the app (Flask UI + FastAPI API mounted together)
 - [ ] Feature parity checklist is complete (section 2)
 - [ ] Fixtures pass in CI (pytest) without network access
-- [ ] No Node required for build/run/test
+- [x] No Node required for build/run/test
 - [ ] Documentation updated (setup, env vars, troubleshooting, ffmpeg requirement)

@@ -180,7 +180,9 @@ def api_job_concatenated_audio(
         return JSONResponse(status_code=400, content=ErrorResponse(error="Invalid path").model_dump())
 
     media_type = "audio/mpeg" if path.name.lower().endswith(".mp3") else "audio/wav"
-    return FileResponse(path, media_type=media_type, filename=path.name, content_disposition_type="inline")
+    resp = FileResponse(path, media_type=media_type)
+    resp.headers["Content-Disposition"] = f'inline; filename="{path.name}"'
+    return resp
 
 
 @router.get("/jobs/{job_id}/audio/{filename}")
@@ -210,7 +212,9 @@ def api_job_audio_clip(
         media_type = "audio/mpeg"
     elif safe_name.lower().endswith(".wav"):
         media_type = "audio/wav"
-    return FileResponse(path, media_type=media_type, filename=safe_name, content_disposition_type="inline")
+    resp = FileResponse(path, media_type=media_type)
+    resp.headers["Content-Disposition"] = f'inline; filename="{safe_name}"'
+    return resp
 
 
 @router.get("/jobs/{job_id}/events")
