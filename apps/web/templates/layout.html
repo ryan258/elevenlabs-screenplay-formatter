@@ -46,16 +46,21 @@
 
             es.onmessage = function () {};
 
-            function setExportReady(jobId) {
+            function setExportReady(jobId, opts) {
+              opts = opts || {};
               if (!exportEl) return;
-              exportEl.innerHTML =
-                '<a class="btn" href="/api/exports/' + jobId + '.zip">Download ZIP</a>' +
+              let html = '<a class="btn" href="/api/exports/' + jobId + '.zip">Download ZIP</a>';
+              if (opts.concatReady) {
+                html += '<a class="btn secondary" href="/api/exports/' + jobId + '/concatenated">Concatenated Audio</a>';
+              }
+              html +=
                 '<a class="btn secondary" href="/api/exports/' + jobId + '.json">manifest.json</a>' +
                 '<a class="btn secondary" href="/api/exports/' + jobId + '.csv">manifest.csv</a>' +
                 '<a class="btn secondary" href="/api/exports/' + jobId + '.srt">SRT</a>' +
                 '<a class="btn secondary" href="/api/exports/' + jobId + '.vtt">VTT</a>' +
                 '<a class="btn secondary" href="/api/exports/' + jobId + '.rpp">Reaper (.rpp)</a>' +
                 '<a class="btn secondary" href="/timeline?job_id=' + jobId + '">Timeline</a>';
+              exportEl.innerHTML = html;
             }
 
             function setStatus(text) {
@@ -74,7 +79,15 @@
                   const total = snap.total || 0;
                   progressEl.textContent = total ? (cur + ' / ' + total) : String(cur);
                 }
-                if (snap.export_ready) setExportReady(snap.job_id);
+                if (snap.export_ready) setExportReady(snap.job_id, { concatReady: !!snap.concat_ready });
+              } catch (_) {}
+            });
+
+            es.addEventListener('warning', function (ev) {
+              try {
+                const d = JSON.parse(ev.data || '{}');
+                const details = d.details || d.warning || 'Warning';
+                if (messageEl) messageEl.textContent = String(details);
               } catch (_) {}
             });
 
@@ -87,8 +100,14 @@
               } catch (_) {}
             });
 
-            es.addEventListener('complete', function () {
+            es.addEventListener('complete', function (ev) {
               setStatus('complete');
+              try {
+                const d = JSON.parse(ev.data || '{}');
+                if (messageEl && d.message) messageEl.textContent = d.message;
+                const jobId = panel.getAttribute('data-job-id');
+                if (jobId && d.export_ready) setExportReady(jobId, { concatReady: !!d.concat_ready });
+              } catch (_) {}
             });
 
             es.addEventListener('job_error', function (ev) {
@@ -107,8 +126,9 @@
               try {
                 const d = JSON.parse(ev.data || '{}');
                 if (d.status) setStatus(d.status);
+                if (messageEl && d.message) messageEl.textContent = d.message;
                 const jobId = panel.getAttribute('data-job-id');
-                if (jobId && d.status === 'complete') setExportReady(jobId);
+                if (jobId && d.export_ready) setExportReady(jobId, { concatReady: !!d.concat_ready });
               } catch (_) {}
               es.close();
             });

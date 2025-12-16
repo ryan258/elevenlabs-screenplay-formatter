@@ -79,6 +79,7 @@ def api_generate_job(
             "status_url": f"/api/jobs/{job.job_id}",
             "events_url": f"/api/jobs/{job.job_id}/events",
             "export_url": f"/api/exports/{job.job_id}.zip",
+            "concatenated_url": f"/api/exports/{job.job_id}/concatenated",
             "srt_url": f"/api/exports/{job.job_id}.srt",
             "vtt_url": f"/api/exports/{job.job_id}.vtt",
             "rpp_url": f"/api/exports/{job.job_id}.rpp",
@@ -155,6 +156,31 @@ def api_job_rpp(job_id: str, store: JobStore = Depends(get_job_store)) -> Union[
     if not path.exists():
         return JSONResponse(status_code=404, content=ErrorResponse(error="RPP not ready").model_dump())
     return FileResponse(path, media_type="text/plain; charset=utf-8", filename="reaper.rpp")
+
+
+@router.get("/exports/{job_id}/concatenated")
+def api_job_concatenated_audio(
+    job_id: str,
+    store: JobStore = Depends(get_job_store),
+) -> Union[FileResponse, JSONResponse]:
+    job = store.get(job_id)
+    if job is None:
+        return JSONResponse(status_code=404, content=ErrorResponse(error="Job not found").model_dump())
+
+    candidates = [
+        (job.work_dir / "concatenated_audio.mp3").resolve(),
+        (job.work_dir / "concatenated_audio.wav").resolve(),
+    ]
+    path = next((p for p in candidates if p.exists()), None)
+    if path is None:
+        return JSONResponse(status_code=404, content=ErrorResponse(error="Concatenated audio not ready").model_dump())
+    try:
+        path.relative_to(job.work_dir.resolve())
+    except ValueError:
+        return JSONResponse(status_code=400, content=ErrorResponse(error="Invalid path").model_dump())
+
+    media_type = "audio/mpeg" if path.name.lower().endswith(".mp3") else "audio/wav"
+    return FileResponse(path, media_type=media_type, filename=path.name, content_disposition_type="inline")
 
 
 @router.get("/jobs/{job_id}/audio/{filename}")

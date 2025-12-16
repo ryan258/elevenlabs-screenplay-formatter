@@ -20,7 +20,7 @@ This roadmap focuses on future enhancements and remaining quality-of-life improv
 **Python rewrite status (v1.0 track):**
 - ✅ `lib/` core port (parser, ElevenLabs client, generation, exports, ffmpeg wrapper) with pytest coverage
 - ✅ FastAPI API + async jobs + SSE progress
-- 🚧 Flask UI (Jinja2 + HTMX) is in progress; current “happy path” works end-to-end
+- ✅ Flask UI wizard (Jinja2 + HTMX) supports the core flow end-to-end, including voice auto-fill + browsing, timeline previews, and exports (ZIP + concatenated audio)
 
 ---
 

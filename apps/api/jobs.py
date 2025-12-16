@@ -32,6 +32,7 @@ class JobSnapshot:
     message: str
     error: Optional[str]
     export_ready: bool
+    concat_ready: bool
 
 
 @dataclass
@@ -51,6 +52,14 @@ class Job:
     _event_cond: threading.Condition = field(default_factory=lambda: threading.Condition())
 
     def snapshot(self) -> JobSnapshot:
+        work_dir = self.work_dir.resolve()
+        concat_ready = any(
+            (work_dir / name).exists()
+            for name in (
+                "concatenated_audio.mp3",
+                "concatenated_audio.wav",
+            )
+        )
         return JobSnapshot(
             job_id=self.job_id,
             status=self.status,
@@ -61,6 +70,7 @@ class Job:
             message=self.message,
             error=self.error,
             export_ready=self.export_path is not None and self.export_path.exists(),
+            concat_ready=concat_ready,
         )
 
     def add_event(self, event: str, data: Dict[str, Any]) -> int:
@@ -253,13 +263,24 @@ class JobStore:
                 ("subtitles.vtt", vtt_path),
                 ("reaper.rpp", rpp_path),
             ]
+            concat_error: Optional[str] = None
 
             if concatenate:
                 # Use the already-written per-line clips and build a single timeline render.
                 ext = "wav" if str(output_format).startswith("pcm_") else "mp3"
                 concat_path = (job.work_dir / f"concatenated_audio.{ext}").resolve()
-                concat_audio(cfg.ffmpeg, [(audio_dir / name).resolve() for name in generated_files], concat_path)
-                extra_paths.append((concat_path.name, concat_path))
+                try:
+                    concat_audio(cfg.ffmpeg, [(audio_dir / name).resolve() for name in generated_files], concat_path)
+                    extra_paths.append((concat_path.name, concat_path))
+                except Exception as exc:
+                    concat_error = str(exc)
+                    job.message = f"Complete (concat failed: {concat_error})"
+                    self._emit(job, "warning", {"warning": "concat_failed", "details": concat_error})
+
+            if concat_error:
+                concat_error_path = (job.work_dir / "concat_error.txt").resolve()
+                concat_error_path.write_text(concat_error, encoding="utf-8")
+                extra_paths.append((concat_error_path.name, concat_error_path))
 
             export_path = (job.work_dir / "bundle.zip").resolve()
             audio_paths = [(name, (audio_dir / name).resolve()) for name in generated_files]
@@ -271,9 +292,19 @@ class JobStore:
             )
             job.export_path = export_path
             job.status = "complete"
-            job.message = "Complete"
+            if not job.message:
+                job.message = "Complete"
             job.updated_at_s = time.time()
-            self._emit(job, "complete", {"export_ready": True})
+            snap = job.snapshot()
+            self._emit(
+                job,
+                "complete",
+                {
+                    "export_ready": snap.export_ready,
+                    "concat_ready": snap.concat_ready,
+                    "message": job.message,
+                },
+            )
         except Exception as exc:
             job.status = "error"
             job.error = str(exc)
@@ -281,7 +312,17 @@ class JobStore:
             job.updated_at_s = time.time()
             self._emit(job, "job_error", {"error": str(exc)})
         finally:
-            self._emit(job, "done", {"status": job.status})
+            snap = job.snapshot()
+            self._emit(
+                job,
+                "done",
+                {
+                    "status": job.status,
+                    "message": job.message,
+                    "export_ready": snap.export_ready,
+                    "concat_ready": snap.concat_ready,
+                },
+            )
 
     def _write_generated_audio(self, audio_dir: Path, generated: GeneratedAudio) -> None:
         target = (audio_dir / generated.filename).resolve()

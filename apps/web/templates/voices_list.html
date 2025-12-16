@@ -1,0 +1,46 @@
+<div class="actions">
+  <button class="btn secondary" type="button" hx-get="/characters/voices?refresh=1" hx-target="#voices-list" hx-swap="innerHTML">
+    Refresh Voices
+  </button>
+</div>
+
+{% if not voices %}
+  <p class="meta">No voices found.</p>
+{% else %}
+  <p class="meta">Voices: {{ voices|length }}</p>
+  <div class="table">
+    <div class="row row--3 header">
+      <div>Voice</div>
+      <div>Voice ID</div>
+      <div>Apply</div>
+    </div>
+    {% for v in voices %}
+      <div class="row row--3">
+        <div class="cell">
+          <div class="strong">{{ v.name }}</div>
+          {% if v.category %}
+            <div class="muted">{{ v.category }}</div>
+          {% endif %}
+          {% if v.preview_url %}
+            <div class="muted"><a href="{{ v.preview_url }}" target="_blank" rel="noopener">Preview</a></div>
+          {% endif %}
+        </div>
+        <div class="cell">
+          <code>{{ v.voice_id }}</code>
+        </div>
+        <div class="cell">
+          <form method="post" action="/characters/apply_voice" hx-post="/characters/apply_voice" hx-target="#characters-table" hx-swap="innerHTML">
+            <input type="hidden" name="voice_id" value="{{ v.voice_id }}" />
+            <select class="input" name="character" style="max-width: 220px">
+              <option value="">Select character…</option>
+              {% for c in characters %}
+                <option value="{{ c }}">{{ c }}</option>
+              {% endfor %}
+            </select>
+            <button class="btn secondary" type="submit">Use</button>
+          </form>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}

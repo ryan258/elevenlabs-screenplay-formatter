@@ -13,8 +13,8 @@ See `ROADMAP.md` and `MIGRATION_ROADMAP.md` for the execution plan.
 
 ## Current Status (Python)
 
-- Flask UI “happy path” works: paste script → parse → configure voices → start async generation → live progress via SSE → download ZIP.
-- FastAPI API + jobs are implemented (`/api/parse`, `/api/projects/validate`, `/api/generate`, `/api/jobs/*`, `/api/exports/*.zip`).
+- Flask UI wizard works end-to-end: paste script → parse → assign voices (auto-fill + browse voices) → start async generation → live progress via SSE → timeline playback → exports.
+- FastAPI API + jobs are implemented (`/api/parse`, `/api/projects/validate`, `/api/generate`, `/api/jobs/*`, `/api/exports/*`).
 - Core library exists in `lib/` (parser, ElevenLabs client, generation, ZIP/manifest, ffmpeg concat/mix helpers) with pytest coverage.
 
 ## Prerequisites
@@ -26,7 +26,7 @@ See `ROADMAP.md` and `MIGRATION_ROADMAP.md` for the execution plan.
 
 ### Optional
 
-- **FFmpeg** - Required for concatenation/mixing features
+- **FFmpeg** - Required for concatenation/mixing features (per-line clips still work without it)
   - **Windows**: `winget install ffmpeg` or [download manually](https://ffmpeg.org/download.html)
   - **Mac**: `brew install ffmpeg`
   - **Linux**: `sudo apt install ffmpeg` (Ubuntu/Debian) or `sudo yum install ffmpeg` (RHEL/Fedora)
@@ -97,8 +97,12 @@ python3 -m py_cli --script path/to/screenplay.txt --config path/to/elevenlabs_pr
 - `GET /api/jobs/{job_id}/events` (SSE; supports `Last-Event-ID`)
 - `GET /api/jobs/{job_id}/audio/{filename}` (per-line clips)
 - `GET /api/exports/{job_id}.zip`
+- `GET /api/exports/{job_id}/concatenated` (single-file listen-through; requires FFmpeg)
 - `GET /api/exports/{job_id}.json` (manifest)
 - `GET /api/exports/{job_id}.csv` (manifest)
+- `GET /api/exports/{job_id}.srt` (subtitles)
+- `GET /api/exports/{job_id}.vtt` (subtitles)
+- `GET /api/exports/{job_id}.rpp` (Reaper project)
 - `POST /api/concatenate` (ffmpeg concat + optional mixing; multipart form)
 
 ## Concatenation & Mixing (FFmpeg)
@@ -106,6 +110,8 @@ python3 -m py_cli --script path/to/screenplay.txt --config path/to/elevenlabs_pr
 Concatenation/mixing is implemented server-side via FFmpeg:
 - API endpoint: `POST /api/concatenate` (multipart)
 - Core wrapper: `lib/audio/ffmpeg.py`
+
+If FFmpeg is missing or concat fails, jobs still complete and the ZIP includes `concat_error.txt`.
 
 ## Project Structure (Python)
 

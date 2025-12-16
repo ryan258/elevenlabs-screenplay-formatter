@@ -18,10 +18,17 @@
         <a class="btn secondary" href="/api/exports/{{ job_id }}.vtt">VTT</a>
         <a class="btn secondary" href="/api/exports/{{ job_id }}.rpp">Reaper (.rpp)</a>
       </div>
+      {% if concat_ready %}
+        <div class="actions">
+          <a class="btn secondary" href="/api/exports/{{ job_id }}/concatenated">Concatenated Audio</a>
+        </div>
+        <audio controls preload="none" src="/api/exports/{{ job_id }}/concatenated"></audio>
+      {% else %}
+        <p class="meta">Concatenated audio is not ready yet.</p>
+      {% endif %}
       <p class="meta">
         Need a different job? Add <code>?job_id=...</code> to the URL.
       </p>
     {% endif %}
   </section>
 {% endblock %}
-

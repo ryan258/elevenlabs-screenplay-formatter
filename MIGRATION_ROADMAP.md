@@ -168,6 +168,11 @@ One repo, one Python environment, clear import direction:
 - [x] `GET /api/jobs/{job_id}` → status/progress snapshot
 - [x] `GET /api/jobs/{job_id}/events` → SSE progress stream
 - [x] `GET /api/exports/{job_id}.zip` → export bundle download
+- [x] `GET /api/jobs/{job_id}/audio/{filename}` → per-line clips (for timeline playback)
+- [x] `GET /api/exports/{job_id}/concatenated` → single-file listen-through (best-effort; requires FFmpeg)
+- [x] `GET /api/exports/{job_id}.json` / `.csv` → manifests
+- [x] `GET /api/exports/{job_id}.srt` / `.vtt` → subtitles
+- [x] `GET /api/exports/{job_id}.rpp` → Reaper export
 
 #### 4.2 Jobs model (v1)
 - In-memory job registry (local-only; not durable across restarts)
@@ -190,7 +195,7 @@ One repo, one Python environment, clear import direction:
 ### Phase 5 — Flask UI (Jinja2 + HTMX) (1–3 weeks)
 **Goal:** Replace React UI with SSR screens while keeping workflows.
 
-**Status (in progress):** `/` script input → HTMX parse → start async job → live progress via SSE → download ZIP.
+**Status:** Core wizard flow works end-to-end (script → characters → generation → timeline → exports), with HTMX enhancements and SSE job progress.
 
 #### 5.1 Pages (minimum parity)
 - [x] `/` Script editor + share link load + HTMX parse
@@ -203,6 +208,7 @@ One repo, one Python environment, clear import direction:
 - [x] Validate config inline before starting generation (server-side validation is enforced)
 - [x] Start job and subscribe to SSE for progress updates (non-HTMX fallback uses full page load)
 - [x] Trigger per-line preview generation (one-off calls)
+- [x] Browse ElevenLabs voices and apply Voice IDs (HTMX partial + table update)
 
 #### 5.3 Candlelight theme enforcement
 - Single CSS file with only allowed hex colors:

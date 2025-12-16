@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import tempfile
 from pathlib import Path
+import time
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from flask import Response, current_app, redirect, render_template, request, send_file, session, url_for
@@ -25,6 +26,8 @@ from lib.reaper_export import build_reaper_project
 from lib.share_links import decode_share_payload
 from lib.validation import validate_character_configs
 from lib.voice_extraction import extract_voice_ids_from_script
+
+_VOICES_CACHE_TTL_S = 300
 
 
 def _get_cfg() -> AppConfig:
@@ -58,6 +61,48 @@ def _get_web_store(cfg: AppConfig) -> WebSessionStore:
     if not isinstance(store, WebSessionStore):
         raise RuntimeError("WEB_SESSION_STORE is not initialized")
     return store
+
+
+def _get_voices_cache() -> Tuple[float, List[Dict[str, Any]]]:
+    cached = current_app.config.get("ELEVENLABS_VOICES_CACHE")
+    if (
+        isinstance(cached, tuple)
+        and len(cached) == 2
+        and isinstance(cached[0], (int, float))
+        and isinstance(cached[1], list)
+    ):
+        return float(cached[0]), list(cached[1])
+    return 0.0, []
+
+
+def _set_voices_cache(fetched_at_s: float, voices: List[Dict[str, Any]]) -> None:
+    current_app.config["ELEVENLABS_VOICES_CACHE"] = (float(fetched_at_s), list(voices))
+
+
+def _list_elevenlabs_voices(cfg: AppConfig, *, force_refresh: bool) -> List[Dict[str, Any]]:
+    fetched_at_s, cached = _get_voices_cache()
+    now = time.time()
+    if (not force_refresh) and cached and (now - fetched_at_s) < _VOICES_CACHE_TTL_S:
+        return cached
+
+    if not cfg.elevenlabs.api_key:
+        return []
+
+    client = ElevenLabsClient(cfg.elevenlabs)
+    voices = client.list_voices()
+    out: List[Dict[str, Any]] = []
+    for v in voices:
+        out.append(
+            {
+                "voice_id": v.voice_id,
+                "name": v.name,
+                "category": v.category,
+                "description": v.description,
+                "preview_url": v.preview_url,
+            }
+        )
+    _set_voices_cache(now, out)
+    return out
 
 
 def _parse_int(value: str, *, default: int) -> int:
@@ -135,7 +180,7 @@ def _build_default_payload(
         "projectSettings": {
             "model": "",
             "outputFormat": "mp3_44100_128",
-            "concatenate": False,
+            "concatenate": True,
             "speakParentheticals": False,
             "preserveStageDirections": preserve_stage_directions,
             "requestDelayMs": 500,
@@ -472,7 +517,29 @@ def exports() -> str:
     cfg = _get_cfg()
     payload = _payload_from_session(cfg) or {}
     job_id = request.args.get("job_id") or payload.get("lastJobId")
-    return render_template("exports.html", job_id=job_id)
+
+    concat_ready = False
+    export_ready = False
+    if job_id:
+        store = _get_store(cfg)
+        job = store.get(str(job_id))
+        if job is not None:
+            export_ready = job.export_path is not None and job.export_path.exists()
+            work_dir = job.work_dir.resolve()
+            concat_ready = any(
+                (work_dir / name).exists()
+                for name in (
+                    "concatenated_audio.mp3",
+                    "concatenated_audio.wav",
+                )
+            )
+
+    return render_template(
+        "exports.html",
+        job_id=job_id,
+        export_ready=export_ready,
+        concat_ready=concat_ready,
+    )
 
 
 @app.post("/parse")
@@ -521,6 +588,79 @@ def characters_autofill() -> Response:
             cfgs[character] = item
 
     payload["characterConfigs"] = cfgs
+    sid = _get_session_id()
+    if sid:
+        _get_web_store(cfg).patch(sid, payload)
+
+    if not _is_hx_request():
+        return redirect(url_for("characters"))
+
+    voice_rows = _voice_rows_from_payload(parsed.characters, payload)
+    html = render_template("characters_table.html", parsed=parsed, voice_rows=voice_rows)
+    return Response(html, status=200, content_type="text/html")
+
+
+@app.get("/characters/voices")
+def characters_voices() -> Response:
+    cfg = _get_cfg()
+    payload = _payload_from_session(cfg)
+    if not payload:
+        return Response(render_template("error_box.html", errors=["Paste a script first."]), status=200)
+
+    if not cfg.elevenlabs.api_key:
+        return Response(
+            render_template("error_box.html", errors=["Missing ELEVENLABS_API_KEY (set it in your environment)."]),
+            status=200,
+        )
+
+    force_refresh = request.args.get("refresh") == "1"
+    try:
+        voices = _list_elevenlabs_voices(cfg, force_refresh=force_refresh)
+    except Exception as exc:
+        return Response(render_template("error_box.html", errors=[f"Failed to load voices: {exc}"]), status=200)
+
+    script_text = str(payload.get("scriptText") or "")
+    preserve = bool(payload.get("projectSettings", {}).get("preserveStageDirections"))
+    try:
+        parsed = parse_script(script_text, preserve_stage_directions=preserve)
+    except Exception as exc:
+        return Response(render_template("error_box.html", errors=[f"Failed to parse script: {exc}"]), status=200)
+
+    html = render_template(
+        "voices_list.html",
+        voices=voices,
+        characters=parsed.characters,
+    )
+    return Response(html, status=200, content_type="text/html")
+
+
+@app.post("/characters/apply_voice")
+def characters_apply_voice() -> Response:
+    cfg = _get_cfg()
+    payload = _payload_from_session(cfg)
+    if not payload:
+        return redirect("/")
+
+    character = (request.form.get("character") or "").strip()
+    voice_id = (request.form.get("voice_id") or "").strip()
+    if not character or not voice_id:
+        return _error_response(["Missing character or voice id"], status=400, hx_retarget="#voices-list")
+
+    script_text = str(payload.get("scriptText") or "")
+    preserve = bool(payload.get("projectSettings", {}).get("preserveStageDirections"))
+    try:
+        parsed = parse_script(script_text, preserve_stage_directions=preserve)
+    except Exception as exc:
+        return _error_response([f"Failed to parse script: {exc}"], status=400, hx_retarget="#voices-list")
+    if character not in parsed.characters:
+        return _error_response(["Invalid character selection"], status=400, hx_retarget="#voices-list")
+
+    cfgs: Dict[str, Any] = payload.get("characterConfigs") or {}
+    item = cfgs.get(character) or {}
+    item["voiceId"] = voice_id
+    cfgs[character] = item
+    payload["characterConfigs"] = cfgs
+
     sid = _get_session_id()
     if sid:
         _get_web_store(cfg).patch(sid, payload)
@@ -891,8 +1031,11 @@ def generate_zip() -> Response:
             out_path = tmp / "concatenated_audio.mp3"
             from lib.audio.ffmpeg import concat_audio as _concat
 
-            _concat(ffmpeg, paths, out_path)
-            audio_files.append(("concatenated_audio.mp3", out_path.read_bytes()))
+            try:
+                _concat(ffmpeg, paths, out_path)
+                audio_files.append(("concatenated_audio.mp3", out_path.read_bytes()))
+            except Exception as exc:
+                audio_files.append(("concat_error.txt", str(exc).encode("utf-8")))
 
     zip_bytes = build_zip_bundle(
         audio_files=audio_files,

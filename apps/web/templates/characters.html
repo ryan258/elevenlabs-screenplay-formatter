@@ -31,6 +31,9 @@
         <button class="btn secondary" type="submit" formaction="/characters/autofill" formmethod="post" hx-post="/characters/autofill" hx-target="#characters-table" hx-swap="innerHTML">
           Auto-fill Voice IDs
         </button>
+        <button class="btn secondary" type="button" hx-get="/characters/voices" hx-target="#voices-list" hx-swap="innerHTML">
+          Load Voices
+        </button>
         <button class="btn" type="submit">Save & Continue</button>
         <a class="btn secondary" href="/">Back</a>
       </div>
@@ -39,6 +42,12 @@
       <div id="characters-table">
         {% include "characters_table.html" %}
       </div>
+
+      <h3>Available Voices</h3>
+      <p class="meta">
+        Load voices from your ElevenLabs account (requires <code>ELEVENLABS_API_KEY</code>).
+      </p>
+      <div id="voices-list"></div>
 
       <div id="save-result"></div>
     </form>

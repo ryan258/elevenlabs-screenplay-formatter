@@ -115,6 +115,11 @@ def api_generate_zip(
         )
 
         audio_files = [(g.filename, g.audio_bytes) for g in generated]
+        extra_files = [
+            ("subtitles.srt", manifest_to_srt(entries).encode("utf-8")),
+            ("subtitles.vtt", manifest_to_vtt(entries).encode("utf-8")),
+            ("reaper.rpp", build_reaper_project(entries).encode("utf-8")),
+        ]
         if body.project_settings.concatenate:
             extension = "wav" if str(body.project_settings.output_format).startswith("pcm_") else "mp3"
             with tempfile.TemporaryDirectory(prefix="esf_api_generate_") as tmpdir:
@@ -125,17 +130,16 @@ def api_generate_zip(
                     p.write_bytes(data)
                     paths.append(p)
                 out_path = tmp / f"concatenated_audio.{extension}"
-                concat_audio(cfg.ffmpeg, paths, out_path)
-                audio_files.append((out_path.name, out_path.read_bytes()))
+                try:
+                    concat_audio(cfg.ffmpeg, paths, out_path)
+                    audio_files.append((out_path.name, out_path.read_bytes()))
+                except Exception as exc:
+                    extra_files.append(("concat_error.txt", str(exc).encode("utf-8")))
 
         zip_bytes = build_zip_bundle(
             audio_files=audio_files,
             manifest_entries=entries,
-            extra_files=[
-                ("subtitles.srt", manifest_to_srt(entries).encode("utf-8")),
-                ("subtitles.vtt", manifest_to_vtt(entries).encode("utf-8")),
-                ("reaper.rpp", build_reaper_project(entries).encode("utf-8")),
-            ],
+            extra_files=extra_files,
         )
 
         return StreamingResponse(
