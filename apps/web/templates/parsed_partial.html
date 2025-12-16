@@ -24,7 +24,15 @@
       <div class="grid">
         <label class="label">
           Model ID
-          <input class="input" type="text" name="model" value="{{ model or '' }}" placeholder="eleven_multilingual_v2" />
+          {% if models %}
+            <select class="input" name="model">
+              {% for m in models %}
+                <option value="{{ m.model_id }}" {% if model == m.model_id %}selected{% endif %}>{{ m.name }} ({{ m.model_id }})</option>
+              {% endfor %}
+            </select>
+          {% else %}
+            <input class="input" type="text" name="model" value="{{ model or '' }}" placeholder="eleven_multilingual_v2" />
+          {% endif %}
         </label>
         <label class="label">
           Output format

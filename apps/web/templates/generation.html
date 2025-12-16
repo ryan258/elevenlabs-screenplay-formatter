@@ -1,82 +1,79 @@
 {% extends "layout.html" %}
 {% block content %}
-  <section class="card">
-    <h2>Generation</h2>
-    <p class="meta">
-      Characters: {{ parsed.characters|length }} · Dialogue chunks: {{ parsed.dialogue_chunks|length }}
-    </p>
+<section class="card">
+  <h2>Generation</h2>
+  <p class="meta">
+    Characters: {{ parsed.characters|length }} · Dialogue chunks: {{ parsed.dialogue_chunks|length }}
+  </p>
 
-    <form method="post" action="/generation/validate">
-      <div class="grid">
-        <label class="label">
-          Model ID
-          <input class="input" type="text" name="model" value="{{ model or '' }}" placeholder="eleven_multilingual_v2" />
-        </label>
-        <label class="label">
-          Output format
-          <select class="input" name="output_format">
-            <option value="mp3_44100_128" {% if output_format == "mp3_44100_128" %}selected{% endif %}>mp3_44100_128</option>
-            <option value="mp3_44100_192" {% if output_format == "mp3_44100_192" %}selected{% endif %}>mp3_44100_192</option>
-            <option value="pcm_24000" {% if output_format == "pcm_24000" %}selected{% endif %}>pcm_24000</option>
-          </select>
-        </label>
-        <label class="label">
-          Request delay (ms)
-          <input class="input" type="number" name="request_delay_ms" value="{{ request_delay_ms or 500 }}" min="0" />
-        </label>
-      </div>
-
+  <form method="post" action="/generation/validate">
+    <div class="grid">
       <label class="label">
-        Filename prefix (optional)
-        <input class="input" type="text" name="filename_prefix" value="{{ filename_prefix or '' }}" />
+        Model ID
+        {% if models %}
+        <select class="input" name="model">
+          {% for m in models %}
+          <option value="{{ m.model_id }}" {% if model==m.model_id %}selected{% endif %}>{{ m.name }} ({{ m.model_id }})
+          </option>
+          {% endfor %}
+        </select>
+        {% else %}
+        <input class="input" type="text" name="model" value="{{ model or '' }}" placeholder="eleven_multilingual_v2" />
+        {% endif %}
       </label>
-
-      <label class="checkbox">
-        <input type="checkbox" name="speak_parentheticals" {% if speak_parentheticals %}checked{% endif %} />
-        Speak parentheticals (use raw/original text)
+      <label class="label">
+        Output format
+        <select class="input" name="output_format">
+          <option value="mp3_44100_128" {% if output_format=="mp3_44100_128" %}selected{% endif %}>mp3_44100_128
+          </option>
+          <option value="mp3_44100_192" {% if output_format=="mp3_44100_192" %}selected{% endif %}>mp3_44100_192
+          </option>
+          <option value="pcm_24000" {% if output_format=="pcm_24000" %}selected{% endif %}>pcm_24000</option>
+        </select>
       </label>
-      <label class="checkbox">
-        <input type="checkbox" name="concatenate" {% if concatenate %}checked{% endif %} />
-        Concatenate output (server-side ffmpeg)
+      <label class="label">
+        Request delay (ms)
+        <input class="input" type="number" name="request_delay_ms" value="{{ request_delay_ms or 500 }}" min="0" />
       </label>
-
-      <div class="actions">
-        <button
-          class="btn secondary"
-          type="submit"
-          formaction="/generation/validate"
-          formmethod="post"
-          hx-post="/generation/validate"
-          hx-target="#validation"
-          hx-swap="innerHTML"
-        >
-          Validate
-        </button>
-        <button
-          class="btn"
-          type="submit"
-          formaction="/generation/start"
-          formmethod="post"
-          hx-post="/generation/start"
-          hx-target="#job-panel"
-          hx-swap="innerHTML"
-        >
-          Start Job
-        </button>
-        <a class="btn secondary" href="/characters">Back</a>
-      </div>
-    </form>
-
-    <div id="validation">
-      {% if errors %}
-        {% include "error_box.html" %}
-      {% endif %}
     </div>
 
-    <div id="job-panel">
-      {% if job_id %}
-        {% include "job_panel.html" %}
-      {% endif %}
+    <label class="label">
+      Filename prefix (optional)
+      <input class="input" type="text" name="filename_prefix" value="{{ filename_prefix or '' }}" />
+    </label>
+
+    <label class="checkbox">
+      <input type="checkbox" name="speak_parentheticals" {% if speak_parentheticals %}checked{% endif %} />
+      Speak parentheticals (use raw/original text)
+    </label>
+    <label class="checkbox">
+      <input type="checkbox" name="concatenate" {% if concatenate %}checked{% endif %} />
+      Concatenate output (server-side ffmpeg)
+    </label>
+
+    <div class="actions">
+      <button class="btn secondary" type="submit" formaction="/generation/validate" formmethod="post"
+        hx-post="/generation/validate" hx-target="#validation" hx-swap="innerHTML">
+        Validate
+      </button>
+      <button class="btn" type="submit" formaction="/generation/start" formmethod="post" hx-post="/generation/start"
+        hx-target="#job-panel" hx-swap="innerHTML">
+        Start Job
+      </button>
+      <a class="btn secondary" href="/characters">Back</a>
     </div>
-  </section>
+  </form>
+
+  <div id="validation">
+    {% if errors %}
+    {% include "error_box.html" %}
+    {% endif %}
+  </div>
+
+  <div id="job-panel">
+    {% if job_id %}
+    {% include "job_panel.html" %}
+    {% endif %}
+  </div>
+</section>
 {% endblock %}

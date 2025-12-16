@@ -5,7 +5,7 @@ import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from lib.config import ElevenLabsConfig
 from lib.models import VoiceSettings, WordTimestamp
@@ -222,6 +222,7 @@ class ElevenLabsClient:
             raw = exc.read().decode("utf-8", errors="replace") if exc.fp else ""
             raise RuntimeError(_translate_api_error(exc.code, raw)) from exc
 
+
     def _request_json(
         self,
         method: str,
@@ -229,10 +230,8 @@ class ElevenLabsClient:
         *,
         headers: Dict[str, str],
         body: Optional[bytes] = None,
-    ) -> dict:
+    ) -> Any:
         data, _ = self._request_bytes(method, url, headers=headers, body=body)
-        parsed = json.loads(data.decode("utf-8"))
-        if not isinstance(parsed, dict):
-            raise TypeError("Expected JSON object response")
-        return parsed
+        return json.loads(data.decode("utf-8"))
+
 

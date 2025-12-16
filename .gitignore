@@ -34,3 +34,4 @@ __pycache__/
 *.sln
 *.sw?
 .claude/settings.local.json
+uploads/

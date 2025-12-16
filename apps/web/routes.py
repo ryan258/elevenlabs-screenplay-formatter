@@ -384,11 +384,20 @@ def generation() -> Response:
         )
     project_settings = payload.get("projectSettings") or {}
 
+    models_list = []
+    if cfg.elevenlabs.api_key:
+        try:
+            client = ElevenLabsClient(cfg.elevenlabs)
+            models_list = client.list_models()
+        except Exception:
+            pass  # Fallback to empty list or default input
+
     job_id = request.args.get("job_id") or payload.get("lastJobId")
     context: Dict[str, Any] = {
         "parsed": parsed,
         "errors": [],
         "model": str(project_settings.get("model") or ""),
+        "models": models_list,
         "output_format": str(project_settings.get("outputFormat") or "mp3_44100_128"),
         "request_delay_ms": int(project_settings.get("requestDelayMs") or 500),
         "speak_parentheticals": bool(project_settings.get("speakParentheticals")),

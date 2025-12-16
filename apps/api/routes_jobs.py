@@ -95,7 +95,7 @@ def api_job_status(job_id: str, store: JobStore = Depends(get_job_store)) -> JSO
     return JSONResponse(job.snapshot().__dict__)
 
 
-@router.get("/exports/{job_id}.zip")
+@router.get("/exports/{job_id}.zip", response_model=None)
 def api_job_export(job_id: str, store: JobStore = Depends(get_job_store)) -> Union[FileResponse, JSONResponse]:
     job = store.get(job_id)
     if job is None or job.export_path is None or not job.export_path.exists():
@@ -103,7 +103,7 @@ def api_job_export(job_id: str, store: JobStore = Depends(get_job_store)) -> Uni
     return FileResponse(job.export_path, media_type="application/zip", filename="bundle.zip")
 
 
-@router.get("/exports/{job_id}.json")
+@router.get("/exports/{job_id}.json", response_model=None)
 def api_job_manifest_json(job_id: str, store: JobStore = Depends(get_job_store)) -> Union[FileResponse, JSONResponse]:
     job = store.get(job_id)
     if job is None:
@@ -114,7 +114,7 @@ def api_job_manifest_json(job_id: str, store: JobStore = Depends(get_job_store))
     return FileResponse(path, media_type="application/json", filename="manifest.json")
 
 
-@router.get("/exports/{job_id}.csv")
+@router.get("/exports/{job_id}.csv", response_model=None)
 def api_job_manifest_csv(job_id: str, store: JobStore = Depends(get_job_store)) -> Union[FileResponse, JSONResponse]:
     job = store.get(job_id)
     if job is None:
@@ -125,7 +125,7 @@ def api_job_manifest_csv(job_id: str, store: JobStore = Depends(get_job_store)) 
     return FileResponse(path, media_type="text/csv; charset=utf-8", filename="manifest.csv")
 
 
-@router.get("/exports/{job_id}.srt")
+@router.get("/exports/{job_id}.srt", response_model=None)
 def api_job_srt(job_id: str, store: JobStore = Depends(get_job_store)) -> Union[FileResponse, JSONResponse]:
     job = store.get(job_id)
     if job is None:
@@ -136,7 +136,7 @@ def api_job_srt(job_id: str, store: JobStore = Depends(get_job_store)) -> Union[
     return FileResponse(path, media_type="text/plain; charset=utf-8", filename="subtitles.srt")
 
 
-@router.get("/exports/{job_id}.vtt")
+@router.get("/exports/{job_id}.vtt", response_model=None)
 def api_job_vtt(job_id: str, store: JobStore = Depends(get_job_store)) -> Union[FileResponse, JSONResponse]:
     job = store.get(job_id)
     if job is None:
@@ -147,7 +147,7 @@ def api_job_vtt(job_id: str, store: JobStore = Depends(get_job_store)) -> Union[
     return FileResponse(path, media_type="text/vtt; charset=utf-8", filename="subtitles.vtt")
 
 
-@router.get("/exports/{job_id}.rpp")
+@router.get("/exports/{job_id}.rpp", response_model=None)
 def api_job_rpp(job_id: str, store: JobStore = Depends(get_job_store)) -> Union[FileResponse, JSONResponse]:
     job = store.get(job_id)
     if job is None:
@@ -158,7 +158,7 @@ def api_job_rpp(job_id: str, store: JobStore = Depends(get_job_store)) -> Union[
     return FileResponse(path, media_type="text/plain; charset=utf-8", filename="reaper.rpp")
 
 
-@router.get("/exports/{job_id}/concatenated")
+@router.get("/exports/{job_id}/concatenated", response_model=None)
 def api_job_concatenated_audio(
     job_id: str,
     store: JobStore = Depends(get_job_store),
@@ -185,7 +185,7 @@ def api_job_concatenated_audio(
     return resp
 
 
-@router.get("/jobs/{job_id}/audio/{filename}")
+@router.get("/jobs/{job_id}/audio/{filename}", response_model=None)
 def api_job_audio_clip(
     job_id: str,
     filename: str,
@@ -217,7 +217,7 @@ def api_job_audio_clip(
     return resp
 
 
-@router.get("/jobs/{job_id}/events")
+@router.get("/jobs/{job_id}/events", response_model=None)
 async def api_job_events(
     job_id: str,
     request: Request,
