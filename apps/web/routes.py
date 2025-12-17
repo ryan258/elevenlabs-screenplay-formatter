@@ -1078,3 +1078,9 @@ def generate_zip() -> WerkzeugResponse:
 @app.get("/health")
 def health() -> WerkzeugResponse:
     return Response(json.dumps({"status": "ok"}), content_type="application/json")
+
+
+@app.post("/reset")
+def reset() -> WerkzeugResponse:
+    session.pop("sid", None)
+    return redirect("/")

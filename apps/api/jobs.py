@@ -307,6 +307,9 @@ class JobStore:
                 },
             )
         except Exception as exc:
+            import traceback
+            traceback.print_exc()
+            print(f"DEBUG: Job failed: {exc}")
             job.status = "error"
             job.error = str(exc)
             job.message = "Error"

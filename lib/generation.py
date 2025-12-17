@@ -134,6 +134,11 @@ def generate_all_audio_iter(
                 else None,
                 max_chars=500,
             )
+            # Turbo v2.5 and Multilingual v2 support context, but v3 (alpha) does not yet.
+            if model_id == "eleven_v3":
+                previous_text = None
+                next_text = None
+
             audio_bytes, remaining = client.generate_audio(
                 voice_id=cfg.voice_id,
                 text=text,
@@ -255,6 +260,11 @@ def generate_one_audio(
         else None,
         max_chars=500,
     )
+    # Turbo v2.5 and Multilingual v2 support context, but v3 (alpha) does not yet.
+    if model_id == "eleven_v3":
+        previous_text = None
+        next_text = None
+
     audio_bytes, _remaining = client.generate_audio(
         voice_id=cfg.voice_id,
         text=text,
