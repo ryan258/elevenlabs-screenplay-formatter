@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import tempfile
 from pathlib import Path
-from typing import Union
+from typing import Optional, Union
 
 try:
     from fastapi import APIRouter, Depends
     from fastapi.responses import JSONResponse, StreamingResponse
+    from fastapi import Request
 except ModuleNotFoundError as exc:  # pragma: no cover
     raise ModuleNotFoundError(
         "FastAPI is not installed. Install Python deps (see pyproject.toml) to run the API."
@@ -25,6 +26,7 @@ from lib.manifest import build_manifest_entries, manifest_to_srt, manifest_to_vt
 from lib.reaper_export import build_reaper_project
 from lib.parser import parse_script
 from lib.validation import validate_character_configs
+from lib.utils_web import generation_limiter
 
 
 router = APIRouter(prefix="/api")
@@ -57,7 +59,13 @@ def api_validate_project(
 def api_generate_zip(
     body: GenerateZipRequest,
     cfg: AppConfig = Depends(get_config),
+    request: Optional[Request] = None,  # Add request for IP
 ) -> Union[StreamingResponse, JSONResponse]:
+    # Rate limit (Bug 18 fix applied to API)
+    client_ip = request.client.host if (request and request.client) else "unknown"
+    if not generation_limiter.check_limit(client_ip):
+        return JSONResponse(status_code=429, content=ErrorResponse(error="Rate limit exceeded").model_dump())
+
     if len(body.script_text) > MAX_SCRIPT_CHARS:
         return JSONResponse(
             status_code=413,

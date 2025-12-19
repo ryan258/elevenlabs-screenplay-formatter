@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import AsyncIterator, Union
+from typing import AsyncIterator, Optional, Union
 
 try:
     from fastapi import APIRouter, Depends
@@ -22,6 +22,7 @@ from apps.api.schemas import ErrorResponse, GenerateZipRequest
 from lib.filenames import safe_basename
 from lib.parser import parse_script
 from lib.validation import validate_character_configs
+from lib.utils_web import generation_limiter
 
 
 router = APIRouter(prefix="/api")
@@ -32,7 +33,13 @@ def api_generate_job(
     body: GenerateZipRequest,
     cfg: AppConfig = Depends(get_config),
     store: JobStore = Depends(get_job_store),
+    request: Optional[Request] = None,  # Add request for IP
 ) -> JSONResponse:
+    # Rate limit (Bug 18 fix applied to API)
+    client_ip = request.client.host if (request and request.client) else "unknown"
+    if not generation_limiter.check_limit(client_ip):
+        return JSONResponse(status_code=429, content=ErrorResponse(error="Rate limit exceeded").model_dump())
+
     if len(body.script_text) > MAX_SCRIPT_CHARS:
         return JSONResponse(status_code=413, content=ErrorResponse(error="Script is too large").model_dump())
     if not cfg.elevenlabs.api_key:

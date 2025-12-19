@@ -28,43 +28,12 @@ from lib.reaper_export import build_reaper_project
 from lib.share_links import decode_share_payload
 from lib.validation import validate_character_configs
 from lib.voice_extraction import extract_voice_ids_from_script
+from lib.utils_web import RateLimiter, generation_limiter, clamp_voice_setting
 
 _VOICES_CACHE_TTL_S = 300
 
 
-# Bug 18 fix - Rate limiting
-class RateLimiter:
-    """Simple in-memory rate limiter"""
-    def __init__(self, max_requests: int, window_s: int):
-        self._max_requests = max_requests
-        self._window_s = window_s
-        self._requests: Dict[str, List[float]] = {}
-        import threading
-        self._lock = threading.Lock()
 
-    def check_limit(self, key: str) -> bool:
-        """Returns True if under limit, False if over"""
-        now = time.time()
-        cutoff = now - self._window_s
-
-        with self._lock:
-            # Initialize if needed
-            if key not in self._requests:
-                self._requests[key] = []
-
-            # Clean old requests
-            self._requests[key] = [t for t in self._requests[key] if t > cutoff]
-
-            # Check limit
-            if len(self._requests[key]) >= self._max_requests:
-                return False
-
-            self._requests[key].append(now)
-            return True
-
-
-# Global rate limiter instance (5 requests per minute per IP)
-_generation_limiter = RateLimiter(max_requests=5, window_s=60)
 
 
 def _get_cfg() -> AppConfig:
@@ -164,12 +133,7 @@ def _parse_float(value: str, *, default: float) -> float:
         return default
 
 
-def _clamp_voice_setting(value: float, min_val: float, max_val: float, default: float) -> float:
-    """Clamp voice settings to valid range (Bug 19 fix)"""
-    try:
-        return max(min_val, min(max_val, float(value)))
-    except (TypeError, ValueError):
-        return default
+
 
 
 def _is_hx_request() -> bool:
@@ -796,19 +760,19 @@ def characters_save() -> WerkzeugResponse:
     for idx, character in enumerate(parsed.characters):
         voice_id = request.form.get(f"voice_id__{idx}", "").strip()
         # Bug 19 fix - clamp voice settings to valid ranges
-        stability = _clamp_voice_setting(
+        stability = clamp_voice_setting(
             _parse_float(request.form.get(f"stability__{idx}", "0.5") or "0.5", default=0.5),
             min_val=0.0, max_val=1.0, default=0.5
         )
-        similarity_boost = _clamp_voice_setting(
+        similarity_boost = clamp_voice_setting(
             _parse_float(request.form.get(f"similarity_boost__{idx}", "0.75") or "0.75", default=0.75),
             min_val=0.0, max_val=1.0, default=0.75
         )
-        style = _clamp_voice_setting(
+        style = clamp_voice_setting(
             _parse_float(request.form.get(f"style__{idx}", "0.1") or "0.1", default=0.1),
             min_val=0.0, max_val=1.0, default=0.1
         )
-        speed = _clamp_voice_setting(
+        speed = clamp_voice_setting(
             _parse_float(request.form.get(f"speed__{idx}", "1") or "1", default=1.0),
             min_val=0.25, max_val=4.0, default=1.0
         )
@@ -887,7 +851,7 @@ def generation_validate() -> WerkzeugResponse:
 def generation_start() -> WerkzeugResponse:
     # Bug 18 fix - Rate limit generation requests
     client_ip = request.remote_addr or "unknown"
-    if not _generation_limiter.check_limit(client_ip):
+    if not generation_limiter.check_limit(client_ip):
         return _error_response(["Rate limit exceeded. Try again in 1 minute."], status=429)
 
     cfg = _get_cfg()
@@ -1053,19 +1017,19 @@ def generate_zip() -> WerkzeugResponse:
     for idx, character in enumerate(parsed.characters):
         voice_id = request.form.get(f"voice_id__{idx}", "").strip()
         # Bug 19 fix - clamp voice settings to valid ranges
-        stability = _clamp_voice_setting(
+        stability = clamp_voice_setting(
             _parse_float(request.form.get(f"stability__{idx}", "0.5") or "0.5", default=0.5),
             min_val=0.0, max_val=1.0, default=0.5
         )
-        similarity_boost = _clamp_voice_setting(
+        similarity_boost = clamp_voice_setting(
             _parse_float(request.form.get(f"similarity_boost__{idx}", "0.75") or "0.75", default=0.75),
             min_val=0.0, max_val=1.0, default=0.75
         )
-        style = _clamp_voice_setting(
+        style = clamp_voice_setting(
             _parse_float(request.form.get(f"style__{idx}", "0.1") or "0.1", default=0.1),
             min_val=0.0, max_val=1.0, default=0.1
         )
-        speed = _clamp_voice_setting(
+        speed = clamp_voice_setting(
             _parse_float(request.form.get(f"speed__{idx}", "1") or "1", default=1.0),
             min_val=0.25, max_val=4.0, default=1.0
         )
