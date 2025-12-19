@@ -23,23 +23,43 @@ from lib.audio.ffmpeg import BackgroundMix, MixConfig, SoundEffectOverlay, apply
 
 router = APIRouter(prefix="/api")
 
+# Bug 13 fix - upload size limits
+MAX_UPLOAD_SIZE = 100 * 1024 * 1024  # 100MB per file
+MAX_TOTAL_UPLOAD = 500 * 1024 * 1024  # 500MB total
+
 
 def _ensure_dir(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
 
 
+def _check_disk_space(path: Path, required_bytes: int) -> None:
+    """Raise if insufficient disk space (Bug 17 fix)"""
+    import shutil
+    stat = shutil.disk_usage(path)
+    if stat.free < required_bytes * 2:
+        raise RuntimeError(
+            f"Insufficient disk space: {stat.free / 1e9:.1f}GB free, "
+            f"need ~{required_bytes * 2 / 1e9:.1f}GB"
+        )
+
+
 def _cleanup_dir(path: Path) -> None:
+    """Safely cleanup directory with shutil.rmtree (Bug 15 fix)"""
     if not path.exists():
         return
+
+    import shutil
+    import logging
     try:
-        for p in path.glob("*"):
-            try:
-                p.unlink()
-            except OSError:
-                pass
-        path.rmdir()
-    except OSError:
+        shutil.rmtree(path, ignore_errors=False)
+    except FileNotFoundError:
+        # Already deleted, that's fine
         pass
+    except PermissionError as exc:
+        # Log but don't fail - cleanup is best-effort
+        logging.getLogger(__name__).warning("Permission denied cleaning up %s: %s", path, exc)
+    except Exception as exc:
+        logging.getLogger(__name__).warning("Failed to cleanup %s: %s", path, exc)
 
 
 def _parse_mix_config_allowlist(
@@ -95,9 +115,20 @@ async def api_concatenate(
     cfg: AppConfig = Depends(get_config),
 ) -> Union[StreamingResponse, JSONResponse]:
     request_dir: Optional[Path] = None
+    total_bytes_written = 0  # Bug 13 fix - track total upload size
     try:
         upload_root = Path(cfg.upload_dir)
         _ensure_dir(upload_root)
+
+        # Check disk space before upload (Bug 17 fix)
+        try:
+            _check_disk_space(upload_root, MAX_TOTAL_UPLOAD * 2)
+        except RuntimeError as exc:
+            return JSONResponse(
+                status_code=507,
+                content=ErrorResponse(error=str(exc)).model_dump(),
+            )
+
         request_dir_path = upload_root / f"req_{uuid.uuid4().hex}"
         request_dir = request_dir_path
         _ensure_dir(request_dir_path)
@@ -133,11 +164,32 @@ async def api_concatenate(
                 target = ensure_child_path(request_dir, safe_key)
                 aux_files[safe_key] = target
 
+            # Bug 13 fix - enforce upload size limits
+            file_bytes_written = 0
             with target.open("wb") as f:
                 while True:
                     chunk = await upload.read(1024 * 1024)
                     if not chunk:
                         break
+
+                    # Check per-file limit
+                    file_bytes_written += len(chunk)
+                    if file_bytes_written > MAX_UPLOAD_SIZE:
+                        _cleanup_dir(request_dir_path)
+                        return JSONResponse(
+                            status_code=413,
+                            content=ErrorResponse(error="File too large (max 100MB)").model_dump(),
+                        )
+
+                    # Check total limit
+                    total_bytes_written += len(chunk)
+                    if total_bytes_written > MAX_TOTAL_UPLOAD:
+                        _cleanup_dir(request_dir_path)
+                        return JSONResponse(
+                            status_code=413,
+                            content=ErrorResponse(error="Total upload too large (max 500MB)").model_dump(),
+                        )
+
                     f.write(chunk)
 
         if not audio_paths:

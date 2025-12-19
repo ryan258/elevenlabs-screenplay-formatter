@@ -156,19 +156,32 @@ def generate_all_audio_iter(
                 alignment = client.fetch_alignment(voice_id=cfg.voice_id, text=text, model_id=model_id)
 
             if alignment:
-                offset_alignment = [
-                    WordTimestamp(
-                        word=w.word,
-                        start_ms=w.start_ms + timeline_cursor,
-                        end_ms=w.end_ms + timeline_cursor,
-                    )
-                    for w in alignment
-                ]
-                start_time_ms = offset_alignment[0].start_ms
-                end_time_ms = offset_alignment[-1].end_ms
-                timeline_cursor = end_time_ms
-                final_alignment = offset_alignment
+                # Guard against empty alignment (Bug 2 fix)
+                if not alignment or len(alignment) == 0:
+                    # Fall back to estimation
+                    start_time_ms = timeline_cursor
+                    duration = estimate_duration_ms(text)
+                    end_time_ms = start_time_ms + duration
+                    timeline_cursor = end_time_ms
+                    final_alignment = None
+                else:
+                    # Create offset alignment for storage
+                    offset_alignment = [
+                        WordTimestamp(
+                            word=w.word,
+                            start_ms=w.start_ms + timeline_cursor,
+                            end_ms=w.end_ms + timeline_cursor,
+                        )
+                        for w in alignment
+                    ]
+                    # Use ORIGINAL alignment for timing (Bug 1 fix - prevents double-offset)
+                    start_time_ms = alignment[0].start_ms + timeline_cursor
+                    end_time_ms = alignment[-1].end_ms + timeline_cursor
+                    # Update cursor to end of this clip
+                    timeline_cursor = end_time_ms
+                    final_alignment = offset_alignment
             else:
+                # No alignment available
                 start_time_ms = timeline_cursor
                 duration = estimate_duration_ms(text)
                 end_time_ms = start_time_ms + duration
@@ -282,8 +295,13 @@ def generate_one_audio(
         alignment = client.fetch_alignment(voice_id=cfg.voice_id, text=text, model_id=model_id)
 
     if alignment:
-        start_time_ms = alignment[0].start_ms
-        end_time_ms = alignment[-1].end_ms
+        # Guard against empty alignment (Bug 2 fix)
+        if not alignment or len(alignment) == 0:
+            start_time_ms = 0
+            end_time_ms = estimate_duration_ms(text)
+        else:
+            start_time_ms = alignment[0].start_ms
+            end_time_ms = alignment[-1].end_ms
     else:
         start_time_ms = 0
         end_time_ms = estimate_duration_ms(text)

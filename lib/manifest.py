@@ -20,6 +20,7 @@ def _format_timestamp(ms: int, fmt: str) -> str:
     seconds = (clamped % 60_000) // 1000
     milliseconds = clamped % 1000
     separator = "," if fmt == "srt" else "."
+    # Keep two-digit hours for SRT/VTT compatibility; supports 100h+ naturally
     return f"{hours:02d}:{minutes:02d}:{seconds:02d}{separator}{milliseconds:03d}"
 
 
@@ -77,7 +78,9 @@ def manifest_to_csv(entries: List[ManifestEntry]) -> str:
     header = "index,character,filename,text,estimatedDurationMs,startTimeMs,endTimeMs"
 
     def csv_quote(value: str) -> str:
-        return '"' + value.replace('"', '""') + '"'
+        """Escape quotes AND newlines per CSV spec"""
+        escaped = value.replace('"', '""').replace('\n', '\\n').replace('\r', '\\r')
+        return '"' + escaped + '"'
 
     rows: List[str] = []
     for entry in entries:

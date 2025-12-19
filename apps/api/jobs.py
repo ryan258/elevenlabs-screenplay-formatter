@@ -3,12 +3,15 @@ from __future__ import annotations
 from collections import deque
 from dataclasses import asdict
 import json
+import logging
 import threading
 import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Deque, Dict, List, Optional, Tuple
+
+logger = logging.getLogger(__name__)
 
 from apps.api.config import AppConfig
 from lib.audio.ffmpeg import concat_audio
@@ -20,6 +23,18 @@ from lib.models import CharacterConfig, WordTimestamp
 from lib.parser import parse_script
 from lib.reaper_export import build_reaper_project
 from lib.validation import validate_character_configs
+
+
+def check_disk_space(path: Path, required_bytes: int) -> None:
+    """Raise if insufficient disk space (Bug 17 fix)"""
+    import shutil
+    stat = shutil.disk_usage(path)
+    # Require 2x the needed space as safety margin
+    if stat.free < required_bytes * 2:
+        raise RuntimeError(
+            f"Insufficient disk space: {stat.free / 1e9:.1f}GB free, "
+            f"need ~{required_bytes * 2 / 1e9:.1f}GB"
+        )
 
 
 @dataclass
@@ -101,15 +116,60 @@ class JobStore:
         self._root_dir = root_dir
         self._lock = threading.Lock()
         self._jobs: Dict[str, Job] = {}
+        self._last_cleanup_s = 0.0  # For periodic cleanup (Bug 6 fix)
+
+    def cleanup_old_jobs(self, *, max_age_s: int = 86400) -> int:
+        """Remove completed/errored jobs older than max_age_s (24h default) - Bug 6 fix"""
+        cutoff = time.time() - max_age_s
+        to_remove: List[Tuple[str, Path]] = []
+        with self._lock:
+            for job_id, job in self._jobs.items():
+                if job.status in {"complete", "error"} and job.updated_at_s < cutoff:
+                    to_remove.append((job_id, job.work_dir))
+            for job_id, _ in to_remove:
+                del self._jobs[job_id]
+
+        # Cleanup filesystem outside the lock
+        import shutil
+
+        for job_id, work_dir in to_remove:
+            try:
+                shutil.rmtree(work_dir, ignore_errors=False)
+            except FileNotFoundError:
+                # Already deleted elsewhere
+                continue
+            except Exception as exc:
+                logger.warning("Failed to cleanup work dir for job %s: %s", job_id, exc)
+
+        return len(to_remove)
+
+    def _maybe_cleanup_jobs(self, *, interval_s: int = 3600) -> None:
+        """Periodically cleanup (hourly) - Bug 6 fix"""
+        now = time.time()
+        if now - self._last_cleanup_s >= interval_s:
+            self._last_cleanup_s = now
+            self.cleanup_old_jobs()
 
     def create(self) -> Job:
+        # Call cleanup periodically (Bug 6 fix)
+        self._maybe_cleanup_jobs()
+
         job_id = uuid.uuid4().hex
         now = time.time()
         work_dir = (self._root_dir / "jobs" / job_id).resolve()
-        work_dir.mkdir(parents=True, exist_ok=True)
-        job = Job(job_id=job_id, created_at_s=now, updated_at_s=now, work_dir=work_dir)
+
+        # Hold lock during ALL state changes (Bug 7 fix - race condition)
         with self._lock:
+            # Double-check job_id uniqueness
+            while job_id in self._jobs:
+                job_id = uuid.uuid4().hex
+                work_dir = (self._root_dir / "jobs" / job_id).resolve()
+
+            # Create directory while holding lock
+            work_dir.mkdir(parents=True, exist_ok=True)
+            job = Job(job_id=job_id, created_at_s=now, updated_at_s=now, work_dir=work_dir)
             self._jobs[job_id] = job
+
         return job
 
     def get(self, job_id: str) -> Optional[Job]:
@@ -179,6 +239,9 @@ class JobStore:
                 raise RuntimeError("Missing model id")
             if not output_format:
                 raise RuntimeError("Missing output format")
+
+            # Check disk space before starting (Bug 17 fix)
+            check_disk_space(job.work_dir, 100 * 1024 * 1024)  # Estimate 100MB needed
 
             parsed = parse_script(script_text, preserve_stage_directions=preserve_stage_directions)
             job.total = len(parsed.dialogue_chunks)
@@ -308,13 +371,34 @@ class JobStore:
             )
         except Exception as exc:
             import traceback
-            traceback.print_exc()
-            print(f"DEBUG: Job failed: {exc}")
+            # Log detailed error internally (Bug 8 fix - use logging, not print)
+            logger.error("Job %s failed: %s\n%s", job.job_id, exc, traceback.format_exc())
+
+            # Sanitize error for client (Bug 11 fix - prevent information disclosure)
+            error_msg = "Generation failed"
+            exc_str = str(exc).lower()
+            if "quota" in exc_str:
+                error_msg = "ElevenLabs quota exhausted"
+            elif "rate limit" in exc_str:
+                error_msg = "Rate limit reached"
+            elif "401" in exc_str or "unauthorized" in exc_str:
+                error_msg = "Authentication failed - check API key"
+
+            # Clean up partial audio files on failure (Bug 14 fix)
+            audio_dir = (job.work_dir / "audio").resolve()
+            if audio_dir.exists():
+                try:
+                    import shutil
+                    shutil.rmtree(audio_dir)
+                    logger.info("Cleaned up audio dir for failed job %s", job.job_id)
+                except Exception as cleanup_exc:
+                    logger.warning("Failed to cleanup audio for job %s: %s", job.job_id, cleanup_exc)
+
             job.status = "error"
-            job.error = str(exc)
+            job.error = error_msg  # Generic message only
             job.message = "Error"
             job.updated_at_s = time.time()
-            self._emit(job, "job_error", {"error": str(exc)})
+            self._emit(job, "job_error", {"error": error_msg})
         finally:
             snap = job.snapshot()
             self._emit(

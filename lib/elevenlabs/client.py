@@ -11,6 +11,11 @@ from lib.config import ElevenLabsConfig
 from lib.models import VoiceSettings, WordTimestamp
 
 
+class NonRetryableError(RuntimeError):
+    """Errors that shouldn't be retried (auth, validation, etc.)"""
+    pass
+
+
 def _join_url(base_url: str, path: str) -> str:
     return base_url.rstrip("/") + "/" + path.lstrip("/")
 
@@ -164,10 +169,19 @@ class ElevenLabsClient:
                 delay_ms = _adjust_delay_based_on_rate_limit(remaining, delay_ms, base_delay_ms)
                 return data, remaining
             except Exception as exc:
+                # Check if error is retryable (Bug 4 fix)
+                error_msg = str(exc).lower()
+                non_retryable_keywords = ["401", "unauthorized", "api key", "400", "bad request", "invalid", "403", "forbidden"]
+                if any(keyword in error_msg for keyword in non_retryable_keywords):
+                    # Don't retry auth/validation errors
+                    raise NonRetryableError(str(exc)) from exc
+
                 last_exc = exc
                 if attempt >= max_retries:
                     break
-                time.sleep(min(5.0, 1.0 * (attempt + 1)))
+
+                # Exponential backoff for retryable errors (429, 5xx)
+                time.sleep(min(5.0, 1.0 * (2 ** attempt)))
                 attempt += 1
         raise last_exc if last_exc else RuntimeError("Unknown error generating audio")
 

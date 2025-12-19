@@ -45,8 +45,22 @@ def _safe_child_path(parent: Path, name: str) -> Path:
     return candidate
 
 
-def _run(args: List[str]) -> None:
-    subprocess.run(args, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+def _run(args: List[str], *, timeout_s: Optional[int] = None) -> None:
+    """Run FFmpeg command and capture stderr for error messages (Bug 22 fix)"""
+    try:
+        subprocess.run(
+            args,
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=timeout_s,
+        )
+    except subprocess.CalledProcessError as exc:
+        # Capture stderr for error message (Bug 22 fix)
+        stderr_output = exc.stderr.decode('utf-8', errors='replace') if exc.stderr else ""
+        raise RuntimeError(f"FFmpeg command failed: {stderr_output}") from exc
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError("FFmpeg command timed out after 5 minutes") from exc
 
 
 def _escape_ffmpeg_concat_filelist_path(path: Path) -> str:
@@ -92,7 +106,11 @@ def concat_audio(config: FfmpegConfig, files: List[Path], output_path: Path) -> 
 def mix_background(
     config: FfmpegConfig, base_audio: Path, background_audio: Path, volume: float, output_path: Path
 ) -> None:
-    safe_volume = volume if isinstance(volume, (int, float)) else 0.35
+    # Clamp to valid range [0.0, 1.0] (Bug 5 fix)
+    if not isinstance(volume, (int, float)):
+        safe_volume = 0.35
+    else:
+        safe_volume = max(0.0, min(1.0, float(volume)))
     _run(
         [
             config.ffmpeg_bin,
@@ -118,7 +136,11 @@ def overlay_sound_effect(
     volume: float,
     output_path: Path,
 ) -> None:
-    safe_volume = volume if isinstance(volume, (int, float)) else 1.0
+    # Clamp to valid range [0.0, 2.0] - allow slight boost for SFX (Bug 5 fix)
+    if not isinstance(volume, (int, float)):
+        safe_volume = 1.0
+    else:
+        safe_volume = max(0.0, min(2.0, float(volume)))
     delay = max(0, int(start_ms))
     delay_string = f"{delay}|{delay}"
     _run(

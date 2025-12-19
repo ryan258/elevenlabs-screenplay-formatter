@@ -50,6 +50,19 @@ def load_config_from_env() -> AppConfig:
     if not elevenlabs_base_url:
         raise RuntimeError("Missing ELEVENLABS_BASE_URL (no hardcoded endpoints).")
 
+    # Bug 12 follow-up: keep secure default without breaking local dev
+    if not flask_secret_key:
+        flask_secret_key = "dev"
+    if flask_secret_key == "dev":
+        import sys
+        print(
+            "WARNING: Using insecure default FLASK_SECRET_KEY for local dev. "
+            "Set FLASK_SECRET_KEY in .env for session persistence.",
+            file=sys.stderr,
+        )
+    elif len(flask_secret_key) < 32:
+        raise RuntimeError("FLASK_SECRET_KEY must be at least 32 characters")
+
     timeout_s = float(timeout_s_raw) if timeout_s_raw else 30.0
 
     return AppConfig(

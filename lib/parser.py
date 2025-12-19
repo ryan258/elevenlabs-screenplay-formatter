@@ -43,25 +43,32 @@ def normalize_character_name(value: str) -> str:
 
 
 def generate_aliases(full_name: str) -> Set[str]:
+    """Generate aliases with limits to prevent explosion (Bug 21 fix)"""
     aliases: Set[str] = set()
     tokens = [token for token in full_name.split(" ") if token]
     if not tokens:
         return aliases
 
-    def add_alias(parts: List[str]) -> None:
-        if parts:
-            aliases.add(" ".join(parts))
+    MAX_TOKENS = 4  # Limit processing for very long names
+    if len(tokens) > MAX_TOKENS:
+        tokens = tokens[:MAX_TOKENS]
 
-    add_alias(tokens)
+    # Full name
+    aliases.add(" ".join(tokens))
+
+    # Individual tokens (first names, last names)
     for token in tokens:
-        add_alias([token])
+        aliases.add(token)
 
-    for start in range(len(tokens)):
-        for end in range(start + 1, len(tokens)):
-            add_alias(tokens[start : end + 1])
-
+    # Only generate compound aliases for short names to avoid O(n²) explosion
     if len(tokens) >= 2:
-        add_alias([tokens[0], tokens[-1]])
+        # First + Last (most common)
+        aliases.add(f"{tokens[0]} {tokens[-1]}")
+
+    # Two-word combinations for 3-word names
+    if len(tokens) == 3:
+        aliases.add(f"{tokens[0]} {tokens[1]}")
+        aliases.add(f"{tokens[1]} {tokens[2]}")
 
     return aliases
 
