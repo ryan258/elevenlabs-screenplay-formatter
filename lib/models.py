@@ -109,6 +109,23 @@ class ParserUnmatchedLine:
 
 
 @dataclass(frozen=True)
+class CharacterDetectionInfo:
+    """Metadata about how a character was detected during parsing"""
+    character_name: str
+    line_count: int
+    word_count: int  # Added
+    first_line_number: int
+    detection_method: str  # "character_list", "uppercase_line", "same_line_dialogue"
+    aliases: List[str]
+    confidence: float  # 0.0 to 1.0
+
+
+@dataclass(frozen=True)
 class ParserDiagnostics:
     unmatched_lines: List[ParserUnmatchedLine]
+    character_detections: List[CharacterDetectionInfo] = field(default_factory=list)
+    total_lines_processed: int = 0
+    dialogue_lines_matched: int = 0
+    total_word_count: int = 0  # Added
+    parsing_mode: str = ""  # "standard", "fountain", "empty"
 

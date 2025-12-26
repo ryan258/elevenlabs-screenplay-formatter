@@ -47,13 +47,34 @@ For historical migration notes, see [MIGRATION_ROADMAP.md](./MIGRATION_ROADMAP.m
 
 ---
 
+## Recent Additions (v2.1 - In Progress)
+
+### UX Improvements ✅
+- **Model Picker Tooltips**: Hover descriptions for ElevenLabs models
+- **FFmpeg Detection**: Real-time availability check with install guidance
+- **Share Link Creation**: Generate shareable project URLs with one click
+
+### Parser Enhancements 🔄
+- **Enhanced Diagnostics**: Character detection metadata with confidence scores
+- **Diagnostics API**: `/characters/diagnostics` endpoint (UI in progress)
+- **Script Formatter**: Auto-fix common parsing issues (planned)
+
+### Validation & Cost Estimation 📋
+- **Cost Calculator**: Pre-generation API cost estimates (planned)
+- **Character Metrics**: Line counts, detection methods, confidence bars
+
+---
+
 ## Future Enhancements
 
 ### Docs & UX
 
-- [ ] Add a small “model picker” (cached) instead of a free-text Model ID field.
-- [ ] Detect FFmpeg availability and make concatenate defaults/UX clearer.
-- [ ] Add an explicit UI affordance for share links (currently decode-only).
+- [x] Add a small "model picker" (cached) instead of a free-text Model ID field.
+  - [x] Enhanced with tooltips showing model descriptions on hover
+- [x] Detect FFmpeg availability and make concatenate defaults/UX clearer.
+  - [x] Shows availability status with install instructions if missing
+- [x] Add an explicit UI affordance for share links (currently decode-only).
+  - [x] "Create Share Link" button with copy-to-clipboard functionality
 
 ### Testing & Quality Assurance
 
@@ -84,10 +105,18 @@ For historical migration notes, see [MIGRATION_ROADMAP.md](./MIGRATION_ROADMAP.m
 
 ### Parser Enhancements
 
-- [ ] **Parser diagnostics mode**
-  - [ ] Optional "show parsed view" that lists detected characters and their lines
-  - [ ] Highlight lines that failed to parse for user debugging
-  - [ ] Character detection confidence scores
+- [/] **Parser diagnostics mode**
+  - [x] Enhanced `ParserDiagnostics` dataclass with character detection metadata
+  - [x] Character detection confidence scores (0.0-1.0 based on detection method and line count)
+  - [/] Optional "show parsed view" that lists detected characters and their lines (route added, UI in progress)
+  - [ ] Highlight lines that failed to parse for user debugging (partially done via unmatched_lines)
+
+- [ ] **Script formatter (auto-fix parsing issues)**
+  - [ ] Detect and fix character name case issues (lowercase → UPPERCASE)
+  - [ ] Normalize whitespace (tabs → spaces, multiple spaces → single)
+  - [ ] Fix inconsistent line breaks
+  - [ ] Add missing character declarations to Characters: list
+  - [ ] Preview mode showing before/after diffs
 
 ### Workflow & Automation
 
@@ -105,8 +134,8 @@ For historical migration notes, see [MIGRATION_ROADMAP.md](./MIGRATION_ROADMAP.m
   - [ ] Graceful degradation when backend is unavailable
 
 - [ ] **Script validation**
-  - [ ] Character/word count display
-  - [ ] Estimated API cost calculator
+  - [x] Character/word count display (shown in diagnostics panel)
+  - [ ] Estimated API cost calculator (in progress - module designed, needs implementation)
   - [ ] Warning before processing extremely large scripts (50K+ words)
   - [ ] Memory usage estimation
 

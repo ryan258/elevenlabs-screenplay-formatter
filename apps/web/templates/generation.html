@@ -11,12 +11,15 @@
       <label class="label">
         Model ID
         {% if models %}
-        <select class="input" name="model">
-          {% for m in models %}
-          <option value="{{ m.model_id }}" {% if model==m.model_id %}selected{% endif %}>{{ m.name }} ({{ m.model_id }})
-          </option>
-          {% endfor %}
-        </select>
+        <div class="tooltip-wrapper" data-tooltip="{{ models[0].description or 'Select a text-to-speech model' }}">
+          <select class="input" name="model" id="model-select">
+            {% for m in models %}
+            <option value="{{ m.model_id }}" data-description="{{ m.description or '' }}" {% if model==m.model_id %}selected{% endif %}>{{ m.name }} ({{ m.model_id }})
+            </option>
+            {% endfor %}
+          </select>
+          <span class="model-info-icon">ℹ</span>
+        </div>
         {% else %}
         <input class="input" type="text" name="model" value="{{ model or '' }}" placeholder="eleven_multilingual_v2" />
         {% endif %}
@@ -51,6 +54,18 @@
       Concatenate output (server-side ffmpeg)
     </label>
 
+    {% if not ffmpeg_available %}
+    <div class="warning-box" style="margin-top: 8px;">
+      <span class="warning">⚠ FFmpeg not available:</span> {{ ffmpeg_message }}
+      <br>
+      <small class="muted">Concatenation will fail. Install FFmpeg or set FFMPEG_BIN environment variable.</small>
+    </div>
+    {% else %}
+    <div class="ok-box" style="margin-top: 4px;">
+      <small class="muted">✓ {{ ffmpeg_message }}</small>
+    </div>
+    {% endif %}
+
     <div class="actions">
       <button class="btn secondary" type="submit" formaction="/generation/validate" formmethod="post"
         hx-post="/generation/validate" hx-target="#validation" hx-swap="innerHTML">
@@ -60,9 +75,15 @@
         hx-target="#job-panel" hx-swap="innerHTML">
         Start Job
       </button>
+      <button class="btn secondary" type="button"
+        hx-post="/generation/create_share_link" hx-target="#share-link-box" hx-swap="innerHTML">
+        Create Share Link
+      </button>
       <a class="btn secondary" href="/characters">Back</a>
     </div>
   </form>
+
+  <div id="share-link-box"></div>
 
   <div id="validation">
     {% if errors %}
@@ -76,4 +97,24 @@
     {% endif %}
   </div>
 </section>
+
+<script>
+  // Update tooltip on model select change
+  // Update tooltip on model select change
+  function updateTooltip(select) {
+    const selected = select.selectedOptions[0];
+    const wrapper = select.closest('.tooltip-wrapper');
+    if (wrapper && selected) {
+      wrapper.setAttribute('data-tooltip', selected.dataset.description || 'No description available');
+    }
+  }
+
+  const modelSelect = document.getElementById('model-select');
+  if (modelSelect) {
+     // Initialize on load
+     updateTooltip(modelSelect);
+     // Update on change
+     modelSelect.addEventListener('change', (e) => updateTooltip(e.target));
+  }
+</script>
 {% endblock %}

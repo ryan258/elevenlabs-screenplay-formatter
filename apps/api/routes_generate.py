@@ -47,8 +47,15 @@ def api_validate_project(
     errors = validate_character_configs(parsed.dialogue_chunks, character_configs)
     if not body.project_settings.model:
         errors.insert(0, "Missing projectSettings.model")
-    if not body.project_settings.output_format:
+
+    # Strict validation (Review fix)
+    from lib.generation import OUTPUT_FORMAT_DETAILS
+    format_val = body.project_settings.output_format
+    if not format_val:
         errors.insert(0, "Missing projectSettings.outputFormat")
+    elif format_val not in OUTPUT_FORMAT_DETAILS:
+        errors.insert(0, f"Invalid outputFormat: {format_val}")
+
     if not cfg.elevenlabs.api_key:
         errors.insert(0, "Missing ELEVENLABS_API_KEY")
 
@@ -92,8 +99,15 @@ def api_generate_zip(
     errors = validate_character_configs(parsed.dialogue_chunks, character_configs)
     if not body.project_settings.model:
         errors = ["Missing projectSettings.model", *errors]
-    if not body.project_settings.output_format:
+    
+    # Strict output format validation (Review fix)
+    from lib.generation import OUTPUT_FORMAT_DETAILS
+    format_val = body.project_settings.output_format
+    if not format_val:
         errors = ["Missing projectSettings.outputFormat", *errors]
+    elif format_val not in OUTPUT_FORMAT_DETAILS:
+        errors = [f"Invalid outputFormat: {format_val}", *errors]
+        
     if errors:
         return JSONResponse(
             status_code=400,

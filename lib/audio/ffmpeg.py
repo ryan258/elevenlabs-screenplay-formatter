@@ -31,6 +31,39 @@ class MixConfig:
     sound_effects: List[SoundEffectOverlay] = field(default_factory=list)
 
 
+def check_ffmpeg_available(config: FfmpegConfig) -> tuple[bool, str]:
+    """
+    Check if FFmpeg is available and returns status.
+
+    Args:
+        config: FFmpeg configuration with binary path
+
+    Returns:
+        (is_available, message): Tuple of availability bool and human-readable message
+    """
+    try:
+        result = subprocess.run(
+            [config.ffmpeg_bin, "-version"],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=5
+        )
+        version_output = result.stdout.decode('utf-8', errors='replace')
+        # Extract version from first line (e.g., "ffmpeg version 6.0")
+        first_line = version_output.split('\n')[0] if version_output else ""
+        return (True, f"FFmpeg available: {first_line[:50]}")
+    except FileNotFoundError:
+        return (False, f"FFmpeg not found at: {config.ffmpeg_bin}")
+    except subprocess.TimeoutExpired:
+        return (False, "FFmpeg check timed out")
+    except subprocess.CalledProcessError as e:
+        stderr = e.stderr.decode('utf-8', errors='replace') if e.stderr else ""
+        return (False, f"FFmpeg error: {stderr[:100]}")
+    except Exception as e:
+        return (False, f"FFmpeg check failed: {str(e)[:100]}")
+
+
 def _safe_child_path(parent: Path, name: str) -> Path:
     if not name or "/" in name or "\\" in name or "\x00" in name:
         raise ValueError("Invalid file reference")

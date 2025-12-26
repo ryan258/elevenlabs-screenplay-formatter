@@ -376,6 +376,28 @@ def characters() -> str:
     return render_template("characters.html", parsed=parsed, voice_rows=voice_rows, errors=[])
 
 
+@app.get("/characters/diagnostics")
+def characters_diagnostics() -> WerkzeugResponse:
+    """Return diagnostics panel for current parsed script"""
+    cfg = _get_cfg()
+    payload = _payload_from_session(cfg)
+    if not payload:
+        return Response("<div class='error'>No active session</div>", status=200)
+
+    script_text = str(payload.get("scriptText") or "")
+    preserve = bool(payload.get("projectSettings", {}).get("preserveStageDirections"))
+
+    try:
+        parsed = parse_script(script_text, preserve_stage_directions=preserve)
+    except Exception as exc:
+        return Response(f"<div class='error'>Parse error: {exc}</div>", status=200)
+
+    return Response(
+        render_template("diagnostics_panel.html", diagnostics=parsed.diagnostics, characters=parsed.characters),
+        status=200
+    )
+
+
 @app.get("/generation")
 def generation() -> WerkzeugResponse:
     cfg = _get_cfg()
@@ -402,6 +424,10 @@ def generation() -> WerkzeugResponse:
         except Exception:
             pass  # Fallback to empty list or default input
 
+    # Check FFmpeg availability
+    from lib.audio.ffmpeg import check_ffmpeg_available
+    ffmpeg_available, ffmpeg_message = check_ffmpeg_available(cfg.ffmpeg)
+
     job_id = request.args.get("job_id") or payload.get("lastJobId")
     context: Dict[str, Any] = {
         "parsed": parsed,
@@ -414,6 +440,8 @@ def generation() -> WerkzeugResponse:
         "concatenate": bool(project_settings.get("concatenate")),
         "filename_prefix": str(payload.get("filename_prefix") or ""),
         "job_id": job_id,
+        "ffmpeg_available": ffmpeg_available,
+        "ffmpeg_message": ffmpeg_message,
     }
 
     if job_id:
@@ -914,6 +942,30 @@ def generation_start() -> WerkzeugResponse:
 
     template = "job_panel.html" if _is_hx_request() else "job_started.html"
     return Response(render_template(template, **context), status=200, content_type="text/html")
+
+
+@app.post("/generation/create_share_link")
+def create_share_link() -> WerkzeugResponse:
+    """Generate shareable link for current session payload"""
+    cfg = _get_cfg()
+    payload = _payload_from_session(cfg)
+    if not payload:
+        return Response("<div class='error'>No active session</div>", status=200)
+
+    # Build minimal share payload (only what's needed)
+    from lib.share_links import encode_share_payload
+    share_view = _session_share_view(payload)
+    share_json = json.dumps(share_view, separators=(',', ':'))
+    encoded = encode_share_payload(share_json)
+
+    # Build full URL
+    base_url = request.host_url.rstrip('/')
+    share_url = f"{base_url}/?project={encoded}"
+
+    return Response(
+        render_template("share_link_box.html", share_url=share_url),
+        status=200
+    )
 
 
 @app.post("/timeline/preview")

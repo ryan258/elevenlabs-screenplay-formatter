@@ -5,20 +5,25 @@ import base64
 
 def encode_share_payload(value: str) -> str:
     """
-    JS parity: btoa(unescape(encodeURIComponent(value))).
-    This is equivalent to base64-encoding UTF-8 bytes.
+    Encode JSON string to URL-safe base64.
     """
     if value == "":
         return ""
-    return base64.b64encode(value.encode("utf-8")).decode("ascii")
+    # Standard b64encode produces + and /, which are not URL-safe without encoding.
+    # urlsafe_b64encode produces - and _ which are safe.
+    return base64.urlsafe_b64encode(value.encode("utf-8")).decode("ascii")
 
 
 def decode_share_payload(value: str) -> str:
     """
-    JS parity: decodeURIComponent(escape(atob(value))).
-    This is equivalent to base64-decoding into UTF-8 text.
+    Decode URL-safe base64 string to JSON string.
     """
     if value == "":
         return ""
-    return base64.b64decode(value.encode("ascii")).decode("utf-8")
+    try:
+        # urlsafe_b64decode handles - and _ instead of + and /
+        return base64.urlsafe_b64decode(value.encode("ascii")).decode("utf-8")
+    except Exception:
+        # Fallback for legacy standard-b64 links if needed, or just fail
+        return base64.b64decode(value.encode("ascii")).decode("utf-8")
 

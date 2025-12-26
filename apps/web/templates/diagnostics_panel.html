@@ -1,0 +1,131 @@
+<div class="diagnostics-panel">
+  <h4>Parser Diagnostics</h4>
+
+  <div class="stats-grid">
+    <div class="stat-item">
+      <span class="label">Lines Processed</span>
+      <span class="value">{{ diagnostics.total_lines_processed }}</span>
+    </div>
+    <div class="stat-item">
+      <span class="label">Dialogue Lines</span>
+      <span class="value">{{ diagnostics.dialogue_lines_matched }}</span>
+    </div>
+    <div class="stat-item">
+      <span class="label">Total Words</span>
+      <span class="value">{{ diagnostics.total_word_count }}</span>
+    </div>
+    <div class="stat-item">
+      <span class="label">Mode</span>
+      <span class="value">{{ diagnostics.parsing_mode|upper }}</span>
+    </div>
+  </div>
+
+  <h5>Character Detection Confidence</h5>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Character</th>
+        <th>Confidence</th>
+        <th>Method</th>
+        <th>Cues</th>
+        <th>Words</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for char in diagnostics.character_detections %}
+      <tr>
+        <td>{{ char.character_name }}</td>
+        <td>
+          <div class="confidence-meter" style="--score: {{ char.confidence }}">
+            {{ (char.confidence * 100)|round|int }}%
+          </div>
+        </td>
+        <td class="muted">{{ char.detection_method }}</td>
+        <td>{{ char.line_count }}</td>
+        <td>{{ char.word_count }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if diagnostics.unmatched_lines %}
+  <details>
+    <summary>
+      Unmatched Lines ({{ diagnostics.unmatched_lines|length }})
+    </summary>
+    <div class="unmatched-list">
+      {% for line in diagnostics.unmatched_lines[:50] %}
+      <div class="unmatched-item">
+        <span class="line-num">{{ line.line_number }}:</span>
+        <span class="line-content">{{ line.content }}</span>
+      </div>
+      {% endfor %} {% if diagnostics.unmatched_lines|length > 50 %}
+      <div class="muted">
+        ...and {{ diagnostics.unmatched_lines|length - 50 }} more
+      </div>
+      {% endif %}
+    </div>
+  </details>
+  {% endif %}
+</div>
+
+<style>
+  .diagnostics-panel {
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    margin-top: 1rem;
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .stat-item .label {
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+
+  .stat-item .value {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: var(--text);
+  }
+
+  .confidence-meter {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    padding: 2px 6px;
+    width: fit-content;
+    font-size: 0.85rem;
+  }
+
+  .unmatched-list {
+    max-height: 200px;
+    overflow-y: auto;
+    margin-top: 0.5rem;
+    font-family: monospace;
+    font-size: 0.85rem;
+  }
+
+  .unmatched-item {
+    display: flex;
+    gap: 0.5rem;
+    padding: 2px 0;
+  }
+
+  .line-num {
+    color: var(--muted);
+    min-width: 3ch;
+    text-align: right;
+  }
+</style>

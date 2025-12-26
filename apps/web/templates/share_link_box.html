@@ -1,0 +1,26 @@
+<div class="share-link-box">
+  <h4>Shareable Link</h4>
+  <p class="muted">Copy this link to share your script configuration with others:</p>
+  <div class="share-link-input-wrapper">
+    <input
+      type="text"
+      class="input share-link-input"
+      value="{{ share_url }}"
+      readonly
+      id="share-url-input"
+      onclick="this.select()"
+    />
+    <button
+      class="btn secondary copy-btn"
+      onclick="navigator.clipboard.writeText(document.getElementById('share-url-input').value).then(() => {
+        this.textContent = 'Copied!';
+        setTimeout(() => this.textContent = 'Copy', 2000);
+      })"
+    >
+      Copy
+    </button>
+  </div>
+  <small class="muted">
+    Note: Voice IDs and settings are included, but uploaded files are not shared.
+  </small>
+</div>
