@@ -1,0 +1,41 @@
+<section class="format-preview card">
+  <h3>Script Formatter Preview</h3>
+
+  {% if not result.changed %}
+    <p class="ok">No formatting changes needed.</p>
+  {% else %}
+    {% if applied %}
+      <div class="ok-box">Formatting applied to the current session.</div>
+    {% endif %}
+    <ul class="changes">
+      {% for change in result.changes %}
+        <li><span class="muted">{{ change.kind }}:</span> {{ change.details }}</li>
+      {% endfor %}
+    </ul>
+    <form method="post" action="/characters/format/apply" hx-post="/characters/format/apply" hx-target="#format-preview" hx-swap="innerHTML">
+      <button class="btn" type="submit">Apply Formatting Fixes</button>
+    </form>
+
+    <details class="details" open>
+      <summary>Diff</summary>
+      <pre class="diff">
+{% for line in diff_lines %}
+{% set is_meta = line.startswith('---') or line.startswith('+++') or line.startswith('@@') %}
+{% set is_add = line.startswith('+') and not line.startswith('+++') %}
+{% set is_del = line.startswith('-') and not line.startswith('---') %}
+<span class="diff-line{% if is_meta %} diff-line--meta{% elif is_add %} diff-line--add{% elif is_del %} diff-line--del{% endif %}">{{ line }}</span>
+{% endfor %}
+      </pre>
+    </details>
+
+    <details class="details">
+      <summary>Before</summary>
+      <pre class="script-block">{{ result.original_text }}</pre>
+    </details>
+
+    <details class="details">
+      <summary>After</summary>
+      <pre class="script-block">{{ result.formatted_text }}</pre>
+    </details>
+  {% endif %}
+</section>

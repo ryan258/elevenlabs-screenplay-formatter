@@ -41,7 +41,7 @@ For historical migration notes, see [MIGRATION_ROADMAP.md](./MIGRATION_ROADMAP.m
 
 - [x] A single `python -m ...` (or `uv run ...`) starts the Flask UI and FastAPI API in local dev without Node (after installing Python deps).
 - [x] Parser + diagnostics match current behavior on existing example scripts (`EXAMPLE_*.md`/`*.txt`).
-- [/] CLI supports multi-script batch generation and local concatenation (minimal; ongoing improvements).
+- [x] CLI supports multi-script batch generation and local concatenation.
 - [x] Export formats (ZIP/manifest, SRT/VTT, Reaper) are implemented in `lib/`.
 - [x] No secrets committed; `.env` remains ignored; `.env.example` documents required values.
 
@@ -54,10 +54,17 @@ For historical migration notes, see [MIGRATION_ROADMAP.md](./MIGRATION_ROADMAP.m
 - **FFmpeg Detection**: Real-time availability check with install guidance
 - **Share Link Creation**: Generate shareable project URLs with one click
 
-### Parser Enhancements 🔄
+### Parser Enhancements ✅
 - **Enhanced Diagnostics**: Character detection metadata with confidence scores
-- **Diagnostics API**: `/characters/diagnostics` endpoint (UI in progress)
-- **Script Formatter**: Auto-fix common parsing issues (planned)
+- **Diagnostics API**: `/characters/diagnostics` endpoint (UI complete)
+- **Script Formatter**: Auto-fix common parsing issues
+
+### Workflow & Automation ✅
+- **Batch CLI**: Batch config support, cooldowns, and per-file progress output
+
+### Developer Experience ✅
+- **Dev Scripts**: `scripts/dev.sh` and `scripts/check.sh`
+- **Pre-commit Hooks**: Optional `pre-commit` setup with Ruff
 
 ### Validation & Cost Estimation 📋
 - **Cost Calculator**: Pre-generation API cost estimates (planned)
@@ -105,26 +112,26 @@ For historical migration notes, see [MIGRATION_ROADMAP.md](./MIGRATION_ROADMAP.m
 
 ### Parser Enhancements
 
-- [/] **Parser diagnostics mode**
+- [x] **Parser diagnostics mode**
   - [x] Enhanced `ParserDiagnostics` dataclass with character detection metadata
   - [x] Character detection confidence scores (0.0-1.0 based on detection method and line count)
-  - [/] Optional "show parsed view" that lists detected characters and their lines (route added, UI in progress)
-  - [ ] Highlight lines that failed to parse for user debugging (partially done via unmatched_lines)
+  - [x] Optional "show parsed view" that lists detected characters and their lines
+  - [x] Highlight lines that failed to parse for user debugging
 
-- [ ] **Script formatter (auto-fix parsing issues)**
-  - [ ] Detect and fix character name case issues (lowercase → UPPERCASE)
-  - [ ] Normalize whitespace (tabs → spaces, multiple spaces → single)
-  - [ ] Fix inconsistent line breaks
-  - [ ] Add missing character declarations to Characters: list
-  - [ ] Preview mode showing before/after diffs
+- [x] **Script formatter (auto-fix parsing issues)**
+  - [x] Detect and fix character name case issues (lowercase to uppercase)
+  - [x] Normalize whitespace (tabs to spaces, multiple spaces to single)
+  - [x] Fix inconsistent line breaks
+  - [x] Add missing character declarations to Characters: list
+  - [x] Preview mode showing before/after diffs
 
 ### Workflow & Automation
 
-- [ ] **Batch processing improvements**
-  - [ ] Sequential processing of multiple screenplay files (chapters/episodes)
-  - [ ] Rate-limiting and cooldown between runs
-  - [ ] Progress tracking across multiple files
-  - [ ] Batch configuration presets
+- [x] **Batch processing improvements**
+  - [x] Sequential processing of multiple screenplay files (chapters/episodes)
+  - [x] Rate-limiting and cooldown between runs
+  - [x] Progress tracking across multiple files
+  - [x] Batch configuration presets
 
 ### Error Handling & Resilience
 
@@ -141,10 +148,10 @@ For historical migration notes, see [MIGRATION_ROADMAP.md](./MIGRATION_ROADMAP.m
 
 ### Developer Experience
 
-- [ ] **Python packaging & dev ergonomics**
-  - [ ] Standardize tooling (`ruff`, `mypy`, `pytest`) and a single-run dev command
-  - [ ] Document local ffmpeg requirements and supported OSes
-  - [ ] Add pre-commit hooks (optional, non-blocking)
+- [x] **Python packaging & dev ergonomics**
+  - [x] Standardize tooling (`ruff`, `mypy`, `pytest`) and a single-run dev command
+  - [x] Document local ffmpeg requirements and supported OSes
+  - [x] Add pre-commit hooks (optional, non-blocking)
 
 ### Integrations & Export Formats
 

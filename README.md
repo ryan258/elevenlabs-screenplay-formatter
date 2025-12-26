@@ -81,6 +81,23 @@ UVICORN_RELOAD=1 python3 -m apps.api
 PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -q
 ```
 
+### Developer Commands
+
+```bash
+# Dev server with reload
+./scripts/dev.sh
+
+# Lint, format check, type check, tests
+./scripts/check.sh
+```
+
+Optional pre-commit hooks:
+
+```bash
+python3 -m pip install -e ".[dev]"
+pre-commit install
+```
+
 ### Python CLI (replacement in progress)
 
 ```bash

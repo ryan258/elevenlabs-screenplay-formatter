@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import AsyncIterator, Optional, Union
+from typing import AsyncIterator, Union
 
 try:
     from fastapi import APIRouter, Depends
@@ -30,13 +30,13 @@ router = APIRouter(prefix="/api")
 
 @router.post("/generate")
 def api_generate_job(
+    request: Request,
     body: GenerateZipRequest,
     cfg: AppConfig = Depends(get_config),
     store: JobStore = Depends(get_job_store),
-    request: Optional[Request] = None,  # Add request for IP
 ) -> JSONResponse:
     # Rate limit (Bug 18 fix applied to API)
-    client_ip = request.client.host if (request and request.client) else "unknown"
+    client_ip = request.client.host if request.client else "unknown"
     if not generation_limiter.check_limit(client_ip):
         return JSONResponse(status_code=429, content=ErrorResponse(error="Rate limit exceeded").model_dump())
 

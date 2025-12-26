@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import tempfile
 from pathlib import Path
-from typing import Optional, Union
+from typing import Union
 
 try:
     from fastapi import APIRouter, Depends
@@ -64,12 +64,12 @@ def api_validate_project(
 
 @router.post("/generate.zip", response_model=None)
 def api_generate_zip(
+    request: Request,
     body: GenerateZipRequest,
     cfg: AppConfig = Depends(get_config),
-    request: Optional[Request] = None,  # Add request for IP
 ) -> Union[StreamingResponse, JSONResponse]:
     # Rate limit (Bug 18 fix applied to API)
-    client_ip = request.client.host if (request and request.client) else "unknown"
+    client_ip = request.client.host if request.client else "unknown"
     if not generation_limiter.check_limit(client_ip):
         return JSONResponse(status_code=429, content=ErrorResponse(error="Rate limit exceeded").model_dump())
 

@@ -13,11 +13,9 @@ A Python framework for creating sequential LLM workflows where each step builds 
 
 ## Commands
 
-**Run Server**: `python -m apps.api` (port 8000)
+**Run Server**: `./scripts/dev.sh` (port 8000)
 
-- Test: `pytest`
-- Format: `ruff format .`
-- Type Check: `mypy .`
+- Checks: `./scripts/check.sh`
 
 **Setup:**
 

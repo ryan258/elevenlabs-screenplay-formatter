@@ -181,3 +181,68 @@ textarea {
   cursor: help;
   pointer-events: none;
 }
+
+.parsed-view,
+.format-preview {
+  margin-top: 16px;
+}
+
+.dialogue-group {
+  margin: 12px 0;
+}
+
+.script-lines {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.85rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--muted);
+  border-radius: 6px;
+  padding: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.script-line {
+  display: flex;
+  gap: 10px;
+  padding: 2px 0;
+}
+
+.script-line--unmatched {
+  background: rgba(224, 108, 117, 0.15);
+}
+
+.line-number {
+  color: var(--muted);
+  min-width: 4ch;
+  text-align: right;
+}
+
+.changes {
+  margin: 10px 0;
+}
+
+.script-block,
+.diff {
+  white-space: pre-wrap;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--muted);
+  border-radius: 6px;
+  padding: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.85rem;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.diff-line--meta {
+  color: var(--muted);
+}
+
+.diff-line--add {
+  color: var(--ok);
+}
+
+.diff-line--del {
+  color: var(--err);
+}

@@ -29,6 +29,8 @@ from lib.share_links import decode_share_payload
 from lib.validation import validate_character_configs
 from lib.voice_extraction import extract_voice_ids_from_script
 from lib.utils_web import RateLimiter, generation_limiter, clamp_voice_setting
+from lib.diagnostics import build_line_info, group_dialogue_by_character
+from lib.script_formatter import format_script
 
 _VOICES_CACHE_TTL_S = 300
 
@@ -131,6 +133,10 @@ def _parse_float(value: str, *, default: float) -> float:
         return float(value)
     except Exception:
         return default
+
+
+def _normalize_character_key(value: str) -> str:
+    return str(value or "").strip().upper()
 
 
 
@@ -376,6 +382,33 @@ def characters() -> str:
     return render_template("characters.html", parsed=parsed, voice_rows=voice_rows, errors=[])
 
 
+@app.get("/characters/parsed")
+def characters_parsed_view() -> WerkzeugResponse:
+    cfg = _get_cfg()
+    payload = _payload_from_session(cfg)
+    if not payload:
+        return Response("<div class='error'>Paste a script first.</div>", status=200)
+
+    script_text = str(payload.get("scriptText") or "")
+    preserve = bool(payload.get("projectSettings", {}).get("preserveStageDirections"))
+    try:
+        parsed = parse_script(script_text, preserve_stage_directions=preserve)
+    except Exception as exc:
+        return Response(f"<div class='error'>Parse error: {exc}</div>", status=200)
+
+    line_info = build_line_info(script_text, parsed.diagnostics.unmatched_lines)
+    dialogue_groups = group_dialogue_by_character(parsed.dialogue_chunks)
+    return Response(
+        render_template(
+            "parsed_view.html",
+            parsed=parsed,
+            line_info=line_info,
+            dialogue_groups=dialogue_groups,
+        ),
+        status=200,
+    )
+
+
 @app.get("/characters/diagnostics")
 def characters_diagnostics() -> WerkzeugResponse:
     """Return diagnostics panel for current parsed script"""
@@ -395,6 +428,62 @@ def characters_diagnostics() -> WerkzeugResponse:
     return Response(
         render_template("diagnostics_panel.html", diagnostics=parsed.diagnostics, characters=parsed.characters),
         status=200
+    )
+
+
+@app.get("/characters/format")
+def characters_format_preview() -> WerkzeugResponse:
+    cfg = _get_cfg()
+    payload = _payload_from_session(cfg)
+    if not payload:
+        return Response("<div class='error'>Paste a script first.</div>", status=200)
+
+    script_text = str(payload.get("scriptText") or "")
+    result = format_script(script_text)
+    diff_lines = result.diff.splitlines()
+    return Response(
+        render_template("format_preview.html", result=result, diff_lines=diff_lines, applied=False),
+        status=200,
+    )
+
+
+@app.post("/characters/format/apply")
+def characters_format_apply() -> WerkzeugResponse:
+    cfg = _get_cfg()
+    payload = _payload_from_session(cfg)
+    if not payload:
+        return Response("<div class='error'>Paste a script first.</div>", status=200)
+
+    preserve = bool(payload.get("projectSettings", {}).get("preserveStageDirections"))
+    script_text = str(payload.get("scriptText") or "")
+    result = format_script(script_text)
+
+    if result.formatted_text and result.formatted_text != script_text:
+        new_payload, _characters = _build_default_payload(
+            script_text=result.formatted_text,
+            preserve_stage_directions=preserve,
+        )
+        new_payload["projectSettings"] = payload.get("projectSettings") or {}
+        new_payload["filename_prefix"] = payload.get("filename_prefix") or ""
+        new_payload["lastJobId"] = payload.get("lastJobId")
+
+        existing_cfgs: Dict[str, Any] = payload.get("characterConfigs") or {}
+        normalized_cfgs = {
+            _normalize_character_key(key): value for key, value in existing_cfgs.items()
+        }
+        for character in new_payload.get("characterConfigs", {}).keys():
+            key = _normalize_character_key(character)
+            if key in normalized_cfgs:
+                new_payload["characterConfigs"][character] = normalized_cfgs[key]
+
+        sid = _get_session_id()
+        if sid:
+            _get_web_store(cfg).patch(sid, new_payload)
+
+    diff_lines = result.diff.splitlines()
+    return Response(
+        render_template("format_preview.html", result=result, diff_lines=diff_lines, applied=True),
+        status=200,
     )
 
 

@@ -1,0 +1,32 @@
+<section class="parsed-view card">
+  <h3>Parsed View</h3>
+  <p class="meta">
+    Characters: {{ parsed.characters|length }} · Dialogue chunks: {{ parsed.dialogue_chunks|length }}
+  </p>
+
+  <details class="details" open>
+    <summary>Dialogue by character</summary>
+    {% for group in dialogue_groups %}
+      <div class="dialogue-group">
+        <div class="chunk-header">{{ group.character }}</div>
+        <ol class="chunks">
+          {% for chunk in group.lines %}
+            <li>{{ chunk.text }}</li>
+          {% endfor %}
+        </ol>
+      </div>
+    {% endfor %}
+  </details>
+
+  <details class="details">
+    <summary>Script lines (unmatched highlighted)</summary>
+    <div class="script-lines">
+      {% for line in line_info %}
+        <div class="script-line{% if line.is_unmatched %} script-line--unmatched{% endif %}">
+          <span class="line-number">{{ line.line_number }}</span>
+          <span class="line-content">{{ line.content }}</span>
+        </div>
+      {% endfor %}
+    </div>
+  </details>
+</section>

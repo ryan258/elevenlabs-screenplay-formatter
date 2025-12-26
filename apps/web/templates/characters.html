@@ -52,6 +52,22 @@
     </p>
     <div id="voices-list"></div>
 
+    <h3>Script Tools</h3>
+    <div class="actions">
+      <button class="btn secondary" type="button" hx-get="/characters/diagnostics" hx-target="#diagnostics-panel" hx-swap="innerHTML">
+        Show Diagnostics
+      </button>
+      <button class="btn secondary" type="button" hx-get="/characters/parsed" hx-target="#parsed-view" hx-swap="innerHTML">
+        Show Parsed View
+      </button>
+      <button class="btn secondary" type="button" hx-get="/characters/format" hx-target="#format-preview" hx-swap="innerHTML">
+        Preview Formatting Fixes
+      </button>
+    </div>
+    <div id="diagnostics-panel"></div>
+    <div id="parsed-view"></div>
+    <div id="format-preview"></div>
+
     {% if parsed.diagnostics.unmatched_lines %}
       <details class="details">
         <summary>Unmatched lines ({{ parsed.diagnostics.unmatched_lines|length }})</summary>
