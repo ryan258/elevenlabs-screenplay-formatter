@@ -27,7 +27,11 @@ def _get_reaper_source_type(filename: str) -> str:
 
 def _build_item(entry: ManifestEntry) -> str:
     start = entry.start_time_ms or 0
-    end = entry.end_time_ms if entry.end_time_ms is not None else (start + entry.estimated_duration_ms)
+    end = (
+        entry.end_time_ms
+        if entry.end_time_ms is not None
+        else (start + entry.estimated_duration_ms)
+    )
     length = max(0.001, (end - start) / 1000)
     source_type = _get_reaper_source_type(entry.filename)
     return "\n".join(
@@ -65,7 +69,9 @@ def _build_item(entry: ManifestEntry) -> str:
     )
 
 
-def build_reaper_project(entries: List[ManifestEntry], project_name: str = "ElevenLabs Session") -> str:
+def build_reaper_project(
+    entries: List[ManifestEntry], project_name: str = "ElevenLabs Session"
+) -> str:
     tracks: Dict[str, List[ManifestEntry]] = defaultdict(list)
     for entry in entries:
         key = entry.character or "Dialogue"
@@ -108,4 +114,3 @@ def build_reaper_project(entries: List[ManifestEntry], project_name: str = "Elev
             ">",
         ]
     )
-

@@ -12,7 +12,6 @@ This roadmap tracks the Python-first implementation on `main`. The legacy Node/R
 - ✅ ElevenLabs voice browsing (cached) + apply-to-character flow
 - ✅ Async generation jobs with SSE progress streaming
 - ✅ Exports: ZIP + manifest JSON/CSV + SRT/VTT + Reaper `.rpp`
-- ✅ Optional FFmpeg concatenated “listen-through” audio (best-effort; per-line clips always generated)
 - ✅ Node/React/Express implementation removed from `main` (archived separately)
 
 ---
@@ -41,7 +40,7 @@ For historical migration notes, see [MIGRATION_ROADMAP.md](./MIGRATION_ROADMAP.m
 
 - [x] A single `python -m ...` (or `uv run ...`) starts the Flask UI and FastAPI API in local dev without Node (after installing Python deps).
 - [x] Parser + diagnostics match current behavior on existing example scripts (`EXAMPLE_*.md`/`*.txt`).
-- [x] CLI supports multi-script batch generation and local concatenation.
+- [x] CLI supports multi-script batch generation.
 - [x] Export formats (ZIP/manifest, SRT/VTT, Reaper) are implemented in `lib/`.
 - [x] No secrets committed; `.env` remains ignored; `.env.example` documents required values.
 
@@ -50,23 +49,27 @@ For historical migration notes, see [MIGRATION_ROADMAP.md](./MIGRATION_ROADMAP.m
 ## Recent Additions (v2.1 - In Progress)
 
 ### UX Improvements ✅
+
 - **Model Picker Tooltips**: Hover descriptions for ElevenLabs models
-- **FFmpeg Detection**: Real-time availability check with install guidance
 - **Share Link Creation**: Generate shareable project URLs with one click
 
 ### Parser Enhancements ✅
+
 - **Enhanced Diagnostics**: Character detection metadata with confidence scores
 - **Diagnostics API**: `/characters/diagnostics` endpoint (UI complete)
 - **Script Formatter**: Auto-fix common parsing issues
 
 ### Workflow & Automation ✅
+
 - **Batch CLI**: Batch config support, cooldowns, and per-file progress output
 
 ### Developer Experience ✅
+
 - **Dev Scripts**: `scripts/dev.sh` and `scripts/check.sh`
 - **Pre-commit Hooks**: Optional `pre-commit` setup with Ruff
 
 ### Validation & Cost Estimation 📋
+
 - **Cost Calculator**: Pre-generation API cost estimates (planned)
 - **Character Metrics**: Line counts, detection methods, confidence bars
 
@@ -78,8 +81,6 @@ For historical migration notes, see [MIGRATION_ROADMAP.md](./MIGRATION_ROADMAP.m
 
 - [x] Add a small "model picker" (cached) instead of a free-text Model ID field.
   - [x] Enhanced with tooltips showing model descriptions on hover
-- [x] Detect FFmpeg availability and make concatenate defaults/UX clearer.
-  - [x] Shows availability status with install instructions if missing
 - [x] Add an explicit UI affordance for share links (currently decode-only).
   - [x] "Create Share Link" button with copy-to-clipboard functionality
 
@@ -150,7 +151,6 @@ For historical migration notes, see [MIGRATION_ROADMAP.md](./MIGRATION_ROADMAP.m
 
 - [x] **Python packaging & dev ergonomics**
   - [x] Standardize tooling (`ruff`, `mypy`, `pytest`) and a single-run dev command
-  - [x] Document local ffmpeg requirements and supported OSes
   - [x] Add pre-commit hooks (optional, non-blocking)
 
 ### Integrations & Export Formats

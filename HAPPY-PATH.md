@@ -1,6 +1,6 @@
 # Happy Path Guide — ElevenLabs Screenplay Formatter (Python)
 
-This walkthrough shows the fastest way to convert a screenplay into per-line audio clips, then optionally listen to a separate concatenated “single-shot” render. The app is designed for local single-user use.
+This walkthrough shows the fastest way to convert a screenplay into per-line audio clips. The app is designed for local single-user use.
 
 ## 1) Install + Configure
 
@@ -9,8 +9,6 @@ python3 -m pip install -e ".[dev]"
 export ELEVENLABS_API_KEY="..."
 export ELEVENLABS_BASE_URL="https://api.elevenlabs.io"
 ```
-
-If you want the optional concatenated file, install FFmpeg and verify `ffmpeg -version`.
 
 ## 2) Run the App
 
@@ -34,13 +32,10 @@ On **Generation**:
 
 1. Set **Model ID** (e.g. `eleven_multilingual_v2`).
 2. Choose output format (mp3 or pcm/wav).
-3. Leave **Concatenate output** enabled if you want an extra concatenated file (FFmpeg required).
-4. Click **Start Job** and watch progress stream via SSE.
+3. Click **Start Job** and watch progress stream via SSE.
 
 ## 5) Timeline + Exports
 
 1. Use **Timeline** to spot-check individual lines.
 2. On **Exports**:
    - Download the ZIP (always available after a successful job).
-   - If concatenation succeeded, **Concatenated Audio** appears and plays inline.
-   - If concatenation fails (FFmpeg missing, etc.), the job still completes and the ZIP includes `concat_error.txt`.

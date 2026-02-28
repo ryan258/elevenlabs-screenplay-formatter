@@ -27,7 +27,9 @@ def _write_sine_wav(path: Path, *, hz: float, seconds: float, sample_rate: int =
 
 def _check_ffmpeg(ffmpeg_bin: str) -> None:
     try:
-        subprocess.run([ffmpeg_bin, "-version"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        subprocess.run(
+            [ffmpeg_bin, "-version"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
     except FileNotFoundError as exc:
         raise SystemExit(
             f"ffmpeg not found: {ffmpeg_bin}\n"

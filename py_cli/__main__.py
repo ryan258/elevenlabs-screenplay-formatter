@@ -8,9 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from lib.audio.ffmpeg import concat_audio
-from lib.config import ElevenLabsConfig, FfmpegConfig
-from lib.elevenlabs.client import ElevenLabsClient, _adjust_delay_based_on_rate_limit
+from lib.config import ElevenLabsConfig
+from lib.elevenlabs.client import ElevenLabsClient, adjust_delay_based_on_rate_limit
 from lib.models import VoiceSettings
 from lib.parser import ParsedScript, parse_script
 
@@ -31,7 +30,6 @@ class JobPlan:
     out_dir: Path
     delay_ms: int
     cooldown_ms: int
-    concat: bool
 
 
 def _slugify(value: str) -> str:
@@ -75,7 +73,6 @@ def _build_jobs_from_batch(
     fallback_out: str,
     fallback_delay: int,
     fallback_cooldown: int,
-    fallback_concat: bool,
     config_cache: Dict[Path, Dict[str, Any]],
 ) -> List[JobPlan]:
     base_dir = batch_path.parent
@@ -106,13 +103,9 @@ def _build_jobs_from_batch(
         out_dir = _resolve_path(base_dir, str(out_value))
 
         delay_ms = int(raw.get("delay_ms") or defaults.get("delay_ms") or fallback_delay)
-        cooldown_ms = int(raw.get("cooldown_ms") or defaults.get("cooldown_ms") or fallback_cooldown)
-        if "concat" in raw:
-            concat = bool(raw.get("concat"))
-        elif "concat" in defaults:
-            concat = bool(defaults.get("concat"))
-        else:
-            concat = fallback_concat
+        cooldown_ms = int(
+            raw.get("cooldown_ms") or defaults.get("cooldown_ms") or fallback_cooldown
+        )
 
         script_text = script_path.read_text(encoding="utf-8")
         parsed = parse_script(script_text, preserve_stage_directions=False)
@@ -127,7 +120,6 @@ def _build_jobs_from_batch(
                 out_dir=out_dir,
                 delay_ms=delay_ms,
                 cooldown_ms=cooldown_ms,
-                concat=concat,
             )
         )
 
@@ -141,7 +133,6 @@ def _build_jobs_from_args(
     out_dir: str,
     delay_ms: int,
     cooldown_ms: int,
-    concat: bool,
     config_cache: Dict[Path, Dict[str, Any]],
 ) -> List[JobPlan]:
     jobs: List[JobPlan] = []
@@ -159,7 +150,6 @@ def _build_jobs_from_args(
                 out_dir=Path(out_dir).resolve(),
                 delay_ms=delay_ms,
                 cooldown_ms=cooldown_ms,
-                concat=concat,
             )
         )
     return jobs
@@ -180,7 +170,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--out", default="cli_output", help="Output directory")
     parser.add_argument("--delay", type=int, default=500, help="Delay between requests (ms)")
     parser.add_argument("--cooldown", type=int, default=0, help="Cooldown between scripts (ms)")
-    parser.add_argument("--concat", action="store_true", help="Concatenate output audio with ffmpeg")
     return parser
 
 
@@ -192,7 +181,6 @@ def main() -> None:
     base_url = _get_required_env("ELEVENLABS_BASE_URL")
     api_key = _get_required_env("ELEVENLABS_API_KEY")
     timeout_s = float(os.environ.get("ELEVENLABS_TIMEOUT_S", "30").strip() or "30")
-    ffmpeg_bin = os.environ.get("FFMPEG_BIN", "ffmpeg").strip()
 
     config_cache: Dict[Path, Dict[str, Any]] = {}
     if args.batch:
@@ -212,7 +200,6 @@ def main() -> None:
             fallback_out=args.out,
             fallback_delay=args.delay,
             fallback_cooldown=args.cooldown,
-            fallback_concat=args.concat,
             config_cache=config_cache,
         )
     else:
@@ -222,7 +209,6 @@ def main() -> None:
             out_dir=args.out,
             delay_ms=args.delay,
             cooldown_ms=args.cooldown,
-            concat=args.concat,
             config_cache=config_cache,
         )
 
@@ -235,7 +221,6 @@ def main() -> None:
     client = ElevenLabsClient(
         ElevenLabsConfig(api_key=api_key, base_url=base_url, timeout_s=timeout_s)
     )
-    ffmpeg = FfmpegConfig(ffmpeg_bin=ffmpeg_bin)
 
     for job_index, job in enumerate(jobs, start=1):
         job.out_dir.mkdir(parents=True, exist_ok=True)
@@ -258,7 +243,6 @@ def main() -> None:
         total_chunks = len(job.parsed.dialogue_chunks)
         print(f"[file {job_index}/{len(jobs)}] {job.script_path.name} ({total_chunks} chunks)")
 
-        generated_files: List[Path] = []
         character_configs = job.config.get("characterConfigs") or {}
         for index, chunk in enumerate(job.parsed.dialogue_chunks):
             overall_index += 1
@@ -275,7 +259,11 @@ def main() -> None:
                 speed=float(voice_settings_raw.get("speed") or 1.0),
             )
 
-            text = chunk.original_text if (speak_parentheticals and chunk.original_text) else chunk.text
+            text = (
+                chunk.original_text
+                if (speak_parentheticals and chunk.original_text)
+                else chunk.text
+            )
             filename = job.out_dir / f"{slug}_{index:04d}_{_slugify(chunk.character)}.{extension}"
             print(
                 f"[chunk {index + 1}/{total_chunks}] "
@@ -293,18 +281,12 @@ def main() -> None:
                 base_delay_ms=base_delay_ms,
             )
             filename.write_bytes(audio_bytes)
-            generated_files.append(filename)
-
-            adaptive_delay_ms = _adjust_delay_based_on_rate_limit(
+            # Basic rate limit handling for sequential chunks
+            adaptive_delay_ms = adjust_delay_based_on_rate_limit(
                 remaining, adaptive_delay_ms, base_delay_ms
             )
             if adaptive_delay_ms > 0 and index < total_chunks - 1:
                 time.sleep(adaptive_delay_ms / 1000)
-
-        if job.concat or bool(project_settings.get("concatenate")):
-            output_path = job.out_dir / f"{slug}_concatenated_audio.{extension}"
-            concat_audio(ffmpeg, generated_files, output_path)
-            print(f"Concatenated audio saved to {output_path}")
 
         if job.cooldown_ms > 0 and job_index < len(jobs):
             time.sleep(job.cooldown_ms / 1000)

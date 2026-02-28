@@ -27,4 +27,3 @@ def ensure_child_path(parent: Path, name: str) -> Path:
     except ValueError as exc:
         raise ValueError("Invalid path") from exc
     return candidate
-

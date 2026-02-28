@@ -5,6 +5,7 @@ A Python modular monolith that converts screenplay dialogue into AI-generated au
 ## Python Migration (v1.0 in progress)
 
 This repo is actively migrating to a Python modular monolith:
+
 - UI: Flask + Jinja2 + HTMX
 - API/jobs: FastAPI
 - Core logic: `lib/` (portable, typed)
@@ -15,7 +16,7 @@ See `ROADMAP.md` and `MIGRATION_ROADMAP.md` for the execution plan.
 
 - Flask UI wizard works end-to-end: paste script → parse → assign voices (auto-fill + browse voices) → start async generation → live progress via SSE → timeline playback → exports.
 - FastAPI API + jobs are implemented (`/api/parse`, `/api/projects/validate`, `/api/generate`, `/api/jobs/*`, `/api/exports/*`).
-- Core library exists in `lib/` (parser, ElevenLabs client, generation, ZIP/manifest, ffmpeg concat/mix helpers) with pytest coverage.
+- Core library exists in `lib/` (parser, ElevenLabs client, generation, ZIP/manifest) with pytest coverage.
 
 ## Prerequisites
 
@@ -23,13 +24,6 @@ See `ROADMAP.md` and `MIGRATION_ROADMAP.md` for the execution plan.
 
 - **Python** (3.9 or higher)
 - **ElevenLabs API Key** - [Get your key here](https://elevenlabs.io/)
-
-### Optional
-
-- **FFmpeg** - Required for concatenation/mixing features (per-line clips still work without it)
-  - **Windows**: `winget install ffmpeg` or [download manually](https://ffmpeg.org/download.html)
-  - **Mac**: `brew install ffmpeg`
-  - **Linux**: `sudo apt install ffmpeg` (Ubuntu/Debian) or `sudo yum install ffmpeg` (RHEL/Fedora)
 
 ## Installation
 
@@ -114,21 +108,11 @@ python3 -m py_cli --script path/to/screenplay.txt --config path/to/elevenlabs_pr
 - `GET /api/jobs/{job_id}/events` (SSE; supports `Last-Event-ID`)
 - `GET /api/jobs/{job_id}/audio/{filename}` (per-line clips)
 - `GET /api/exports/{job_id}.zip`
-- `GET /api/exports/{job_id}/concatenated` (single-file listen-through; requires FFmpeg)
 - `GET /api/exports/{job_id}.json` (manifest)
 - `GET /api/exports/{job_id}.csv` (manifest)
 - `GET /api/exports/{job_id}.srt` (subtitles)
 - `GET /api/exports/{job_id}.vtt` (subtitles)
 - `GET /api/exports/{job_id}.rpp` (Reaper project)
-- `POST /api/concatenate` (ffmpeg concat + optional mixing; multipart form)
-
-## Concatenation & Mixing (FFmpeg)
-
-Concatenation/mixing is implemented server-side via FFmpeg:
-- API endpoint: `POST /api/concatenate` (multipart)
-- Core wrapper: `lib/audio/ffmpeg.py`
-
-If FFmpeg is missing or concat fails, jobs still complete and the ZIP includes `concat_error.txt`.
 
 ## Project Structure (Python)
 
@@ -154,7 +138,6 @@ ELEVENLABS_BASE_URL=https://api.elevenlabs.io
 ELEVENLABS_TIMEOUT_S=30
 FLASK_SECRET_KEY=dev
 UPLOAD_DIR=uploads
-FFMPEG_BIN=ffmpeg
 ```
 
 Never commit `.env` (gitignored). If a key is ever exposed in logs/chat/screenshots, rotate it immediately in ElevenLabs.
@@ -162,6 +145,7 @@ Never commit `.env` (gitignored). If a key is ever exposed in logs/chat/screensh
 ## Screenplay Formats
 
 The parser supports:
+
 - Standard “Characters:” list + dialogue blocks
 - Fountain-style scripts (no character list required)
 
@@ -180,10 +164,6 @@ python3 -m pip install -e ".[dev]"
 ### `Missing ELEVENLABS_API_KEY`
 
 Set `ELEVENLABS_API_KEY` in `.env` (copy from `.env.example`).
-
-### `FFmpeg failed` or `ffmpeg: command not found`
-
-Install ffmpeg and verify `ffmpeg -version`.
 
 ## Tech Stack
 

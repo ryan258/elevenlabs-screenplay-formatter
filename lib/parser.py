@@ -89,7 +89,7 @@ def parse_script(script_text: str, preserve_stage_directions: bool = False) -> P
                 character_detections=[],
                 total_lines_processed=0,
                 dialogue_lines_matched=0,
-                parsing_mode="empty"
+                parsing_mode="empty",
             ),
         )
 
@@ -104,7 +104,9 @@ def parse_script(script_text: str, preserve_stage_directions: bool = False) -> P
     character_metadata: Dict[str, Dict[str, Any]] = {}
     dialogue_lines_count = 0
 
-    def add_character(full_name: str, detection_method: str = "unknown", line_number: int = 0) -> _DefinedCharacter:
+    def add_character(
+        full_name: str, detection_method: str = "unknown", line_number: int = 0
+    ) -> _DefinedCharacter:
         existing = full_name_map.get(full_name)
         if existing:
             # Update metadata if we have a better detection method
@@ -120,7 +122,7 @@ def parse_script(script_text: str, preserve_stage_directions: bool = False) -> P
         character_metadata[full_name] = {
             "first_line": line_number,
             "line_count": 0,
-            "detection_methods": {detection_method}
+            "detection_methods": {detection_method},
         }
 
         for alias in new_character.aliases:
@@ -133,7 +135,9 @@ def parse_script(script_text: str, preserve_stage_directions: bool = False) -> P
             return None
         return alias_map.get(normalized)
 
-    def register_character(raw_name: str, detection_method: str = "unknown", line_number: int = 0) -> Optional[_DefinedCharacter]:
+    def register_character(
+        raw_name: str, detection_method: str = "unknown", line_number: int = 0
+    ) -> Optional[_DefinedCharacter]:
         full_name = normalize_character_name(raw_name)
         if not full_name:
             return None
@@ -191,9 +195,13 @@ def parse_script(script_text: str, preserve_stage_directions: bool = False) -> P
                 raw_line = dialogue_part.strip()
                 text = clean_dialogue(raw_line, preserve_stage_directions)
                 if text:
-                    original_text = raw_line if preserve_stage_directions else strip_brackets(raw_line)
+                    original_text = (
+                        raw_line if preserve_stage_directions else strip_brackets(raw_line)
+                    )
                     chunks.append(
-                        DialogueChunk(character=found.full_name, text=text, original_text=original_text)
+                        DialogueChunk(
+                            character=found.full_name, text=text, original_text=original_text
+                        )
                     )
                     # Track dialogue line count for same-line dialogue
                     if found.full_name in character_metadata:
@@ -228,7 +236,9 @@ def parse_script(script_text: str, preserve_stage_directions: bool = False) -> P
             if trimmed_line.lower().startswith("characters:"):
                 mode = "characterList"
                 continue
-            if _SCENE_HEADING_RE.search(trimmed_line) or _SAME_LINE_DIALOGUE_RE.search(trimmed_line):
+            if _SCENE_HEADING_RE.search(trimmed_line) or _SAME_LINE_DIALOGUE_RE.search(
+                trimmed_line
+            ):
                 mode = "scriptBody"
             else:
                 continue
@@ -264,10 +274,12 @@ def parse_script(script_text: str, preserve_stage_directions: bool = False) -> P
     for character in defined_characters:
         meta = character_metadata.get(character.full_name, {})
         line_count = meta.get("line_count", 0)
-        
+
         # Calculate word count for this character
         # Scan chunks instead of tracking in metadata to keep it simple
-        char_word_count = sum(len(c.text.split()) for c in chunks if c.character == character.full_name)
+        char_word_count = sum(
+            len(c.text.split()) for c in chunks if c.character == character.full_name
+        )
         total_word_count += char_word_count
 
         # Calculate confidence based on multiple factors
@@ -282,7 +294,7 @@ def parse_script(script_text: str, preserve_stage_directions: bool = False) -> P
             confidence += 0.2
         elif line_count >= 1:
             confidence += 0.1
-        
+
         # Word count bonus
         if char_word_count > 50:
             confidence += 0.1
@@ -297,21 +309,31 @@ def parse_script(script_text: str, preserve_stage_directions: bool = False) -> P
         else:
             primary_method = "unknown"
 
-        character_detections.append(CharacterDetectionInfo(
-            character_name=character.full_name,
-            line_count=line_count,
-            word_count=char_word_count,
-            first_line_number=meta.get("first_line", 0),
-            detection_method=primary_method,
-            aliases=sorted(character.aliases),
-            confidence=confidence
-        ))
+        character_detections.append(
+            CharacterDetectionInfo(
+                character_name=character.full_name,
+                line_count=line_count,
+                word_count=char_word_count,
+                first_line_number=meta.get("first_line", 0),
+                detection_method=primary_method,
+                aliases=sorted(character.aliases),
+                confidence=confidence,
+            )
+        )
 
     # Sort by confidence descending, then by character name
     character_detections.sort(key=lambda x: (-x.confidence, x.character_name))
 
     # Determine parsing mode
-    parsing_mode = "fountain" if not any("character_list" in character_metadata.get(c.full_name, {}).get("detection_methods", set()) for c in defined_characters) else "standard"
+    parsing_mode = (
+        "fountain"
+        if not any(
+            "character_list"
+            in character_metadata.get(c.full_name, {}).get("detection_methods", set())
+            for c in defined_characters
+        )
+        else "standard"
+    )
 
     return ParsedScript(
         characters=character_names,
@@ -322,6 +344,6 @@ def parse_script(script_text: str, preserve_stage_directions: bool = False) -> P
             total_lines_processed=len(lines),
             dialogue_lines_matched=dialogue_lines_count,
             total_word_count=total_word_count,
-            parsing_mode=parsing_mode
+            parsing_mode=parsing_mode,
         ),
     )

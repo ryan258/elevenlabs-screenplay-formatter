@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import tempfile
-from pathlib import Path
 from typing import Union
 
 try:
@@ -18,7 +16,6 @@ from apps.api.character_configs import build_character_configs
 from apps.api.deps import get_config
 from apps.api.limits import MAX_DIALOGUE_CHUNKS, MAX_SCRIPT_CHARS
 from apps.api.schemas import ErrorResponse, GenerateZipRequest, ValidateProjectResponse
-from lib.audio.ffmpeg import concat_audio
 from lib.elevenlabs.client import ElevenLabsClient
 from lib.exports.zip_bundle import build_zip_bundle
 from lib.generation import generate_all_audio
@@ -50,6 +47,7 @@ def api_validate_project(
 
     # Strict validation (Review fix)
     from lib.generation import OUTPUT_FORMAT_DETAILS
+
     format_val = body.project_settings.output_format
     if not format_val:
         errors.insert(0, "Missing projectSettings.outputFormat")
@@ -71,7 +69,9 @@ def api_generate_zip(
     # Rate limit (Bug 18 fix applied to API)
     client_ip = request.client.host if request.client else "unknown"
     if not generation_limiter.check_limit(client_ip):
-        return JSONResponse(status_code=429, content=ErrorResponse(error="Rate limit exceeded").model_dump())
+        return JSONResponse(
+            status_code=429, content=ErrorResponse(error="Rate limit exceeded").model_dump()
+        )
 
     if len(body.script_text) > MAX_SCRIPT_CHARS:
         return JSONResponse(
@@ -99,19 +99,22 @@ def api_generate_zip(
     errors = validate_character_configs(parsed.dialogue_chunks, character_configs)
     if not body.project_settings.model:
         errors = ["Missing projectSettings.model", *errors]
-    
+
     # Strict output format validation (Review fix)
     from lib.generation import OUTPUT_FORMAT_DETAILS
+
     format_val = body.project_settings.output_format
     if not format_val:
         errors = ["Missing projectSettings.outputFormat", *errors]
     elif format_val not in OUTPUT_FORMAT_DETAILS:
         errors = [f"Invalid outputFormat: {format_val}", *errors]
-        
+
     if errors:
         return JSONResponse(
             status_code=400,
-            content=ErrorResponse(error="Invalid configuration", meta={"errors": errors}).model_dump(),
+            content=ErrorResponse(
+                error="Invalid configuration", meta={"errors": errors}
+            ).model_dump(),
         )
 
     try:
@@ -142,21 +145,6 @@ def api_generate_zip(
             ("subtitles.vtt", manifest_to_vtt(entries).encode("utf-8")),
             ("reaper.rpp", build_reaper_project(entries).encode("utf-8")),
         ]
-        if body.project_settings.concatenate:
-            extension = "wav" if str(body.project_settings.output_format).startswith("pcm_") else "mp3"
-            with tempfile.TemporaryDirectory(prefix="esf_api_generate_") as tmpdir:
-                tmp = Path(tmpdir)
-                paths = []
-                for name, data in audio_files:
-                    p = tmp / name
-                    p.write_bytes(data)
-                    paths.append(p)
-                out_path = tmp / f"concatenated_audio.{extension}"
-                try:
-                    concat_audio(cfg.ffmpeg, paths, out_path)
-                    audio_files.append((out_path.name, out_path.read_bytes()))
-                except Exception as exc:
-                    extra_files.append(("concat_error.txt", str(exc).encode("utf-8")))
 
         zip_bytes = build_zip_bundle(
             audio_files=audio_files,

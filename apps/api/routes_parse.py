@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 try:
-    from fastapi import APIRouter
+    from fastapi import APIRouter, HTTPException
 except ModuleNotFoundError as exc:  # pragma: no cover
     raise ModuleNotFoundError(
         "FastAPI is not installed. Install Python deps (see pyproject.toml) to run the API."
@@ -16,7 +16,12 @@ router = APIRouter(prefix="/api")
 
 @router.post("/parse", response_model=ParseResponse)
 def api_parse(body: ParseRequest) -> ParseResponse:
-    parsed = parse_script(body.script_text, preserve_stage_directions=body.preserve_stage_directions)
+    try:
+        parsed = parse_script(
+            body.script_text, preserve_stage_directions=body.preserve_stage_directions
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Failed to parse script: {exc}")
     return ParseResponse.model_validate(
         {
             "characters": parsed.characters,
@@ -32,4 +37,3 @@ def api_parse(body: ParseRequest) -> ParseResponse:
             },
         }
     )
-

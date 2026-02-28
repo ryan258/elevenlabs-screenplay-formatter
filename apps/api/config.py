@@ -4,13 +4,12 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from lib.config import ElevenLabsConfig, FfmpegConfig
+from lib.config import ElevenLabsConfig
 
 
 @dataclass(frozen=True)
 class AppConfig:
     elevenlabs: ElevenLabsConfig
-    ffmpeg: FfmpegConfig
     flask_secret_key: str
     upload_dir: str
 
@@ -43,7 +42,6 @@ def load_config_from_env() -> AppConfig:
     elevenlabs_api_key = os.environ.get("ELEVENLABS_API_KEY", "").strip()
     elevenlabs_base_url = os.environ.get("ELEVENLABS_BASE_URL", "").strip()
     timeout_s_raw = os.environ.get("ELEVENLABS_TIMEOUT_S", "30").strip()
-    ffmpeg_bin = os.environ.get("FFMPEG_BIN", "ffmpeg").strip()
     flask_secret_key = os.environ.get("FLASK_SECRET_KEY", "dev").strip()
     upload_dir = os.environ.get("UPLOAD_DIR", "uploads").strip()
 
@@ -55,6 +53,7 @@ def load_config_from_env() -> AppConfig:
         flask_secret_key = "dev"
     if flask_secret_key == "dev":
         import sys
+
         print(
             "WARNING: Using insecure default FLASK_SECRET_KEY for local dev. "
             "Set FLASK_SECRET_KEY in .env for session persistence.",
@@ -71,7 +70,6 @@ def load_config_from_env() -> AppConfig:
             base_url=elevenlabs_base_url,
             timeout_s=timeout_s,
         ),
-        ffmpeg=FfmpegConfig(ffmpeg_bin=ffmpeg_bin),
         flask_secret_key=flask_secret_key,
         upload_dir=upload_dir,
     )

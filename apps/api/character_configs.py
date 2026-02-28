@@ -19,4 +19,3 @@ def build_character_configs(body: GenerateZipRequest) -> Dict[str, CharacterConf
             ),
         )
     return character_configs
-

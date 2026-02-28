@@ -5,13 +5,21 @@ All notable changes to the ElevenLabs Screenplay Formatter project.
 Note: `main` is now Python-first. The entries below primarily describe the legacy Node/React v0.4.0 app, which is archived in an older branch/tag and removed from `main`.
 
 ## [Unreleased]
+
 ### Added
+
 - Auto-fill Voice IDs feature: extracts Voice IDs from character lists in screenplay format `- CHARACTER (Voice ID: <ID>)` with one-click population of character configs.
 - Context-aware audio generation: sends previous and next dialogue text to ElevenLabs API for improved audio continuity and natural transitions between lines.
 - Stage direction preservation: new "Preserve Stage Directions [Brackets]" toggle for Turbo v2.5+ and Multilingual v3 models to send performance instructions like `[whispering]` or `[shouting]` to the AI for more expressive audio generation.
 
+### Changed
+
+- Removed all FFmpeg concatenation capabilities and options from the codebase, migrating exclusively to per-line audio generation.
+
 ## [0.4.0] - 2025-11-28
+
 ### Added - Core Features
+
 - Word-level timestamp support via ElevenLabs alignment API plus subtitle exports (SRT/VTT) and manifest timing metadata.
 - Background-music/SFX Audio Production panel with persisted presets; concatenation server now mixes uploads alongside dialogue.
 - Shareable project URLs, toast notifications, and enhanced UX messaging for status/errors, including auto-loading shared configs.
@@ -26,6 +34,7 @@ Note: `main` is now Python-first. The entries below primarily describe the legac
 - Script versioning: lightweight version label field on projects with labels included in filenames and manifests.
 
 ### Added - Parsing & UX
+
 - Alias-aware screenplay parser with parenthetical handling, local-storage state persistence, progress-log controls, and accessibility tweaks.
 - Fountain-style screenplay parsing (uppercase lines auto-create characters), support for `V.O./O.S./CONT'D`, optional spoken parentheticals, and new Fountain example script.
 - Parser Diagnostics card with unmatched-line reporting for troubleshooting.
@@ -37,6 +46,7 @@ Note: `main` is now Python-first. The entries below primarily describe the legac
 - Color contrast improvements for readability.
 
 ### Added - Developer Experience
+
 - Environment-driven output formats and concatenation URL support.
 - ESLint/Vitest tooling and parser unit tests.
 - Backend security knobs (configurable port/origin) and docs for advanced usage.
@@ -44,12 +54,14 @@ Note: `main` is now Python-first. The entries below primarily describe the legac
 - Architecture overview documentation describing component layout, state management, backend endpoints, and data flow.
 
 ### Added - Project Management
+
 - Project save/load: JSON-based configs with script text, character mappings, voice settings, model, output format, and concatenate toggle.
 - Voice presets: save and quickly assign named presets (e.g., "Narrator", "Hero") to characters.
 - Default templates and "Load demo project" button for end-to-end workflow demonstration.
 - Auto-save of last project to localStorage.
 
 ### Added - API & Error Handling
+
 - Concatenation health-check card with backend status indicator and manual health check button.
 - Resumable generation flow with progress bar and snippet previews.
 - Optional "remember API key" toggle with clear browser-only storage explanation.
@@ -59,12 +71,14 @@ Note: `main` is now Python-first. The entries below primarily describe the legac
 - User-friendly error translations converting technical API errors into actionable advice.
 
 ### Added - CLI & Automation
+
 - Node/CLI wrapper (`cli/generate.ts`) for command-line screenplay processing.
 - Takes screenplay file and JSON config as input.
 - Generates audio files with optional concatenation using same logic as UI.
 - CLI documentation in `CLI.md`.
 
 ### Changed - Architecture
+
 - Frontend state management migrated to Zustand store with persisted serialized blobs, enabling cross-session resume after browser refresh/crash.
 - Refactored `App.tsx` from 895 to 723 lines (-19%) by extracting `useAudioGeneration` hook and utility modules (`downloads.ts`, `stringUtils.ts`, `errorHandling.ts`).
 - Split monolithic state selectors into 7 focused selectors using `useShallow` for fine-grained subscriptions and reduced re-renders.
@@ -72,22 +86,26 @@ Note: `main` is now Python-first. The entries below primarily describe the legac
 - Optimized parser from O(n²) to O(n) by replacing linear character search with Map-based lookups (`aliasMap` and `fullNameMap`).
 
 ### Changed - API & Generation
+
 - ElevenLabs generation pipeline now applies dynamic rate limiting, clearer error translations, and exposes detailed progress metadata.
 - Output format now propagates correctly to ElevenLabs requests, downloads, and bash scripts with safe payload escaping.
 - Voice speed setting now properly included in all API calls (previously ignored).
 - CLI respects output format and voice speed settings (previously hardcoded to MP3 and default speed).
 
 ### Changed - Backend
+
 - Concatenation server emits streams with randomized temp files and improved error handling.
 - README/CONCATENATION_SETUP/AGENTS now reference correct dev ports and environment setup.
 
 ### Fixed - Critical Issues
+
 - **Blob storage in localStorage**: Migrated from localStorage (causing 5-10MB quota crashes with base64-encoded audio) to IndexedDB for binary blob storage. Only metadata and resume indices persist in localStorage.
 - **Resume flow data loss**: Fixed bug where completed audio clips were lost when concatenation was disabled. Now preserves `error.completedBlobs` regardless of concatenation setting.
 - **Concatenation failures wasting API credits**: Generation now returns `generatedBlobs` even when FFmpeg server fails, allowing ZIP download and retry of just concatenation step.
 - **Memory leaks from object URLs**: Implemented proper cleanup in `handlePreviewLine` to revoke object URLs when replaced, preventing browser slowdown.
 
 ### Fixed - Functional Issues
+
 - Voice speed slider now functional (previously UI displayed slider but API calls omitted the `speed` field).
 - React error boundaries implemented to catch component rendering errors and prevent full app crashes.
 - Reaper export now declares correct source type (`<SOURCE MP3>` or `<SOURCE WAV>`) based on actual file format instead of always outputting `WAV`.
@@ -95,6 +113,7 @@ Note: `main` is now Python-first. The entries below primarily describe the legac
 - VoiceSuggestionsPanel no longer mutates state during render (fixed `safeCharacter` useMemo side effect using `useEffect` pattern).
 
 ### Fixed - Parser & UX
+
 - Inline dialogue with parentheticals now parses correctly.
 - Misaligned port references and missing environment guidance in documentation.
 - Inconsistent error handling patterns unified with `logError` and `notifyError` utilities.

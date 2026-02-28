@@ -1,166 +1,206 @@
 <!doctype html>
 <html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ElevenLabs Screenplay Formatter (Python)</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='candlelight.css') }}"
+    />
+    <script
+      src="{{ url_for('static', filename='htmx.min.js') }}"
+      onerror="
+        this.onerror = null;
+        this.src = 'https://unpkg.com/htmx.org@1.9.12';
+      "
+      defer
+    ></script>
+  </head>
 
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>ElevenLabs Screenplay Formatter (Python)</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='candlelight.css') }}" />
-  <script src="{{ url_for('static', filename='htmx.min.js') }}"
-    onerror="this.onerror=null;this.src='https://unpkg.com/htmx.org@1.9.12';" defer></script>
-</head>
+  <body>
+    <header class="site-header">
+      <div class="container">
+        <h1>ElevenLabs Screenplay Formatter</h1>
+        <p class="subtitle">Python modular monolith (Flask + HTMX + FastAPI)</p>
+        <nav class="nav">
+          <a href="/">Script</a>
+          <a href="/characters">Characters</a>
+          <a href="/generation">Generation</a>
+          <a href="/timeline">Timeline</a>
+          <a href="/exports">Exports</a>
+          <form action="/reset" method="post" style="margin: 0; display: flex">
+            <button
+              type="submit"
+              style="
+                background: none;
+                border: none;
+                padding: 0;
+                color: var(--text);
+                font: inherit;
+                cursor: pointer;
+                border-bottom: 1px solid transparent;
+              "
+            >
+              New Play
+            </button>
+          </form>
+        </nav>
+      </div>
+    </header>
+    <main class="container">{% block content %} {% endblock %}</main>
+    <script>
+      (function () {
+        function bindJobPanels(root) {
+          const selector = "[data-sse-url]:not([data-sse-bound])";
 
-<body>
-  <header class="site-header">
-    <div class="container">
-      <h1>ElevenLabs Screenplay Formatter</h1>
-      <p class="subtitle">Python modular monolith (Flask + HTMX + FastAPI)</p>
-      <nav class="nav">
-        <a href="/">Script</a>
-        <a href="/characters">Characters</a>
-        <a href="/generation">Generation</a>
-        <a href="/timeline">Timeline</a>
-        <a href="/exports">Exports</a>
-        <form action="/reset" method="post" style="margin:0;display:flex;">
-          <button type="submit"
-            style="background:none;border:none;padding:0;color:var(--text);font:inherit;cursor:pointer;border-bottom:1px solid transparent;">New
-            Play</button>
-        </form>
-      </nav>
-    </div>
-  </header>
-  <main class="container">
-    {% block content %}{% endblock %}
-  </main>
-  <script>
-    (function () {
-      function bindJobPanels(root) {
-        const selector = '[data-sse-url]:not([data-sse-bound])';
+          function bindOne(panel) {
+            panel.setAttribute("data-sse-bound", "1");
+            const url = panel.getAttribute("data-sse-url");
+            if (!url) return;
 
-        function bindOne(panel) {
-          panel.setAttribute('data-sse-bound', '1');
-          const url = panel.getAttribute('data-sse-url');
-          if (!url) return;
+            const statusEl = panel.querySelector('[data-role="job-status"]');
+            const messageEl = panel.querySelector('[data-role="job-message"]');
+            const progressEl = panel.querySelector(
+              '[data-role="job-progress"]',
+            );
+            const exportEl = panel.querySelector('[data-role="job-export"]');
 
-          const statusEl = panel.querySelector('[data-role="job-status"]');
-          const messageEl = panel.querySelector('[data-role="job-message"]');
-          const progressEl = panel.querySelector('[data-role="job-progress"]');
-          const exportEl = panel.querySelector('[data-role="job-export"]');
+            const es = new EventSource(url);
 
-          const es = new EventSource(url);
+            es.onmessage = function () {};
 
-          es.onmessage = function () { };
+            function setExportReady(jobId, opts) {
+              opts = opts || {};
+              if (!exportEl) return;
+              let html =
+                '<a class="btn" href="/api/exports/' +
+                jobId +
+                '.zip">Download ZIP</a>';
 
-          function setExportReady(jobId, opts) {
-            opts = opts || {};
-            if (!exportEl) return;
-            let html = '<a class="btn" href="/api/exports/' + jobId + '.zip">Download ZIP</a>';
-            if (opts.concatReady) {
-              html += '<a class="btn secondary" href="/api/exports/' + jobId + '/concatenated">Concatenated Audio</a>';
+              html +=
+                '<a class="btn secondary" href="/api/exports/' +
+                jobId +
+                '.json">manifest.json</a>' +
+                '<a class="btn secondary" href="/api/exports/' +
+                jobId +
+                '.csv">manifest.csv</a>' +
+                '<a class="btn secondary" href="/api/exports/' +
+                jobId +
+                '.srt">SRT</a>' +
+                '<a class="btn secondary" href="/api/exports/' +
+                jobId +
+                '.vtt">VTT</a>' +
+                '<a class="btn secondary" href="/api/exports/' +
+                jobId +
+                '.rpp">Reaper (.rpp)</a>' +
+                '<a class="btn secondary" href="/timeline?job_id=' +
+                jobId +
+                '">Timeline</a>';
+              exportEl.innerHTML = html;
             }
-            html +=
-              '<a class="btn secondary" href="/api/exports/' + jobId + '.json">manifest.json</a>' +
-              '<a class="btn secondary" href="/api/exports/' + jobId + '.csv">manifest.csv</a>' +
-              '<a class="btn secondary" href="/api/exports/' + jobId + '.srt">SRT</a>' +
-              '<a class="btn secondary" href="/api/exports/' + jobId + '.vtt">VTT</a>' +
-              '<a class="btn secondary" href="/api/exports/' + jobId + '.rpp">Reaper (.rpp)</a>' +
-              '<a class="btn secondary" href="/timeline?job_id=' + jobId + '">Timeline</a>';
-            exportEl.innerHTML = html;
-          }
 
-          function setStatus(text) {
-            if (!statusEl) return;
-            statusEl.textContent = text || '';
-            statusEl.className = 'status status--' + (text || '').toLowerCase();
-          }
+            function setStatus(text) {
+              if (!statusEl) return;
+              statusEl.textContent = text || "";
+              statusEl.className =
+                "status status--" + (text || "").toLowerCase();
+            }
 
-          es.addEventListener('snapshot', function (ev) {
-            try {
-              const snap = JSON.parse(ev.data || '{}');
-              setStatus(snap.status || '');
-              if (messageEl) messageEl.textContent = snap.message || '';
-              if (progressEl) {
-                const cur = snap.current || 0;
-                const total = snap.total || 0;
-                progressEl.textContent = total ? (cur + ' / ' + total) : String(cur);
-              }
-              if (snap.export_ready) setExportReady(snap.job_id, { concatReady: !!snap.concat_ready });
-            } catch (_) { }
-          });
-
-          es.addEventListener('warning', function (ev) {
-            try {
-              const d = JSON.parse(ev.data || '{}');
-              const details = d.details || d.warning || 'Warning';
-              if (messageEl) messageEl.textContent = String(details);
-            } catch (_) { }
-          });
-
-          es.addEventListener('progress', function (ev) {
-            try {
-              const d = JSON.parse(ev.data || '{}');
-              setStatus(d.status || 'running');
-              if (messageEl) messageEl.textContent = d.message || '';
-              if (progressEl) progressEl.textContent = (d.current || 0) + ' / ' + (d.total || 0);
-            } catch (_) { }
-          });
-
-          es.addEventListener('complete', function (ev) {
-            setStatus('complete');
-            try {
-              const d = JSON.parse(ev.data || '{}');
-              if (messageEl && d.message) messageEl.textContent = d.message;
-              const jobId = panel.getAttribute('data-job-id');
-              if (jobId && d.export_ready) setExportReady(jobId, { concatReady: !!d.concat_ready });
-            } catch (_) { }
-          });
-
-          es.addEventListener('job_error', function (ev) {
-            setStatus('error');
-            if (messageEl) {
+            es.addEventListener("snapshot", function (ev) {
               try {
-                const d = JSON.parse(ev.data || '{}');
-                messageEl.textContent = d.error || 'Error';
-              } catch (_) {
-                messageEl.textContent = ev.data || 'Error';
+                const snap = JSON.parse(ev.data || "{}");
+                setStatus(snap.status || "");
+                if (messageEl) messageEl.textContent = snap.message || "";
+                if (progressEl) {
+                  const cur = snap.current || 0;
+                  const total = snap.total || 0;
+                  progressEl.textContent = total
+                    ? cur + " / " + total
+                    : String(cur);
+                }
+                if (snap.export_ready) setExportReady(snap.job_id);
+              } catch (_) {}
+            });
+
+            es.addEventListener("warning", function (ev) {
+              try {
+                const d = JSON.parse(ev.data || "{}");
+                const details = d.details || d.warning || "Warning";
+                if (messageEl) messageEl.textContent = String(details);
+              } catch (_) {}
+            });
+
+            es.addEventListener("progress", function (ev) {
+              try {
+                const d = JSON.parse(ev.data || "{}");
+                setStatus(d.status || "running");
+                if (messageEl) messageEl.textContent = d.message || "";
+                if (progressEl)
+                  progressEl.textContent =
+                    (d.current || 0) + " / " + (d.total || 0);
+              } catch (_) {}
+            });
+
+            es.addEventListener("complete", function (ev) {
+              setStatus("complete");
+              try {
+                const d = JSON.parse(ev.data || "{}");
+                if (messageEl && d.message) messageEl.textContent = d.message;
+                const jobId = panel.getAttribute("data-job-id");
+                if (jobId && d.export_ready) setExportReady(jobId);
+              } catch (_) {}
+            });
+
+            es.addEventListener("job_error", function (ev) {
+              setStatus("error");
+              if (messageEl) {
+                try {
+                  const d = JSON.parse(ev.data || "{}");
+                  messageEl.textContent = d.error || "Error";
+                } catch (_) {
+                  messageEl.textContent = ev.data || "Error";
+                }
               }
-            }
-          });
+            });
 
-          es.addEventListener('done', function (ev) {
-            try {
-              const d = JSON.parse(ev.data || '{}');
-              if (d.status) setStatus(d.status);
-              if (messageEl && d.message) messageEl.textContent = d.message;
-              const jobId = panel.getAttribute('data-job-id');
-              if (jobId && d.export_ready) setExportReady(jobId, { concatReady: !!d.concat_ready });
-            } catch (_) { }
-            es.close();
-          });
+            es.addEventListener("done", function (ev) {
+              try {
+                const d = JSON.parse(ev.data || "{}");
+                if (d.status) setStatus(d.status);
+                if (messageEl && d.message) messageEl.textContent = d.message;
+                const jobId = panel.getAttribute("data-job-id");
+                if (jobId && d.export_ready) setExportReady(jobId);
+              } catch (_) {}
+              es.close();
+            });
 
-          es.onopen = function () { };
-          es.onerror = function () {
-            if (statusEl && statusEl.textContent !== 'complete') setStatus('disconnected');
-          };
-        }
-
-        if (root.matches && root.matches(selector)) {
-          bindOne(root);
-        }
-        root.querySelectorAll(selector).forEach(bindOne);
-      }
-
-      const observer = new MutationObserver((mutations) => {
-        for (const m of mutations) {
-          for (const n of m.addedNodes) {
-            if (n && n.nodeType === 1) bindJobPanels(n);
+            es.onopen = function () {};
+            es.onerror = function () {
+              if (statusEl && statusEl.textContent !== "complete")
+                setStatus("disconnected");
+            };
           }
-        }
-      });
-      observer.observe(document.documentElement, { childList: true, subtree: true });
-      bindJobPanels(document);
-    })();
-  </script>
-</body>
 
+          if (root.matches && root.matches(selector)) {
+            bindOne(root);
+          }
+          root.querySelectorAll(selector).forEach(bindOne);
+        }
+
+        const observer = new MutationObserver((mutations) => {
+          for (const m of mutations) {
+            for (const n of m.addedNodes) {
+              if (n && n.nodeType === 1) bindJobPanels(n);
+            }
+          }
+        });
+        observer.observe(document.documentElement, {
+          childList: true,
+          subtree: true,
+        });
+        bindJobPanels(document);
+      })();
+    </script>
+  </body>
 </html>

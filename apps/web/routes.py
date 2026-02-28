@@ -1,13 +1,19 @@
 from __future__ import annotations
 
 import json
-import tempfile
 from pathlib import Path
-import hashlib
-import time
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from flask import Response, current_app, redirect, render_template, request, send_file, session, url_for
+from flask import (
+    Response,
+    current_app,
+    redirect,
+    render_template,
+    request,
+    send_file,
+    session,
+    url_for,
+)
 from werkzeug.wrappers.response import Response as WerkzeugResponse
 
 from apps.api.character_configs import build_character_configs
@@ -17,25 +23,25 @@ from apps.api.limits import MAX_DIALOGUE_CHUNKS, MAX_SCRIPT_CHARS
 from apps.api.schemas import GenerateZipRequest
 from apps.web.app import app
 from apps.web.session_store import WebSessionStore
-from lib.config import FfmpegConfig
-from lib.elevenlabs.client import ElevenLabsClient
-from lib.exports.zip_bundle import build_zip_bundle
-from lib.generation import generate_all_audio, generate_one_audio, output_format_extension
-from lib.manifest import build_manifest_entries, manifest_to_srt, manifest_to_vtt
-from lib.models import CharacterConfig, VoiceSettings
-from lib.parser import parse_script
-from lib.reaper_export import build_reaper_project
-from lib.share_links import decode_share_payload
+from lib.sync_generation import generate_sync_zip_bundle
+from lib.share_links import decode_share_payload, normalize_share_payload, session_share_view
 from lib.validation import validate_character_configs
 from lib.voice_extraction import extract_voice_ids_from_script
-from lib.utils_web import RateLimiter, generation_limiter, clamp_voice_setting
+from lib.utils import clamp_voice_setting
+from lib.utils_web import generation_limiter
 from lib.diagnostics import build_line_info, group_dialogue_by_character
 from lib.script_formatter import format_script
+
+from lib.elevenlabs.client import ElevenLabsClient, list_elevenlabs_voices_cached
+from lib.generation import generate_one_audio, output_format_extension
+from lib.parser import parse_script
 
 _VOICES_CACHE_TTL_S = 300
 
 
-
+def _sanitize_error(exc: Exception) -> str:
+    msg = str(exc)
+    return msg.split("\n")[0][:200]
 
 
 def _get_cfg() -> AppConfig:
@@ -71,56 +77,6 @@ def _get_web_store(cfg: AppConfig) -> WebSessionStore:
     return store
 
 
-def _api_key_cache_tag(api_key: str) -> str:
-    if not api_key:
-        return ""
-    return hashlib.sha256(api_key.encode("utf-8")).hexdigest()[:16]
-
-
-def _get_voices_cache() -> Tuple[float, str, List[Dict[str, Any]]]:
-    cached = current_app.config.get("ELEVENLABS_VOICES_CACHE")
-    if (
-        isinstance(cached, tuple)
-        and len(cached) == 3
-        and isinstance(cached[0], (int, float))
-        and isinstance(cached[1], str)
-        and isinstance(cached[2], list)
-    ):
-        return float(cached[0]), str(cached[1]), list(cached[2])
-    return 0.0, "", []
-
-
-def _set_voices_cache(fetched_at_s: float, api_key_tag: str, voices: List[Dict[str, Any]]) -> None:
-    current_app.config["ELEVENLABS_VOICES_CACHE"] = (float(fetched_at_s), str(api_key_tag), list(voices))
-
-
-def _list_elevenlabs_voices(cfg: AppConfig, *, force_refresh: bool) -> List[Dict[str, Any]]:
-    fetched_at_s, cached_tag, cached = _get_voices_cache()
-    now = time.time()
-    key_tag = _api_key_cache_tag(cfg.elevenlabs.api_key)
-    if (not force_refresh) and cached and cached_tag == key_tag and (now - fetched_at_s) < _VOICES_CACHE_TTL_S:
-        return cached
-
-    if not cfg.elevenlabs.api_key:
-        return []
-
-    client = ElevenLabsClient(cfg.elevenlabs)
-    voices = client.list_voices()
-    out: List[Dict[str, Any]] = []
-    for v in voices:
-        out.append(
-            {
-                "voice_id": v.voice_id,
-                "name": v.name,
-                "category": v.category,
-                "description": v.description,
-                "preview_url": v.preview_url,
-            }
-        )
-    _set_voices_cache(now, key_tag, out)
-    return out
-
-
 def _parse_int(value: str, *, default: int) -> int:
     try:
         return int(value)
@@ -139,9 +95,6 @@ def _normalize_character_key(value: str) -> str:
     return str(value or "").strip().upper()
 
 
-
-
-
 def _is_hx_request() -> bool:
     return request.headers.get("HX-Request") == "true"
 
@@ -152,7 +105,9 @@ def _error_response(
     effective_status = 200 if _is_hx_request() else status
     if not _is_hx_request():
         body = "; ".join([e for e in errors if e])
-        return Response(render_template("simple_page.html", title="Error", body=body), status=status)
+        return Response(
+            render_template("simple_page.html", title="Error", body=body), status=status
+        )
 
     resp = Response(render_template("error_box.html", errors=list(errors)), status=effective_status)
     resp.headers["HX-Retarget"] = hx_retarget
@@ -205,7 +160,6 @@ def _build_default_payload(
         "projectSettings": {
             "model": "",
             "outputFormat": "mp3_44100_128",
-            "concatenate": True,
             "speakParentheticals": False,
             "preserveStageDirections": preserve_stage_directions,
             "requestDelayMs": 500,
@@ -217,7 +171,9 @@ def _build_default_payload(
     return payload, parsed.characters
 
 
-def _voice_rows_from_payload(parsed_characters: List[str], payload: Dict[str, Any]) -> List[Dict[str, Any]]:
+def _voice_rows_from_payload(
+    parsed_characters: List[str], payload: Dict[str, Any]
+) -> List[Dict[str, Any]]:
     cfgs: Dict[str, Any] = payload.get("characterConfigs") or {}
     rows: List[Dict[str, Any]] = []
     for character in parsed_characters:
@@ -239,7 +195,7 @@ def _validate_payload(cfg: AppConfig, payload: Dict[str, Any]) -> List[str]:
     try:
         body = GenerateZipRequest.model_validate(payload)
     except Exception as exc:
-        return [str(exc)]
+        return [_sanitize_error(exc)]
 
     if len(body.script_text) > MAX_SCRIPT_CHARS:
         return ["Script is too large"]
@@ -249,7 +205,7 @@ def _validate_payload(cfg: AppConfig, payload: Dict[str, Any]) -> List[str]:
             preserve_stage_directions=body.project_settings.preserve_stage_directions,
         )
     except Exception as exc:
-        return [f"Failed to parse script: {exc}"]
+        return [f"Failed to parse script: {_sanitize_error(exc)}"]
     if len(parsed.dialogue_chunks) > MAX_DIALOGUE_CHUNKS:
         return ["Too many dialogue chunks"]
 
@@ -262,39 +218,6 @@ def _validate_payload(cfg: AppConfig, payload: Dict[str, Any]) -> List[str]:
     if not cfg.elevenlabs.api_key:
         errors.insert(0, "Missing ELEVENLABS_API_KEY")
     return errors
-
-
-def _share_normalized_payload(share_payload: Dict[str, Any]) -> Dict[str, Any]:
-    script_text = str(share_payload.get("scriptText") or share_payload.get("script_text") or "").strip()
-    project_settings = share_payload.get("projectSettings") or {}
-    if not isinstance(project_settings, dict):
-        project_settings = {}
-    character_configs = share_payload.get("characterConfigs") or {}
-    if not isinstance(character_configs, dict):
-        character_configs = {}
-    filename_prefix = share_payload.get("filename_prefix") or share_payload.get("filenamePrefix") or ""
-
-    return {
-        "scriptText": script_text,
-        "projectSettings": project_settings,
-        "characterConfigs": character_configs,
-        "filename_prefix": str(filename_prefix),
-    }
-
-
-def _session_share_view(payload: Dict[str, Any]) -> Dict[str, Any]:
-    project_settings = payload.get("projectSettings") or {}
-    if not isinstance(project_settings, dict):
-        project_settings = {}
-    character_configs = payload.get("characterConfigs") or {}
-    if not isinstance(character_configs, dict):
-        character_configs = {}
-    return {
-        "scriptText": str(payload.get("scriptText") or "").strip(),
-        "projectSettings": project_settings,
-        "characterConfigs": character_configs,
-        "filename_prefix": str(payload.get("filename_prefix") or ""),
-    }
 
 
 def _find_preview_path(preview_dir: Path, chunk_index: int) -> Optional[Path]:
@@ -326,12 +249,13 @@ def index() -> str:
         try:
             decoded = decode_share_payload(shared_project)
             share_payload_raw = json.loads(decoded)
-            share_norm = _share_normalized_payload(share_payload_raw)
+            share_norm = normalize_share_payload(share_payload_raw)
             share_script_text = str(share_norm["scriptText"] or "").strip()
             if share_script_text:
                 share_project_settings = share_norm["projectSettings"]
                 preserve_stage_directions = bool(
-                    share_project_settings.get("preserveStageDirections") or share_payload_raw.get("preserve_stage_directions")
+                    share_project_settings.get("preserveStageDirections")
+                    or share_payload_raw.get("preserve_stage_directions")
                 )
 
                 share_effective, _characters = _build_default_payload(
@@ -339,7 +263,10 @@ def index() -> str:
                     preserve_stage_directions=preserve_stage_directions,
                 )
                 if isinstance(share_project_settings, dict) and share_project_settings:
-                    share_effective["projectSettings"] = {**share_effective.get("projectSettings", {}), **share_project_settings}
+                    share_effective["projectSettings"] = {
+                        **share_effective.get("projectSettings", {}),
+                        **share_project_settings,
+                    }
                 share_character_configs = share_norm["characterConfigs"]
                 if isinstance(share_character_configs, dict) and share_character_configs:
                     share_effective["characterConfigs"] = share_character_configs
@@ -348,7 +275,9 @@ def index() -> str:
                     share_effective["filename_prefix"] = str(filename_prefix)
 
                 needs_new_session = True
-                if stored_payload and _session_share_view(stored_payload) == _session_share_view(share_effective):
+                if stored_payload and session_share_view(stored_payload) == session_share_view(
+                    share_effective
+                ):
                     needs_new_session = False
 
                 if needs_new_session:
@@ -362,7 +291,12 @@ def index() -> str:
         except Exception:
             script_text = ""
 
-    return render_template("index.html", script_text=script_text, preserve=preserve, has_session=stored_payload is not None)
+    return render_template(
+        "index.html",
+        script_text=script_text,
+        preserve=preserve,
+        has_session=stored_payload is not None,
+    )
 
 
 @app.get("/characters")
@@ -377,7 +311,11 @@ def characters() -> str:
     try:
         parsed = parse_script(script_text, preserve_stage_directions=preserve)
     except Exception as exc:
-        return render_template("simple_page.html", title="Characters", body=f"Failed to parse script: {exc}")
+        return render_template(
+            "simple_page.html",
+            title="Characters",
+            body=f"Failed to parse script: {_sanitize_error(exc)}",
+        )
     voice_rows = _voice_rows_from_payload(parsed.characters, payload)
     return render_template("characters.html", parsed=parsed, voice_rows=voice_rows, errors=[])
 
@@ -394,7 +332,7 @@ def characters_parsed_view() -> WerkzeugResponse:
     try:
         parsed = parse_script(script_text, preserve_stage_directions=preserve)
     except Exception as exc:
-        return Response(f"<div class='error'>Parse error: {exc}</div>", status=200)
+        return Response(f"<div class='error'>Parse error: {_sanitize_error(exc)}</div>", status=200)
 
     line_info = build_line_info(script_text, parsed.diagnostics.unmatched_lines)
     dialogue_groups = group_dialogue_by_character(parsed.dialogue_chunks)
@@ -423,11 +361,13 @@ def characters_diagnostics() -> WerkzeugResponse:
     try:
         parsed = parse_script(script_text, preserve_stage_directions=preserve)
     except Exception as exc:
-        return Response(f"<div class='error'>Parse error: {exc}</div>", status=200)
+        return Response(f"<div class='error'>Parse error: {_sanitize_error(exc)}</div>", status=200)
 
     return Response(
-        render_template("diagnostics_panel.html", diagnostics=parsed.diagnostics, characters=parsed.characters),
-        status=200
+        render_template(
+            "diagnostics_panel.html", diagnostics=parsed.diagnostics, characters=parsed.characters
+        ),
+        status=200,
     )
 
 
@@ -500,7 +440,11 @@ def generation() -> WerkzeugResponse:
         parsed = parse_script(script_text, preserve_stage_directions=preserve)
     except Exception as exc:
         return Response(
-            render_template("simple_page.html", title="Generation", body=f"Failed to parse script: {exc}"),
+            render_template(
+                "simple_page.html",
+                title="Generation",
+                body=f"Failed to parse script: {_sanitize_error(exc)}",
+            ),
             status=400,
         )
     project_settings = payload.get("projectSettings") or {}
@@ -513,10 +457,6 @@ def generation() -> WerkzeugResponse:
         except Exception:
             pass  # Fallback to empty list or default input
 
-    # Check FFmpeg availability
-    from lib.audio.ffmpeg import check_ffmpeg_available
-    ffmpeg_available, ffmpeg_message = check_ffmpeg_available(cfg.ffmpeg)
-
     job_id = request.args.get("job_id") or payload.get("lastJobId")
     context: Dict[str, Any] = {
         "parsed": parsed,
@@ -526,11 +466,8 @@ def generation() -> WerkzeugResponse:
         "output_format": str(project_settings.get("outputFormat") or "mp3_44100_128"),
         "request_delay_ms": int(project_settings.get("requestDelayMs") or 500),
         "speak_parentheticals": bool(project_settings.get("speakParentheticals")),
-        "concatenate": bool(project_settings.get("concatenate")),
         "filename_prefix": str(payload.get("filename_prefix") or ""),
         "job_id": job_id,
-        "ffmpeg_available": ffmpeg_available,
-        "ffmpeg_message": ffmpeg_message,
     }
 
     if job_id:
@@ -571,11 +508,16 @@ def timeline() -> WerkzeugResponse:
     if job_id:
         job = store.get(str(job_id))
         if job is None:
-            return Response(render_template("simple_page.html", title="Timeline", body="Job not found."), status=404)
+            return Response(
+                render_template("simple_page.html", title="Timeline", body="Job not found."),
+                status=404,
+            )
         manifest_path = (job.work_dir / "manifest.json").resolve()
         if not manifest_path.exists():
             return Response(
-                render_template("simple_page.html", title="Timeline", body="manifest.json not ready."),
+                render_template(
+                    "simple_page.html", title="Timeline", body="manifest.json not ready."
+                ),
                 status=404,
             )
         entries = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -617,7 +559,14 @@ def timeline() -> WerkzeugResponse:
     try:
         parsed = parse_script(script_text, preserve_stage_directions=preserve)
     except Exception as exc:
-        return Response(render_template("simple_page.html", title="Timeline", body=f"Failed to parse script: {exc}"), status=400)
+        return Response(
+            render_template(
+                "simple_page.html",
+                title="Timeline",
+                body=f"Failed to parse script: {_sanitize_error(exc)}",
+            ),
+            status=400,
+        )
 
     total_chunks = len(parsed.dialogue_chunks)
     total_pages = max(1, (total_chunks + per_page - 1) // per_page)
@@ -631,7 +580,9 @@ def timeline() -> WerkzeugResponse:
     preview_dir = web_store.preview_dir(sid)
 
     items = []
-    for idx, chunk in enumerate(parsed.dialogue_chunks[start_index : start_index + per_page], start=start_index):
+    for idx, chunk in enumerate(
+        parsed.dialogue_chunks[start_index : start_index + per_page], start=start_index
+    ):
         preview_path = _find_preview_path(preview_dir, idx)
         items.append(
             {
@@ -663,27 +614,17 @@ def exports() -> str:
     payload = _payload_from_session(cfg) or {}
     job_id = request.args.get("job_id") or payload.get("lastJobId")
 
-    concat_ready = False
     export_ready = False
     if job_id:
         store = _get_store(cfg)
         job = store.get(str(job_id))
         if job is not None:
             export_ready = job.export_path is not None and job.export_path.exists()
-            work_dir = job.work_dir.resolve()
-            concat_ready = any(
-                (work_dir / name).exists()
-                for name in (
-                    "concatenated_audio.mp3",
-                    "concatenated_audio.wav",
-                )
-            )
 
     return render_template(
         "exports.html",
         job_id=job_id,
         export_ready=export_ready,
-        concat_ready=concat_ready,
     )
 
 
@@ -697,9 +638,15 @@ def parse() -> WerkzeugResponse:
     cfg = _get_cfg()
     web_store = _get_web_store(cfg)
     try:
-        payload, _characters = _build_default_payload(script_text=script_text, preserve_stage_directions=preserve)
+        payload, _characters = _build_default_payload(
+            script_text=script_text, preserve_stage_directions=preserve
+        )
     except Exception as exc:
-        return _error_response([f"Failed to parse script: {exc}"], status=400, hx_retarget="#job-panel")
+        return _error_response(
+            [f"Failed to parse script: {_sanitize_error(exc)}"],
+            status=400,
+            hx_retarget="#job-panel",
+        )
     data = web_store.create(payload=payload)
     session["sid"] = data.session_id
 
@@ -722,7 +669,11 @@ def characters_autofill() -> WerkzeugResponse:
     try:
         parsed = parse_script(script_text, preserve_stage_directions=preserve)
     except Exception as exc:
-        return _error_response([f"Failed to parse script: {exc}"], status=400, hx_retarget="#characters-table")
+        return _error_response(
+            [f"Failed to parse script: {_sanitize_error(exc)}"],
+            status=400,
+            hx_retarget="#characters-table",
+        )
     extracted = extract_voice_ids_from_script(script_text)
     cfgs: Dict[str, Any] = payload.get("characterConfigs") or {}
     for character in parsed.characters:
@@ -750,26 +701,44 @@ def characters_voices() -> WerkzeugResponse:
     cfg = _get_cfg()
     payload = _payload_from_session(cfg)
     if not payload:
-        return Response(render_template("error_box.html", errors=["Paste a script first."]), status=200)
+        return Response(
+            render_template("error_box.html", errors=["Paste a script first."]), status=200
+        )
 
     if not cfg.elevenlabs.api_key:
         return Response(
-            render_template("error_box.html", errors=["Missing ELEVENLABS_API_KEY (set it in your environment)."]),
+            render_template(
+                "error_box.html",
+                errors=["Missing ELEVENLABS_API_KEY (set it in your environment)."],
+            ),
             status=200,
         )
 
     force_refresh = request.args.get("refresh") == "1"
     try:
-        voices = _list_elevenlabs_voices(cfg, force_refresh=force_refresh)
+        client = ElevenLabsClient(cfg.elevenlabs)
+        voices = list_elevenlabs_voices_cached(
+            client, force_refresh=force_refresh, api_key=cfg.elevenlabs.api_key
+        )
     except Exception as exc:
-        return Response(render_template("error_box.html", errors=[f"Failed to load voices: {exc}"]), status=200)
+        return Response(
+            render_template(
+                "error_box.html", errors=[f"Failed to load voices: {_sanitize_error(exc)}"]
+            ),
+            status=200,
+        )
 
     script_text = str(payload.get("scriptText") or "")
     preserve = bool(payload.get("projectSettings", {}).get("preserveStageDirections"))
     try:
         parsed = parse_script(script_text, preserve_stage_directions=preserve)
     except Exception as exc:
-        return Response(render_template("error_box.html", errors=[f"Failed to parse script: {exc}"]), status=200)
+        return Response(
+            render_template(
+                "error_box.html", errors=[f"Failed to parse script: {_sanitize_error(exc)}"]
+            ),
+            status=200,
+        )
 
     html = render_template(
         "voices_list.html",
@@ -789,16 +758,24 @@ def characters_apply_voice() -> WerkzeugResponse:
     character = (request.form.get("character") or "").strip()
     voice_id = (request.form.get("voice_id") or "").strip()
     if not character or not voice_id:
-        return _error_response(["Missing character or voice id"], status=400, hx_retarget="#voices-list")
+        return _error_response(
+            ["Missing character or voice id"], status=400, hx_retarget="#voices-list"
+        )
 
     script_text = str(payload.get("scriptText") or "")
     preserve = bool(payload.get("projectSettings", {}).get("preserveStageDirections"))
     try:
         parsed = parse_script(script_text, preserve_stage_directions=preserve)
     except Exception as exc:
-        return _error_response([f"Failed to parse script: {exc}"], status=400, hx_retarget="#voices-list")
+        return _error_response(
+            [f"Failed to parse script: {_sanitize_error(exc)}"],
+            status=400,
+            hx_retarget="#voices-list",
+        )
     if character not in parsed.characters:
-        return _error_response(["Invalid character selection"], status=400, hx_retarget="#voices-list")
+        return _error_response(
+            ["Invalid character selection"], status=400, hx_retarget="#voices-list"
+        )
 
     cfgs: Dict[str, Any] = payload.get("characterConfigs") or {}
     item = cfgs.get(character) or {}
@@ -853,7 +830,11 @@ def characters_apply_preset() -> WerkzeugResponse:
     try:
         parsed = parse_script(script_text, preserve_stage_directions=preserve)
     except Exception as exc:
-        return _error_response([f"Failed to parse script: {exc}"], status=400, hx_retarget="#characters-table")
+        return _error_response(
+            [f"Failed to parse script: {_sanitize_error(exc)}"],
+            status=400,
+            hx_retarget="#characters-table",
+        )
     voice_rows = _voice_rows_from_payload(parsed.characters, payload)
     html = render_template("characters_table.html", parsed=parsed, voice_rows=voice_rows)
     return Response(html, status=200, content_type="text/html")
@@ -871,7 +852,11 @@ def characters_save() -> WerkzeugResponse:
     try:
         parsed = parse_script(script_text, preserve_stage_directions=preserve)
     except Exception as exc:
-        return _error_response([f"Failed to parse script: {exc}"], status=400, hx_retarget="#save-result")
+        return _error_response(
+            [f"Failed to parse script: {_sanitize_error(exc)}"],
+            status=400,
+            hx_retarget="#save-result",
+        )
 
     character_configs_payload: Dict[str, Dict[str, Any]] = {}
     for idx, character in enumerate(parsed.characters):
@@ -879,19 +864,29 @@ def characters_save() -> WerkzeugResponse:
         # Bug 19 fix - clamp voice settings to valid ranges
         stability = clamp_voice_setting(
             _parse_float(request.form.get(f"stability__{idx}", "0.5") or "0.5", default=0.5),
-            min_val=0.0, max_val=1.0, default=0.5
+            min_val=0.0,
+            max_val=1.0,
+            default=0.5,
         )
         similarity_boost = clamp_voice_setting(
-            _parse_float(request.form.get(f"similarity_boost__{idx}", "0.75") or "0.75", default=0.75),
-            min_val=0.0, max_val=1.0, default=0.75
+            _parse_float(
+                request.form.get(f"similarity_boost__{idx}", "0.75") or "0.75", default=0.75
+            ),
+            min_val=0.0,
+            max_val=1.0,
+            default=0.75,
         )
         style = clamp_voice_setting(
             _parse_float(request.form.get(f"style__{idx}", "0.1") or "0.1", default=0.1),
-            min_val=0.0, max_val=1.0, default=0.1
+            min_val=0.0,
+            max_val=1.0,
+            default=0.1,
         )
         speed = clamp_voice_setting(
             _parse_float(request.form.get(f"speed__{idx}", "1") or "1", default=1.0),
-            min_val=0.25, max_val=4.0, default=1.0
+            min_val=0.25,
+            max_val=4.0,
+            default=1.0,
         )
         character_configs_payload[character] = {
             "voiceId": voice_id,
@@ -909,7 +904,9 @@ def characters_save() -> WerkzeugResponse:
         _get_web_store(cfg).patch(sid, payload)
 
     if _is_hx_request():
-        resp = Response(render_template("ok_box.html", message="Saved."), status=200, content_type="text/html")
+        resp = Response(
+            render_template("ok_box.html", message="Saved."), status=200, content_type="text/html"
+        )
         resp.headers["HX-Redirect"] = url_for("generation")
         return resp
     return redirect(url_for("generation"))
@@ -925,9 +922,10 @@ def generation_validate() -> WerkzeugResponse:
     project_settings = payload.get("projectSettings") or {}
     project_settings["model"] = request.form.get("model", "").strip()
     project_settings["outputFormat"] = request.form.get("output_format", "mp3_44100_128").strip()
-    project_settings["requestDelayMs"] = _parse_int(request.form.get("request_delay_ms", "500") or "500", default=500)
+    project_settings["requestDelayMs"] = _parse_int(
+        request.form.get("request_delay_ms", "500") or "500", default=500
+    )
     project_settings["speakParentheticals"] = request.form.get("speak_parentheticals") == "on"
-    project_settings["concatenate"] = request.form.get("concatenate") == "on"
     payload["projectSettings"] = project_settings
     payload["filename_prefix"] = request.form.get("filename_prefix", "").strip()
 
@@ -939,14 +937,25 @@ def generation_validate() -> WerkzeugResponse:
     if _is_hx_request():
         if errors:
             return _error_response(errors, status=400, hx_retarget="#validation")
-        return Response(render_template("ok_box.html", message="Looks good."), status=200, content_type="text/html")
+        return Response(
+            render_template("ok_box.html", message="Looks good."),
+            status=200,
+            content_type="text/html",
+        )
 
     script_text = str(payload.get("scriptText") or "")
     preserve = bool(payload.get("projectSettings", {}).get("preserveStageDirections"))
     try:
         parsed = parse_script(script_text, preserve_stage_directions=preserve)
     except Exception as exc:
-        return Response(render_template("simple_page.html", title="Generation", body=f"Failed to parse script: {exc}"), status=400)
+        return Response(
+            render_template(
+                "simple_page.html",
+                title="Generation",
+                body=f"Failed to parse script: {_sanitize_error(exc)}",
+            ),
+            status=400,
+        )
     return Response(
         render_template(
             "generation.html",
@@ -956,7 +965,6 @@ def generation_validate() -> WerkzeugResponse:
             output_format=project_settings.get("outputFormat", "mp3_44100_128"),
             request_delay_ms=project_settings.get("requestDelayMs", 500),
             speak_parentheticals=project_settings.get("speakParentheticals", False),
-            concatenate=project_settings.get("concatenate", False),
             filename_prefix=payload.get("filename_prefix", ""),
             job_id=None,
         ),
@@ -980,9 +988,10 @@ def generation_start() -> WerkzeugResponse:
     project_settings = payload.get("projectSettings") or {}
     project_settings["model"] = request.form.get("model", "").strip()
     project_settings["outputFormat"] = request.form.get("output_format", "mp3_44100_128").strip()
-    project_settings["requestDelayMs"] = _parse_int(request.form.get("request_delay_ms", "500") or "500", default=500)
+    project_settings["requestDelayMs"] = _parse_int(
+        request.form.get("request_delay_ms", "500") or "500", default=500
+    )
     project_settings["speakParentheticals"] = request.form.get("speak_parentheticals") == "on"
-    project_settings["concatenate"] = request.form.get("concatenate") == "on"
     payload["projectSettings"] = project_settings
     payload["filename_prefix"] = request.form.get("filename_prefix", "").strip()
 
@@ -996,9 +1005,16 @@ def generation_start() -> WerkzeugResponse:
 
     body = GenerateZipRequest.model_validate(payload)
     try:
-        parsed = parse_script(body.script_text, preserve_stage_directions=body.project_settings.preserve_stage_directions)
+        parsed = parse_script(
+            body.script_text,
+            preserve_stage_directions=body.project_settings.preserve_stage_directions,
+        )
     except Exception as exc:
-        return _error_response([f"Failed to parse script: {exc}"], status=400, hx_retarget="#job-panel")
+        return _error_response(
+            [f"Failed to parse script: {_sanitize_error(exc)}"],
+            status=400,
+            hx_retarget="#job-panel",
+        )
     character_configs = build_character_configs(body)
 
     job = store.create()
@@ -1011,7 +1027,6 @@ def generation_start() -> WerkzeugResponse:
         output_format=body.project_settings.output_format,
         request_delay_ms=body.project_settings.request_delay_ms or 500,
         speak_parentheticals=body.project_settings.speak_parentheticals,
-        concatenate=body.project_settings.concatenate,
         filename_prefix=body.filename_prefix or "",
         character_configs=character_configs,
     )
@@ -1043,18 +1058,16 @@ def create_share_link() -> WerkzeugResponse:
 
     # Build minimal share payload (only what's needed)
     from lib.share_links import encode_share_payload
-    share_view = _session_share_view(payload)
-    share_json = json.dumps(share_view, separators=(',', ':'))
+
+    share_view = session_share_view(payload)
+    share_json = json.dumps(share_view, separators=(",", ":"))
     encoded = encode_share_payload(share_json)
 
     # Build full URL
-    base_url = request.host_url.rstrip('/')
+    base_url = request.host_url.rstrip("/")
     share_url = f"{base_url}/?project={encoded}"
 
-    return Response(
-        render_template("share_link_box.html", share_url=share_url),
-        status=200
-    )
+    return Response(render_template("share_link_box.html", share_url=share_url), status=200)
 
 
 @app.post("/timeline/preview")
@@ -1075,9 +1088,16 @@ def timeline_preview() -> WerkzeugResponse:
 
     body = GenerateZipRequest.model_validate(payload)
     try:
-        parsed = parse_script(body.script_text, preserve_stage_directions=body.project_settings.preserve_stage_directions)
+        parsed = parse_script(
+            body.script_text,
+            preserve_stage_directions=body.project_settings.preserve_stage_directions,
+        )
     except Exception as exc:
-        return _error_response([f"Failed to parse script: {exc}"], status=400, hx_retarget=f"#chunk-{index}")
+        return _error_response(
+            [f"Failed to parse script: {_sanitize_error(exc)}"],
+            status=400,
+            hx_retarget=f"#chunk-{index}",
+        )
     if index < 0 or index >= len(parsed.dialogue_chunks):
         return _error_response(["Chunk not found"], status=404, hx_retarget=f"#chunk-{index}")
     character_configs = build_character_configs(body)
@@ -1138,51 +1158,89 @@ def timeline_preview_file(chunk_index: int) -> WerkzeugResponse:
 def generate_zip() -> WerkzeugResponse:
     cfg = _get_cfg()
     if not cfg.elevenlabs.api_key:
-        return Response(render_template("simple_page.html", title="Error", body="Missing ELEVENLABS_API_KEY"), status=400)
+        return Response(
+            render_template("simple_page.html", title="Error", body="Missing ELEVENLABS_API_KEY"),
+            status=400,
+        )
 
     script_text = request.form.get("script_text", "")
     if len(script_text) > MAX_SCRIPT_CHARS:
-        return Response(render_template("simple_page.html", title="Error", body="Script is too large"), status=413)
+        return Response(
+            render_template("simple_page.html", title="Error", body="Script is too large"),
+            status=413,
+        )
     preserve = request.form.get("preserve_stage_directions") == "on"
     model = request.form.get("model", "")
     output_format = request.form.get("output_format", "mp3_44100_128")
     speak_parentheticals = request.form.get("speak_parentheticals") == "on"
     delay_ms = _parse_int(request.form.get("request_delay_ms", "500") or "500", default=500)
-    concatenate = request.form.get("concatenate") == "on"
 
     parsed = parse_script(script_text, preserve_stage_directions=preserve)
     if len(parsed.dialogue_chunks) > MAX_DIALOGUE_CHUNKS:
-        return Response(render_template("simple_page.html", title="Error", body="Too many dialogue chunks"), status=413)
+        return Response(
+            render_template("simple_page.html", title="Error", body="Too many dialogue chunks"),
+            status=413,
+        )
 
-    character_configs: dict[str, CharacterConfig] = {}
+    payload: Dict[str, Any] = {
+        "scriptText": script_text,
+        "projectSettings": {
+            "model": model,
+            "outputFormat": output_format,
+            "speakParentheticals": speak_parentheticals,
+            "preserveStageDirections": preserve,
+            "requestDelayMs": delay_ms,
+        },
+        "characterConfigs": {},
+        "filename_prefix": "",
+    }
+
     for idx, character in enumerate(parsed.characters):
-        voice_id = request.form.get(f"voice_id__{idx}", "").strip()
-        # Bug 19 fix - clamp voice settings to valid ranges
-        stability = clamp_voice_setting(
-            _parse_float(request.form.get(f"stability__{idx}", "0.5") or "0.5", default=0.5),
-            min_val=0.0, max_val=1.0, default=0.5
-        )
-        similarity_boost = clamp_voice_setting(
-            _parse_float(request.form.get(f"similarity_boost__{idx}", "0.75") or "0.75", default=0.75),
-            min_val=0.0, max_val=1.0, default=0.75
-        )
-        style = clamp_voice_setting(
-            _parse_float(request.form.get(f"style__{idx}", "0.1") or "0.1", default=0.1),
-            min_val=0.0, max_val=1.0, default=0.1
-        )
-        speed = clamp_voice_setting(
-            _parse_float(request.form.get(f"speed__{idx}", "1") or "1", default=1.0),
-            min_val=0.25, max_val=4.0, default=1.0
-        )
-        character_configs[character] = CharacterConfig(
-            voice_id=voice_id,
-            voice_settings=VoiceSettings(
-                stability=stability,
-                similarity_boost=similarity_boost,
-                style=style,
-                speed=speed,
+        payload["characterConfigs"][character] = {
+            "voiceId": request.form.get(f"voice_id__{idx}", "").strip(),
+            "voiceSettings": {
+                "stability": clamp_voice_setting(
+                    _parse_float(
+                        request.form.get(f"stability__{idx}", "0.5") or "0.5", default=0.5
+                    ),
+                    min_val=0.0,
+                    max_val=1.0,
+                    default=0.5,
+                ),
+                "similarity_boost": clamp_voice_setting(
+                    _parse_float(
+                        request.form.get(f"similarity_boost__{idx}", "0.75") or "0.75", default=0.75
+                    ),
+                    min_val=0.0,
+                    max_val=1.0,
+                    default=0.75,
+                ),
+                "style": clamp_voice_setting(
+                    _parse_float(request.form.get(f"style__{idx}", "0.1") or "0.1", default=0.1),
+                    min_val=0.0,
+                    max_val=1.0,
+                    default=0.1,
+                ),
+                "speed": clamp_voice_setting(
+                    _parse_float(request.form.get(f"speed__{idx}", "1") or "1", default=1.0),
+                    min_val=0.25,
+                    max_val=4.0,
+                    default=1.0,
+                ),
+            },
+        }
+
+    try:
+        body = GenerateZipRequest.model_validate(payload)
+    except Exception as exc:
+        return Response(
+            render_template(
+                "simple_page.html", title="Error", body=f"Validation failed: {_sanitize_error(exc)}"
             ),
+            status=400,
         )
+
+    character_configs = build_character_configs(body)
 
     errors = validate_character_configs(parsed.dialogue_chunks, character_configs)
     if errors:
@@ -1191,54 +1249,14 @@ def generate_zip() -> WerkzeugResponse:
             status=400,
         )
 
-    client = ElevenLabsClient(cfg.elevenlabs)
-    generated = generate_all_audio(
-        client=client,
+    zip_bytes = generate_sync_zip_bundle(
+        elevenlabs_config=cfg.elevenlabs,
         dialogue_chunks=parsed.dialogue_chunks,
         character_configs=character_configs,
-        model_id=model,
-        output_format=output_format,
+        model_id=body.project_settings.model,
+        output_format=body.project_settings.output_format,
         delay_ms=delay_ms,
-        speak_parentheticals=speak_parentheticals,
-        fetch_alignment=True,
-    )
-
-    entries = build_manifest_entries(
-        parsed.dialogue_chunks,
-        [g.filename for g in generated],
-        start_times_ms=[g.start_time_ms for g in generated],
-        end_times_ms=[g.end_time_ms for g in generated],
-        alignments=[g.alignment for g in generated],
-    )
-
-    audio_files = [(g.filename, g.audio_bytes) for g in generated]
-
-    if concatenate:
-        ffmpeg = FfmpegConfig(ffmpeg_bin=cfg.ffmpeg.ffmpeg_bin)
-        with tempfile.TemporaryDirectory(prefix="esf_generate_") as tmpdir:
-            tmp = Path(tmpdir)
-            paths = []
-            for name, data in audio_files:
-                p = tmp / name
-                p.write_bytes(data)
-                paths.append(p)
-            out_path = tmp / "concatenated_audio.mp3"
-            from lib.audio.ffmpeg import concat_audio as _concat
-
-            try:
-                _concat(ffmpeg, paths, out_path)
-                audio_files.append(("concatenated_audio.mp3", out_path.read_bytes()))
-            except Exception as exc:
-                audio_files.append(("concat_error.txt", str(exc).encode("utf-8")))
-
-    zip_bytes = build_zip_bundle(
-        audio_files=audio_files,
-        manifest_entries=entries,
-        extra_files=[
-            ("subtitles.srt", manifest_to_srt(entries).encode("utf-8")),
-            ("subtitles.vtt", manifest_to_vtt(entries).encode("utf-8")),
-            ("reaper.rpp", build_reaper_project(entries).encode("utf-8")),
-        ],
+        speak_parentheticals=body.project_settings.speak_parentheticals,
     )
     return Response(
         zip_bytes,

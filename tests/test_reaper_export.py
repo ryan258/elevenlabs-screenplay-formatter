@@ -22,4 +22,3 @@ def test_reaper_project_contains_track_and_item() -> None:
     assert "<REAPER_PROJECT" in project
     assert 'NAME "Test"' in project
     assert 'NAME "JOHN"' in project
-

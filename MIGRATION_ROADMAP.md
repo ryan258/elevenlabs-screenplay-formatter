@@ -2,9 +2,10 @@
 
 **Status (current):** The core migration is complete on `main`. The legacy Node/React app is archived in an older branch/tag and removed from `main`.
 
-**Goal:** Track remaining work for the Python-first modular monolith (parsing, character voice assignment, generation, exports, optional ffmpeg concatenation).
+**Goal:** Track remaining work for the Python-first modular monolith (parsing, character voice assignment, generation, exports).
 
 **Target Stack (No-Bloat compliant):**
+
 - HTML UI: **Flask + Jinja2 + HTMX** (progressive enhancement)
 - API + jobs/progress: **FastAPI**
 - Core library: **`lib/`** (pure, reusable, typed; no web/framework imports)
@@ -25,7 +26,6 @@ One repo, one Python environment, clear import direction:
 │   ├── models.py              # ProjectConfig, CharacterConfig, etc. (dataclasses)
 │   ├── elevenlabs/            # API client, retries, rate limiting
 │   ├── exports/               # ZIP, SRT/VTT, Reaper, manifests
-│   ├── audio/                 # concat + mixing helpers (ffmpeg wrapper)
 │   └── share_links.py         # base64 project payload encoding/decoding
 ├── apps/
 │   ├── api/                   # FastAPI (JSON, jobs, SSE progress)
@@ -51,21 +51,23 @@ One repo, one Python environment, clear import direction:
 ## 2) Feature Parity Map (what must survive the rewrite)
 
 ### Core
+
 - Screenplay parsing (standard + Fountain), alias resolution, diagnostics
 - Voice assignment per character
 - ElevenLabs generation (voices listing; text-to-speech; context previous/next)
 - Retry + rate limiting behavior
 - Timeline-like preview (at least per-line preview playback)
 - Exports: ZIP of audio, manifest JSON/CSV, SRT/VTT, Reaper `.rpp`
-- Optional concatenation via ffmpeg (best-effort; should not fail the job)
 
 ### Deferred / not required for local-only v1
+
 - Full project management UI (save/load presets, demo loading)
 - Resume across restarts and durable job registry
 - Audio production UI (background/SFX mixing). (API support may exist without a UI.)
 - Share-link authoring UI (decode/import support exists; authoring is optional)
 
 ### UX/Behavioral equivalence targets
+
 - Same default voice settings (stability/similarity/style/speed) semantics
 - Same parsing output for `EXAMPLE_SCREENPLAY.md` and `EXAMPLE_FOUNTAIN.md`
 - Same export formats for the same inputs (byte-identical where feasible; otherwise structurally equivalent)
@@ -75,6 +77,7 @@ One repo, one Python environment, clear import direction:
 ## 3) Migration Strategy (phased, verifiable, ends cleanly)
 
 ### Phase 0 — Baseline & Lockdown (1–3 days)
+
 **Goal:** Freeze Node features and produce fixtures that prove parity.
 
 - [ ] Tag current working version: `v0.4.0-node-final` (or equivalent)
@@ -91,6 +94,7 @@ One repo, one Python environment, clear import direction:
 ---
 
 ### Phase 1 — Python Project Skeleton (2–4 days)
+
 **Goal:** Create the modular monolith scaffolding and tooling before porting logic.
 
 - [x] Add `pyproject.toml` (minimal deps), `ruff`, `mypy`, `pytest`
@@ -107,9 +111,11 @@ One repo, one Python environment, clear import direction:
 ---
 
 ### Phase 2 — Port Core Library (`lib/`) (1–3 weeks)
+
 **Goal:** Rebuild all non-UI functionality in `lib/` with strong typing and tests.
 
 #### 2.1 Parser + Diagnostics (port `utils/parser.ts`)
+
 - [x] Port parsing semantics (standard + Fountain)
 - [x] Preserve diagnostics: unmatched lines, detected characters, confidence/flags (as currently implemented)
 - [x] Unit tests: golden JSON outputs from Phase 0 fixtures
@@ -117,10 +123,12 @@ One repo, one Python environment, clear import direction:
 **Exit criteria:** fixture scripts produce the same parsed structure as TS.
 
 #### 2.2 Voice extraction + alias helpers (port `utils/voiceExtraction.ts`)
+
 - [x] Auto-fill voice IDs from character lists
 - [x] Tests ported from `utils/voiceExtraction.test.ts`
 
 #### 2.3 ElevenLabs integration (port `utils/elevenLabsApi.ts` + `utils/elevenLabsClient.ts`)
+
 - [x] Implement a typed client:
   - `Client(config: ElevenLabsConfig)` with `generate_audio(...)`, `list_voices()`, `list_models()`
 - [x] Retry logic (429 backoff), network error handling, and rate-limit-aware pacing
@@ -129,6 +137,7 @@ One repo, one Python environment, clear import direction:
 **Exit criteria:** mocked responses + “dry-run” mode prove parity without network calls.
 
 #### 2.4 Exporters (port `utils/manifest.ts`, `utils/downloads.ts`, `utils/reaperExport.ts`)
+
 - [x] Manifest JSON/CSV builder
 - [x] SRT/VTT generation (timestamp formatting parity)
 - [x] ZIP bundling with stable filenames
@@ -136,26 +145,16 @@ One repo, one Python environment, clear import direction:
 
 **Exit criteria:** fixture outputs match (or are structurally equivalent with documented diffs).
 
-#### 2.5 Audio concat + production mixing (ported from legacy Node concat server)
-- [x] Implement `lib/audio/ffmpeg.py` wrapper using `subprocess` (no shell=True)
-- [x] Implement:
-  - Concat N files (safe temp filelist)
-  - Optional background mix (volume)
-  - Optional SFX overlays (start time + volume)
-- [x] Use safe temp directories and deterministic cleanup
-
-**Exit criteria:** produces a playable MP3 for a known fixture set, with expected ordering and approximate duration.
-
 ---
 
 ### Phase 3 — Python CLI Parity (3–7 days)
+
 **Goal:** Replace `cli/generate.ts` with a Python CLI that uses `lib/`.
 
-- [ ] CLI commands (minimal parity):
-  - Parse-only (outputs JSON diagnostics)
+- [x] CLI commands (minimal parity):
+  - [x] Parse-only (outputs JSON diagnostics)
   - [x] Generate audio (per-chunk files)
-  - [x] Concat/mix via ffmpeg wrapper
-  - [ ] Export bundle generation (ZIP/manifest/subtitles/Reaper)
+  - [x] Export bundle generation (ZIP/manifest/subtitles/Reaper)
 - [x] Input validation (file paths, config shape)
 - [x] Document environment vars; no secrets in args by default
 
@@ -164,9 +163,11 @@ One repo, one Python environment, clear import direction:
 ---
 
 ### Phase 4 — FastAPI: JSON API + Jobs/Progress (1–2 weeks)
+
 **Goal:** Provide stable programmatic endpoints and background execution.
 
 #### 4.1 API Surface (minimum)
+
 - [x] `POST /api/parse` → parsed chunks + diagnostics
 - [x] `POST /api/projects/validate` → config validation errors (typed)
 - [x] `POST /api/generate` → returns `job_id` (async jobs)
@@ -174,12 +175,12 @@ One repo, one Python environment, clear import direction:
 - [x] `GET /api/jobs/{job_id}/events` → SSE progress stream
 - [x] `GET /api/exports/{job_id}.zip` → export bundle download
 - [x] `GET /api/jobs/{job_id}/audio/{filename}` → per-line clips (for timeline playback)
-- [x] `GET /api/exports/{job_id}/concatenated` → single-file listen-through (best-effort; requires FFmpeg)
 - [x] `GET /api/exports/{job_id}.json` / `.csv` → manifests
 - [x] `GET /api/exports/{job_id}.srt` / `.vtt` → subtitles
 - [x] `GET /api/exports/{job_id}.rpp` → Reaper export
 
 #### 4.2 Jobs model (v1)
+
 - In-memory job registry (local-only; not durable across restarts)
 - SSE semantics:
   - Per-job event ring buffer (bounded; supports reconnect via `Last-Event-ID`)
@@ -198,11 +199,13 @@ One repo, one Python environment, clear import direction:
 ---
 
 ### Phase 5 — Flask UI (Jinja2 + HTMX) (1–3 weeks)
+
 **Goal:** Replace React UI with SSR screens while keeping workflows.
 
 **Status:** Core wizard flow works end-to-end (script → characters → generation → timeline → exports), with HTMX enhancements and SSE job progress.
 
 #### 5.1 Pages (minimum parity)
+
 - [x] `/` Script editor + share link load + HTMX parse
 - [x] `/characters` character list + voice assignment + presets
 - [x] `/generation` start job + live progress
@@ -210,12 +213,14 @@ One repo, one Python environment, clear import direction:
 - [x] `/exports` download ZIP/manifest/subtitles/Reaper
 
 #### 5.2 HTMX interactions
+
 - [x] Validate config inline before starting generation (server-side validation is enforced)
 - [x] Start job and subscribe to SSE for progress updates (non-HTMX fallback uses full page load)
 - [x] Trigger per-line preview generation (one-off calls)
 - [x] Browse ElevenLabs voices and apply Voice IDs (HTMX partial + table update)
 
 #### 5.3 Candlelight theme enforcement
+
 - Single CSS file with only allowed hex colors:
   - `#121212`, `#EBD2BE`, `#A6ACCD`, `#98C379`, `#E06C75`
 
@@ -224,6 +229,7 @@ One repo, one Python environment, clear import direction:
 ---
 
 ### Phase 6 — Cutover & Node Removal (2–5 days)
+
 **Goal:** Finish cleanly: Python is the product; Node is archived.
 
 - [x] Update `README.md` to make Python the default
@@ -245,7 +251,6 @@ One repo, one Python environment, clear import direction:
 
 - Parser: fixture scripts match expected parsed JSON exactly
 - Exports: manifest JSON/CSV + SRT/VTT + `.rpp` match expected outputs
-- Audio pipeline: concat and mixing produce playable output; ordering correct
 - API boundaries: invalid inputs produce typed, actionable errors
 - Secrets: no keys in git; `.env` ignored; `.env.example` updated as needed
 - UI: candlelight palette only; core flows available without JS beyond HTMX
@@ -273,4 +278,4 @@ One repo, one Python environment, clear import direction:
 - [ ] Feature parity checklist is complete (section 2)
 - [ ] Fixtures pass in CI (pytest) without network access
 - [x] No Node required for build/run/test
-- [ ] Documentation updated (setup, env vars, troubleshooting, ffmpeg requirement)
+- [ ] Documentation updated (setup, env vars, troubleshooting)

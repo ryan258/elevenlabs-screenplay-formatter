@@ -4,7 +4,7 @@ import time
 from dataclasses import dataclass
 from typing import Callable, Dict, Iterator, List, Optional, Tuple
 
-from lib.elevenlabs.client import ElevenLabsClient, _adjust_delay_based_on_rate_limit
+from lib.elevenlabs.client import ElevenLabsClient, adjust_delay_based_on_rate_limit
 from lib.filenames import safe_basename
 from lib.manifest import estimate_duration_ms
 from lib.models import CharacterConfig, DialogueChunk, WordTimestamp
@@ -123,13 +123,17 @@ def generate_all_audio_iter(
         try:
             text = _get_spoken_text(chunk, speak_parentheticals=speak_parentheticals)
             previous_text = _clip_context(
-                _get_spoken_text(dialogue_chunks[index - 1], speak_parentheticals=speak_parentheticals)
+                _get_spoken_text(
+                    dialogue_chunks[index - 1], speak_parentheticals=speak_parentheticals
+                )
                 if index > 0
                 else None,
                 max_chars=500,
             )
             next_text = _clip_context(
-                _get_spoken_text(dialogue_chunks[index + 1], speak_parentheticals=speak_parentheticals)
+                _get_spoken_text(
+                    dialogue_chunks[index + 1], speak_parentheticals=speak_parentheticals
+                )
                 if index + 1 < len(dialogue_chunks)
                 else None,
                 max_chars=500,
@@ -153,33 +157,26 @@ def generate_all_audio_iter(
 
             alignment: Optional[List[WordTimestamp]] = None
             if fetch_alignment:
-                alignment = client.fetch_alignment(voice_id=cfg.voice_id, text=text, model_id=model_id)
+                alignment = client.fetch_alignment(
+                    voice_id=cfg.voice_id, text=text, model_id=model_id
+                )
 
             if alignment:
-                # Guard against empty alignment (Bug 2 fix)
-                if not alignment or len(alignment) == 0:
-                    # Fall back to estimation
-                    start_time_ms = timeline_cursor
-                    duration = estimate_duration_ms(text)
-                    end_time_ms = start_time_ms + duration
-                    timeline_cursor = end_time_ms
-                    final_alignment = None
-                else:
-                    # Create offset alignment for storage
-                    offset_alignment = [
-                        WordTimestamp(
-                            word=w.word,
-                            start_ms=w.start_ms + timeline_cursor,
-                            end_ms=w.end_ms + timeline_cursor,
-                        )
-                        for w in alignment
-                    ]
-                    # Use ORIGINAL alignment for timing (Bug 1 fix - prevents double-offset)
-                    start_time_ms = alignment[0].start_ms + timeline_cursor
-                    end_time_ms = alignment[-1].end_ms + timeline_cursor
-                    # Update cursor to end of this clip
-                    timeline_cursor = end_time_ms
-                    final_alignment = offset_alignment
+                # Create offset alignment for storage
+                offset_alignment = [
+                    WordTimestamp(
+                        word=w.word,
+                        start_ms=w.start_ms + timeline_cursor,
+                        end_ms=w.end_ms + timeline_cursor,
+                    )
+                    for w in alignment
+                ]
+                # Use ORIGINAL alignment for timing (Bug 1 fix - prevents double-offset)
+                start_time_ms = alignment[0].start_ms + timeline_cursor
+                end_time_ms = alignment[-1].end_ms + timeline_cursor
+                # Update cursor to end of this clip
+                timeline_cursor = end_time_ms
+                final_alignment = offset_alignment
             else:
                 # No alignment available
                 start_time_ms = timeline_cursor
@@ -214,7 +211,7 @@ def generate_all_audio_iter(
                     )
                 )
 
-            adaptive_delay = _adjust_delay_based_on_rate_limit(remaining, adaptive_delay, base_delay)
+            adaptive_delay = adjust_delay_based_on_rate_limit(remaining, adaptive_delay, base_delay)
             if index < total - 1 and adaptive_delay > 0:
                 time.sleep(adaptive_delay / 1000)
         except Exception as exc:
@@ -264,7 +261,9 @@ def generate_one_audio(
 
     text = _get_spoken_text(chunk, speak_parentheticals=speak_parentheticals)
     previous_text = _clip_context(
-        _get_spoken_text(dialogue_chunks[index - 1], speak_parentheticals=speak_parentheticals) if index > 0 else None,
+        _get_spoken_text(dialogue_chunks[index - 1], speak_parentheticals=speak_parentheticals)
+        if index > 0
+        else None,
         max_chars=500,
     )
     next_text = _clip_context(
@@ -295,13 +294,8 @@ def generate_one_audio(
         alignment = client.fetch_alignment(voice_id=cfg.voice_id, text=text, model_id=model_id)
 
     if alignment:
-        # Guard against empty alignment (Bug 2 fix)
-        if not alignment or len(alignment) == 0:
-            start_time_ms = 0
-            end_time_ms = estimate_duration_ms(text)
-        else:
-            start_time_ms = alignment[0].start_ms
-            end_time_ms = alignment[-1].end_ms
+        start_time_ms = alignment[0].start_ms
+        end_time_ms = alignment[-1].end_ms
     else:
         start_time_ms = 0
         end_time_ms = estimate_duration_ms(text)

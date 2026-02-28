@@ -38,19 +38,27 @@ def api_generate_job(
     # Rate limit (Bug 18 fix applied to API)
     client_ip = request.client.host if request.client else "unknown"
     if not generation_limiter.check_limit(client_ip):
-        return JSONResponse(status_code=429, content=ErrorResponse(error="Rate limit exceeded").model_dump())
+        return JSONResponse(
+            status_code=429, content=ErrorResponse(error="Rate limit exceeded").model_dump()
+        )
 
     if len(body.script_text) > MAX_SCRIPT_CHARS:
-        return JSONResponse(status_code=413, content=ErrorResponse(error="Script is too large").model_dump())
+        return JSONResponse(
+            status_code=413, content=ErrorResponse(error="Script is too large").model_dump()
+        )
     if not cfg.elevenlabs.api_key:
-        return JSONResponse(status_code=400, content=ErrorResponse(error="Missing ELEVENLABS_API_KEY").model_dump())
+        return JSONResponse(
+            status_code=400, content=ErrorResponse(error="Missing ELEVENLABS_API_KEY").model_dump()
+        )
 
     parsed = parse_script(
         body.script_text,
         preserve_stage_directions=body.project_settings.preserve_stage_directions,
     )
     if len(parsed.dialogue_chunks) > MAX_DIALOGUE_CHUNKS:
-        return JSONResponse(status_code=413, content=ErrorResponse(error="Too many dialogue chunks").model_dump())
+        return JSONResponse(
+            status_code=413, content=ErrorResponse(error="Too many dialogue chunks").model_dump()
+        )
 
     character_configs = build_character_configs(body)
     errors = validate_character_configs(parsed.dialogue_chunks, character_configs)
@@ -58,10 +66,19 @@ def api_generate_job(
         errors = ["Missing projectSettings.model", *errors]
     if not body.project_settings.output_format:
         errors = ["Missing projectSettings.outputFormat", *errors]
+    else:
+        from lib.generation import output_format_extension
+
+        try:
+            output_format_extension(body.project_settings.output_format)
+        except ValueError:
+            errors = [f"Invalid output format: {body.project_settings.output_format}", *errors]
     if errors:
         return JSONResponse(
             status_code=400,
-            content=ErrorResponse(error="Invalid configuration", meta={"errors": errors}).model_dump(),
+            content=ErrorResponse(
+                error="Invalid configuration", meta={"errors": errors}
+            ).model_dump(),
         )
 
     job = store.create()
@@ -75,7 +92,6 @@ def api_generate_job(
         output_format=body.project_settings.output_format,
         request_delay_ms=body.project_settings.request_delay_ms or 500,
         speak_parentheticals=body.project_settings.speak_parentheticals,
-        concatenate=body.project_settings.concatenate,
         filename_prefix=body.filename_prefix or "",
         character_configs=character_configs,
     )
@@ -86,7 +102,6 @@ def api_generate_job(
             "status_url": f"/api/jobs/{job.job_id}",
             "events_url": f"/api/jobs/{job.job_id}/events",
             "export_url": f"/api/exports/{job.job_id}.zip",
-            "concatenated_url": f"/api/exports/{job.job_id}/concatenated",
             "srt_url": f"/api/exports/{job.job_id}.srt",
             "vtt_url": f"/api/exports/{job.job_id}.vtt",
             "rpp_url": f"/api/exports/{job.job_id}.rpp",
@@ -98,98 +113,107 @@ def api_generate_job(
 def api_job_status(job_id: str, store: JobStore = Depends(get_job_store)) -> JSONResponse:
     job = store.get(job_id)
     if job is None:
-        return JSONResponse(status_code=404, content=ErrorResponse(error="Job not found").model_dump())
+        return JSONResponse(
+            status_code=404, content=ErrorResponse(error="Job not found").model_dump()
+        )
     return JSONResponse(job.snapshot().__dict__)
 
 
 @router.get("/exports/{job_id}.zip", response_model=None)
-def api_job_export(job_id: str, store: JobStore = Depends(get_job_store)) -> Union[FileResponse, JSONResponse]:
+def api_job_export(
+    job_id: str, store: JobStore = Depends(get_job_store)
+) -> Union[FileResponse, JSONResponse]:
     job = store.get(job_id)
     if job is None or job.export_path is None or not job.export_path.exists():
-        return JSONResponse(status_code=404, content=ErrorResponse(error="Export not ready").model_dump())
+        return JSONResponse(
+            status_code=404, content=ErrorResponse(error="Export not ready").model_dump()
+        )
     return FileResponse(job.export_path, media_type="application/zip", filename="bundle.zip")
 
 
 @router.get("/exports/{job_id}.json", response_model=None)
-def api_job_manifest_json(job_id: str, store: JobStore = Depends(get_job_store)) -> Union[FileResponse, JSONResponse]:
+def api_job_manifest_json(
+    job_id: str, store: JobStore = Depends(get_job_store)
+) -> Union[FileResponse, JSONResponse]:
     job = store.get(job_id)
     if job is None:
-        return JSONResponse(status_code=404, content=ErrorResponse(error="Job not found").model_dump())
+        return JSONResponse(
+            status_code=404, content=ErrorResponse(error="Job not found").model_dump()
+        )
     path = (job.work_dir / "manifest.json").resolve()
     if not path.exists():
-        return JSONResponse(status_code=404, content=ErrorResponse(error="manifest.json not ready").model_dump())
+        return JSONResponse(
+            status_code=404, content=ErrorResponse(error="manifest.json not ready").model_dump()
+        )
     return FileResponse(path, media_type="application/json", filename="manifest.json")
 
 
 @router.get("/exports/{job_id}.csv", response_model=None)
-def api_job_manifest_csv(job_id: str, store: JobStore = Depends(get_job_store)) -> Union[FileResponse, JSONResponse]:
+def api_job_manifest_csv(
+    job_id: str, store: JobStore = Depends(get_job_store)
+) -> Union[FileResponse, JSONResponse]:
     job = store.get(job_id)
     if job is None:
-        return JSONResponse(status_code=404, content=ErrorResponse(error="Job not found").model_dump())
+        return JSONResponse(
+            status_code=404, content=ErrorResponse(error="Job not found").model_dump()
+        )
     path = (job.work_dir / "manifest.csv").resolve()
     if not path.exists():
-        return JSONResponse(status_code=404, content=ErrorResponse(error="manifest.csv not ready").model_dump())
+        return JSONResponse(
+            status_code=404, content=ErrorResponse(error="manifest.csv not ready").model_dump()
+        )
     return FileResponse(path, media_type="text/csv; charset=utf-8", filename="manifest.csv")
 
 
 @router.get("/exports/{job_id}.srt", response_model=None)
-def api_job_srt(job_id: str, store: JobStore = Depends(get_job_store)) -> Union[FileResponse, JSONResponse]:
+def api_job_srt(
+    job_id: str, store: JobStore = Depends(get_job_store)
+) -> Union[FileResponse, JSONResponse]:
     job = store.get(job_id)
     if job is None:
-        return JSONResponse(status_code=404, content=ErrorResponse(error="Job not found").model_dump())
+        return JSONResponse(
+            status_code=404, content=ErrorResponse(error="Job not found").model_dump()
+        )
     path = (job.work_dir / "subtitles.srt").resolve()
     if not path.exists():
-        return JSONResponse(status_code=404, content=ErrorResponse(error="SRT not ready").model_dump())
+        return JSONResponse(
+            status_code=404, content=ErrorResponse(error="SRT not ready").model_dump()
+        )
     return FileResponse(path, media_type="text/plain; charset=utf-8", filename="subtitles.srt")
 
 
 @router.get("/exports/{job_id}.vtt", response_model=None)
-def api_job_vtt(job_id: str, store: JobStore = Depends(get_job_store)) -> Union[FileResponse, JSONResponse]:
+def api_job_vtt(
+    job_id: str, store: JobStore = Depends(get_job_store)
+) -> Union[FileResponse, JSONResponse]:
     job = store.get(job_id)
     if job is None:
-        return JSONResponse(status_code=404, content=ErrorResponse(error="Job not found").model_dump())
+        return JSONResponse(
+            status_code=404, content=ErrorResponse(error="Job not found").model_dump()
+        )
     path = (job.work_dir / "subtitles.vtt").resolve()
     if not path.exists():
-        return JSONResponse(status_code=404, content=ErrorResponse(error="VTT not ready").model_dump())
+        return JSONResponse(
+            status_code=404, content=ErrorResponse(error="VTT not ready").model_dump()
+        )
     return FileResponse(path, media_type="text/vtt; charset=utf-8", filename="subtitles.vtt")
 
 
 @router.get("/exports/{job_id}.rpp", response_model=None)
-def api_job_rpp(job_id: str, store: JobStore = Depends(get_job_store)) -> Union[FileResponse, JSONResponse]:
-    job = store.get(job_id)
-    if job is None:
-        return JSONResponse(status_code=404, content=ErrorResponse(error="Job not found").model_dump())
-    path = (job.work_dir / "reaper.rpp").resolve()
-    if not path.exists():
-        return JSONResponse(status_code=404, content=ErrorResponse(error="RPP not ready").model_dump())
-    return FileResponse(path, media_type="text/plain; charset=utf-8", filename="reaper.rpp")
-
-
-@router.get("/exports/{job_id}/concatenated", response_model=None)
-def api_job_concatenated_audio(
-    job_id: str,
-    store: JobStore = Depends(get_job_store),
+def api_job_rpp(
+    job_id: str, store: JobStore = Depends(get_job_store)
 ) -> Union[FileResponse, JSONResponse]:
     job = store.get(job_id)
     if job is None:
-        return JSONResponse(status_code=404, content=ErrorResponse(error="Job not found").model_dump())
-
-    candidates = [
-        (job.work_dir / "concatenated_audio.mp3").resolve(),
-        (job.work_dir / "concatenated_audio.wav").resolve(),
-    ]
-    path = next((p for p in candidates if p.exists()), None)
-    if path is None:
-        return JSONResponse(status_code=404, content=ErrorResponse(error="Concatenated audio not ready").model_dump())
-    try:
-        path.relative_to(job.work_dir.resolve())
-    except ValueError:
-        return JSONResponse(status_code=400, content=ErrorResponse(error="Invalid path").model_dump())
-
-    media_type = "audio/mpeg" if path.name.lower().endswith(".mp3") else "audio/wav"
-    resp = FileResponse(path, media_type=media_type)
-    resp.headers["Content-Disposition"] = f'inline; filename="{path.name}"'
-    return resp
+        return JSONResponse(
+            status_code=404, content=ErrorResponse(error="Job not found").model_dump()
+        )
+    path = (job.work_dir / "reaper.rpp").resolve()
+    if not path.exists():
+        return JSONResponse(
+            status_code=404, content=ErrorResponse(error="RPP not ready").model_dump()
+        )
+    return FileResponse(path, media_type="text/plain; charset=utf-8", filename="reaper.rpp")
 
 
 @router.get("/jobs/{job_id}/audio/{filename}", response_model=None)
@@ -200,19 +224,27 @@ def api_job_audio_clip(
 ) -> Union[FileResponse, JSONResponse]:
     job = store.get(job_id)
     if job is None:
-        return JSONResponse(status_code=404, content=ErrorResponse(error="Job not found").model_dump())
+        return JSONResponse(
+            status_code=404, content=ErrorResponse(error="Job not found").model_dump()
+        )
     safe_name = safe_basename(filename, default="")
     if not safe_name:
-        return JSONResponse(status_code=400, content=ErrorResponse(error="Invalid filename").model_dump())
+        return JSONResponse(
+            status_code=400, content=ErrorResponse(error="Invalid filename").model_dump()
+        )
 
     audio_dir = (job.work_dir / "audio").resolve()
     path = (audio_dir / safe_name).resolve()
     try:
         path.relative_to(audio_dir)
     except ValueError:
-        return JSONResponse(status_code=400, content=ErrorResponse(error="Invalid filename").model_dump())
+        return JSONResponse(
+            status_code=400, content=ErrorResponse(error="Invalid filename").model_dump()
+        )
     if not path.exists():
-        return JSONResponse(status_code=404, content=ErrorResponse(error="Audio not found").model_dump())
+        return JSONResponse(
+            status_code=404, content=ErrorResponse(error="Audio not found").model_dump()
+        )
 
     media_type = "application/octet-stream"
     if safe_name.lower().endswith(".mp3"):
@@ -232,7 +264,9 @@ async def api_job_events(
 ) -> Union[StreamingResponse, JSONResponse]:
     job = store.get(job_id)
     if job is None:
-        return JSONResponse(status_code=404, content=ErrorResponse(error="Job not found").model_dump())
+        return JSONResponse(
+            status_code=404, content=ErrorResponse(error="Job not found").model_dump()
+        )
 
     async def event_stream() -> AsyncIterator[bytes]:
         last_event_id = 0
@@ -246,7 +280,9 @@ async def api_job_events(
         snapshot = job.snapshot().__dict__
         yield f"event: snapshot\ndata: {json.dumps(snapshot)}\n\n".encode("utf-8")
         if snapshot["status"] in {"complete", "error"}:
-            yield f"event: done\ndata: {json.dumps({'status': snapshot['status']})}\n\n".encode("utf-8")
+            yield f"event: done\ndata: {json.dumps({'status': snapshot['status']})}\n\n".encode(
+                "utf-8"
+            )
             return
 
         loop = asyncio.get_running_loop()
@@ -263,11 +299,9 @@ async def api_job_events(
                 event_id = int(item.get("id", 0))
                 event = item.get("event", "message")
                 data = item.get("data", {})
-                payload = (
-                    f"id: {event_id}\n"
-                    f"event: {event}\n"
-                    f"data: {json.dumps(data)}\n\n"
-                ).encode("utf-8")
+                payload = (f"id: {event_id}\nevent: {event}\ndata: {json.dumps(data)}\n\n").encode(
+                    "utf-8"
+                )
                 yield payload
                 if event == "done":
                     return

@@ -28,7 +28,9 @@ class _FakeClient:
         self.seen.append((previous_text, next_text))
         return b"audio", None
 
-    def fetch_alignment(self, *, voice_id: str, text: str, model_id: str) -> None:  # pragma: no cover
+    def fetch_alignment(
+        self, *, voice_id: str, text: str, model_id: str
+    ) -> None:  # pragma: no cover
         return None
 
 

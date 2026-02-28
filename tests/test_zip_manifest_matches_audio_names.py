@@ -16,8 +16,12 @@ def test_zip_manifest_filenames_match_sanitized_audio_names(tmp_path: Path) -> N
     audio_1.write_bytes(b"b")
 
     manifest = [
-        ManifestEntry(index=0, character="A", filename="../evil.mp3", text="Hi", estimated_duration_ms=1000),
-        ManifestEntry(index=1, character="B", filename="nested/ok.mp3", text="Yo", estimated_duration_ms=1000),
+        ManifestEntry(
+            index=0, character="A", filename="../evil.mp3", text="Hi", estimated_duration_ms=1000
+        ),
+        ManifestEntry(
+            index=1, character="B", filename="nested/ok.mp3", text="Yo", estimated_duration_ms=1000
+        ),
     ]
 
     out = tmp_path / "bundle.zip"
@@ -37,8 +41,12 @@ def test_zip_manifest_filenames_match_sanitized_audio_names(tmp_path: Path) -> N
 
 def test_zip_bytes_manifest_filenames_match_sanitized_audio_names() -> None:
     manifest = [
-        ManifestEntry(index=0, character="A", filename="../evil.mp3", text="Hi", estimated_duration_ms=1000),
-        ManifestEntry(index=1, character="B", filename="nested/ok.mp3", text="Yo", estimated_duration_ms=1000),
+        ManifestEntry(
+            index=0, character="A", filename="../evil.mp3", text="Hi", estimated_duration_ms=1000
+        ),
+        ManifestEntry(
+            index=1, character="B", filename="nested/ok.mp3", text="Yo", estimated_duration_ms=1000
+        ),
     ]
 
     zip_bytes = build_zip_bundle(
@@ -56,7 +64,9 @@ def test_zip_bytes_manifest_filenames_match_sanitized_audio_names() -> None:
 
 def test_zip_manifest_out_of_bounds_uses_safe_default() -> None:
     manifest = [
-        ManifestEntry(index=99, character="A", filename="..", text="Hi", estimated_duration_ms=1000),
+        ManifestEntry(
+            index=99, character="A", filename="..", text="Hi", estimated_duration_ms=1000
+        ),
     ]
     zip_bytes = build_zip_bundle(
         audio_files=[("ok.mp3", b"a")],

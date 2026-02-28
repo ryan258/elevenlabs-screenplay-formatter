@@ -44,7 +44,9 @@ class WebSessionStore:
         obj = json.loads(path.read_text(encoding="utf-8"))
         payload = obj.get("payload") or {}
         updated_at_s = float(obj.get("updated_at_s") or 0.0)
-        return WebSessionData(session_id=session_id, updated_at_s=updated_at_s, payload=dict(payload))
+        return WebSessionData(
+            session_id=session_id, updated_at_s=updated_at_s, payload=dict(payload)
+        )
 
     def put(self, data: WebSessionData) -> None:
         path = self._session_path(data.session_id)

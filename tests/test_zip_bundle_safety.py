@@ -18,4 +18,3 @@ def test_zip_bundle_strips_path_components() -> None:
         ],
     )
     assert zip_bytes.startswith(b"PK")
-

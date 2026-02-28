@@ -20,4 +20,3 @@ def extract_voice_ids_from_script(script_text: str) -> Dict[str, str]:
         if character_name and voice_id:
             voice_ids[character_name] = voice_id
     return voice_ids
-

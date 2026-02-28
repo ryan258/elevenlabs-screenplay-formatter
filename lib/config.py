@@ -8,9 +8,3 @@ class ElevenLabsConfig:
     api_key: str
     base_url: str
     timeout_s: float
-
-
-@dataclass(frozen=True)
-class FfmpegConfig:
-    ffmpeg_bin: str
-

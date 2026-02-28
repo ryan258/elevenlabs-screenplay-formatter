@@ -20,4 +20,6 @@ def test_parse_fountain_examples_have_output() -> None:
 
 def test_parse_script_records_unmatched_lines() -> None:
     parsed = parse_script("INT. HOUSE\nThis is not dialogue\n\nJOHN\nHello")
-    assert any(item.content == "This is not dialogue" for item in parsed.diagnostics.unmatched_lines)
+    assert any(
+        item.content == "This is not dialogue" for item in parsed.diagnostics.unmatched_lines
+    )

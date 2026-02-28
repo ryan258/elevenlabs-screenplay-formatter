@@ -7,10 +7,8 @@ from typing import List, Optional, Tuple
 
 from lib.parser import parse_script
 
-_SCENE_HEADING_RE = re.compile(r"^(INT\.?|EXT\.?|I\/E\.?|SCENE \d+|EST\.|INT\/EXT\.?|\.)", re.I)
-_TRANSITION_RE = re.compile(
-    r"(CUT TO:|FADE (IN|OUT)|SMASH CUT|MATCH CUT|DISSOLVE TO:|IRIS OUT|WIPE TO:)", re.I
-)
+from lib.utils import SCENE_HEADING_RE, TRANSITION_RE
+
 _POTENTIAL_CHARACTER_RE = re.compile(r"^[A-Za-z][A-Za-z0-9\s.'\"()-]*$")
 
 
@@ -65,7 +63,7 @@ def _is_potential_character(line: str) -> bool:
     stripped = line.strip()
     if not stripped:
         return False
-    if _SCENE_HEADING_RE.search(stripped) or _TRANSITION_RE.search(stripped):
+    if SCENE_HEADING_RE.search(stripped) or TRANSITION_RE.search(stripped):
         return False
     return bool(_POTENTIAL_CHARACTER_RE.match(stripped))
 
@@ -74,7 +72,7 @@ def _looks_like_dialogue(line: str) -> bool:
     stripped = line.strip()
     if not stripped:
         return False
-    if _SCENE_HEADING_RE.search(stripped) or _TRANSITION_RE.search(stripped):
+    if SCENE_HEADING_RE.search(stripped) or TRANSITION_RE.search(stripped):
         return False
     if stripped.endswith(":"):
         return False
@@ -210,7 +208,9 @@ def format_script(script_text: str) -> ScriptFormatResult:
 
     interim_text = "\n".join(lines)
     parsed = parse_script(interim_text)
-    characters = sorted(parsed.characters) if parsed.characters else sorted(_detect_character_cues(lines))
+    characters = (
+        sorted(parsed.characters) if parsed.characters else sorted(_detect_character_cues(lines))
+    )
     lines, missing_count, created = _ensure_character_list(lines, characters)
     if missing_count:
         details = (

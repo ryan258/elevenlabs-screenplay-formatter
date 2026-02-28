@@ -1,16 +1,19 @@
 <section class="card">
   <h2>Parsed Output</h2>
-  <p class="meta">Characters detected: {{ parsed.characters|length }} · Dialogue chunks: {{ parsed.dialogue_chunks|length }}</p>
+  <p class="meta">
+    Characters detected: {{ parsed.characters|length }} · Dialogue chunks: {{
+    parsed.dialogue_chunks|length }}
+  </p>
 
   {% if errors %}
-    <div class="error">
-      <p><strong>Validation errors</strong></p>
-      <ul>
-        {% for e in errors %}
-          <li>{{ e }}</li>
-        {% endfor %}
-      </ul>
-    </div>
+  <div class="error">
+    <p><strong>Validation errors</strong></p>
+    <ul>
+      {% for e in errors %}
+      <li>{{ e }}</li>
+      {% endfor %}
+    </ul>
+  </div>
   {% endif %}
 
   <details class="details" open>
@@ -18,48 +21,89 @@
     <form method="post" action="/generate.zip">
       <textarea name="script_text" hidden>{{ script_text }}</textarea>
       {% if preserve %}
-        <input type="hidden" name="preserve_stage_directions" value="on" />
+      <input type="hidden" name="preserve_stage_directions" value="on" />
       {% endif %}
 
       <div class="grid">
         <label class="label">
-          Model ID
-          {% if models %}
-            <select class="input" name="model">
-              {% for m in models %}
-                <option value="{{ m.model_id }}" {% if model == m.model_id %}selected{% endif %}>{{ m.name }} ({{ m.model_id }})</option>
-              {% endfor %}
-            </select>
+          Model ID {% if models %}
+          <select class="input" name="model">
+            {% for m in models %}
+            <option
+              value="{{ m.model_id }}"
+              {% if model == m.model_id %}selected{% endif %}
+            >
+              {{ m.name }} ({{ m.model_id }})
+            </option>
+            {% endfor %}
+          </select>
           {% else %}
-            <input class="input" type="text" name="model" value="{{ model or '' }}" placeholder="eleven_multilingual_v2" />
+          <input
+            class="input"
+            type="text"
+            name="model"
+            value="{{ model or '' }}"
+            placeholder="eleven_multilingual_v2"
+          />
           {% endif %}
         </label>
         <label class="label">
           Output format
           <select class="input" name="output_format">
-            <option value="mp3_44100_128" {% if output_format == "mp3_44100_128" %}selected{% endif %}>mp3_44100_128</option>
-            <option value="mp3_44100_192" {% if output_format == "mp3_44100_192" %}selected{% endif %}>mp3_44100_192</option>
-            <option value="pcm_24000" {% if output_format == "pcm_24000" %}selected{% endif %}>pcm_24000</option>
+            <option
+              value="mp3_44100_128"
+              {% if output_format == "mp3_44100_128" %}selected{% endif %}
+            >
+              mp3_44100_128
+            </option>
+            <option
+              value="mp3_44100_192"
+              {% if output_format == "mp3_44100_192" %}selected{% endif %}
+            >
+              mp3_44100_192
+            </option>
+            <option
+              value="pcm_24000"
+              {% if output_format == "pcm_24000" %}selected{% endif %}
+            >
+              pcm_24000
+            </option>
           </select>
         </label>
         <label class="label">
           Request delay (ms)
-          <input class="input" type="number" name="request_delay_ms" value="{{ request_delay_ms or 500 }}" min="0" />
+          <input
+            class="input"
+            type="number"
+            name="request_delay_ms"
+            value="{{ request_delay_ms or 500 }}"
+            min="0"
+          />
         </label>
       </div>
 
       <label class="label">
         Filename prefix (optional)
-        <input class="input" type="text" name="filename_prefix" value="{{ filename_prefix or '' }}" />
+        <input
+          class="input"
+          type="text"
+          name="filename_prefix"
+          value="{{ filename_prefix or '' }}"
+        />
       </label>
 
       <label class="checkbox">
-        <input type="checkbox" name="speak_parentheticals" {% if speak_parentheticals %}checked{% endif %} />
+        <input
+          type="checkbox"
+          name="speak_parentheticals"
+          {%
+          if
+          speak_parentheticals
+          %}checked{%
+          endif
+          %}
+        />
         Speak parentheticals (use raw/original text)
-      </label>
-      <label class="checkbox">
-        <input type="checkbox" name="concatenate" {% if concatenate %}checked{% endif %} />
-        Concatenate output (server-side ffmpeg)
       </label>
 
       <h3>Character Voices</h3>
@@ -72,27 +116,65 @@
           <div>Style</div>
           <div>Speed</div>
         </div>
-        {% for character in parsed.characters %}
-          {% set i = loop.index0 %}
-          {% set row = voice_rows[i] if voice_rows and (voice_rows|length > i) else None %}
-          <div class="row">
-            <div class="cell strong">{{ character }}</div>
-            <div class="cell">
-              <input class="input" type="text" name="voice_id__{{ i }}" value="{{ row['voice_id'] if row else '' }}" required />
-            </div>
-            <div class="cell">
-              <input class="input" type="number" step="0.01" min="0" max="1" name="stability__{{ i }}" value="{{ row['stability'] if row else 0.5 }}" />
-            </div>
-            <div class="cell">
-              <input class="input" type="number" step="0.01" min="0" max="1" name="similarity_boost__{{ i }}" value="{{ row['similarity_boost'] if row else 0.75 }}" />
-            </div>
-            <div class="cell">
-              <input class="input" type="number" step="0.01" min="0" max="1" name="style__{{ i }}" value="{{ row['style'] if row else 0.1 }}" />
-            </div>
-            <div class="cell">
-              <input class="input" type="number" step="0.01" min="0" max="2" name="speed__{{ i }}" value="{{ row['speed'] if row else 1 }}" />
-            </div>
+        {% for character in parsed.characters %} {% set i = loop.index0 %} {%
+        set row = voice_rows[i] if voice_rows and (voice_rows|length > i) else
+        None %}
+        <div class="row">
+          <div class="cell strong">{{ character }}</div>
+          <div class="cell">
+            <input
+              class="input"
+              type="text"
+              name="voice_id__{{ i }}"
+              value="{{ row['voice_id'] if row else '' }}"
+              required
+            />
           </div>
+          <div class="cell">
+            <input
+              class="input"
+              type="number"
+              step="0.01"
+              min="0"
+              max="1"
+              name="stability__{{ i }}"
+              value="{{ row['stability'] if row else 0.5 }}"
+            />
+          </div>
+          <div class="cell">
+            <input
+              class="input"
+              type="number"
+              step="0.01"
+              min="0"
+              max="1"
+              name="similarity_boost__{{ i }}"
+              value="{{ row['similarity_boost'] if row else 0.75 }}"
+            />
+          </div>
+          <div class="cell">
+            <input
+              class="input"
+              type="number"
+              step="0.01"
+              min="0"
+              max="1"
+              name="style__{{ i }}"
+              value="{{ row['style'] if row else 0.1 }}"
+            />
+          </div>
+          <div class="cell">
+            <input
+              class="input"
+              type="number"
+              step="0.01"
+              min="0"
+              max="2"
+              name="speed__{{ i }}"
+              value="{{ row['speed'] if row else 1 }}"
+            />
+          </div>
+        </div>
         {% endfor %}
       </div>
 
@@ -117,23 +199,28 @@
   <div id="job-panel"></div>
 
   {% if parsed.diagnostics.unmatched_lines %}
-    <details class="details">
-      <summary>Unmatched lines ({{ parsed.diagnostics.unmatched_lines|length }})</summary>
-      <ul>
-        {% for item in parsed.diagnostics.unmatched_lines %}
-          <li><span class="muted">Line {{ item.line_number }}:</span> {{ item.content }}</li>
-        {% endfor %}
-      </ul>
-    </details>
+  <details class="details">
+    <summary>
+      Unmatched lines ({{ parsed.diagnostics.unmatched_lines|length }})
+    </summary>
+    <ul>
+      {% for item in parsed.diagnostics.unmatched_lines %}
+      <li>
+        <span class="muted">Line {{ item.line_number }}:</span> {{ item.content
+        }}
+      </li>
+      {% endfor %}
+    </ul>
+  </details>
   {% endif %}
   <details class="details">
     <summary>Dialogue (preview)</summary>
     <ol class="chunks">
       {% for chunk in parsed.dialogue_chunks %}
-        <li>
-          <div class="chunk-header">{{ chunk.character }}</div>
-          <div class="chunk-text">{{ chunk.text }}</div>
-        </li>
+      <li>
+        <div class="chunk-header">{{ chunk.character }}</div>
+        <div class="chunk-text">{{ chunk.text }}</div>
+      </li>
       {% endfor %}
     </ol>
   </details>

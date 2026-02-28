@@ -6,7 +6,7 @@ try:
     import uvicorn
 except ModuleNotFoundError as exc:  # pragma: no cover
     raise ModuleNotFoundError(
-        "uvicorn is not installed. Install deps (e.g. `python3 -m pip install -e \".[dev]\"`) to run the app."
+        'uvicorn is not installed. Install deps (e.g. `python3 -m pip install -e ".[dev]"`) to run the app.'
     ) from exc
 
 

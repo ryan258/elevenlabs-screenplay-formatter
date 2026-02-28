@@ -30,12 +30,11 @@ A Python framework for creating sequential LLM workflows where each step builds 
 ### Core Components
 
 - **Arsenal (`lib/`)**: Pure Python modules. Independent. Copy-paste ready.
-  - `pattern_service.py`: Reasoning Pattern Engine (Socratic, Scientific, etc.).
-  - `tool_service.py`: Tool discovery (Local + MCP) & Execution.
-  - `meta_chain_service.py`: Self-improving chain design logic.
-  - `artifact_service.py`: Knowledge persistence logic.
-  - `db_service.py`: SQLite persistence layer.
-  - `mcp_client.py`: Model Context Protocol integration.
+  - `config.py`: Core configuration dataclasses.
+  - `parser.py`: Screenplay parsing and diagnostics.
+  - `elevenlabs/`: API client, retries, rate limiting.
+  - `exports/`: ZIP, SRT/VTT, Reaper generators.
+  - `models.py`: Immutable data models.
 - **Frontend (`apps/web/templates/`)**: Jinja2 pages with HTMX for interactivity.
 - **Entry (`apps/api/main.py`)**: Thin routing layer.
 

@@ -61,7 +61,6 @@ class CharacterConfigIn(BaseModel):
 class ProjectSettingsIn(BaseModel):
     model: str
     output_format: str = Field(alias="outputFormat")
-    concatenate: bool
     speak_parentheticals: bool = Field(alias="speakParentheticals")
     preserve_stage_directions: bool = Field(default=False, alias="preserveStageDirections")
     request_delay_ms: Optional[int] = Field(default=None, alias="requestDelayMs")

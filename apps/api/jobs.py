@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections import deque
 from dataclasses import asdict
 import json
-import logging
 import threading
 import time
 import uuid
@@ -11,10 +10,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Deque, Dict, List, Optional, Tuple
 
-logger = logging.getLogger(__name__)
-
+import logging
 from apps.api.config import AppConfig
-from lib.audio.ffmpeg import concat_audio
 from lib.elevenlabs.client import ElevenLabsClient
 from lib.exports.zip_bundle import build_zip_bundle_to_path
 from lib.generation import GeneratedAudio, GenerationProgress, generate_all_audio_iter
@@ -23,18 +20,9 @@ from lib.models import CharacterConfig, WordTimestamp
 from lib.parser import parse_script
 from lib.reaper_export import build_reaper_project
 from lib.validation import validate_character_configs
+from lib.utils import check_disk_space
 
-
-def check_disk_space(path: Path, required_bytes: int) -> None:
-    """Raise if insufficient disk space (Bug 17 fix)"""
-    import shutil
-    stat = shutil.disk_usage(path)
-    # Require 2x the needed space as safety margin
-    if stat.free < required_bytes * 2:
-        raise RuntimeError(
-            f"Insufficient disk space: {stat.free / 1e9:.1f}GB free, "
-            f"need ~{required_bytes * 2 / 1e9:.1f}GB"
-        )
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -48,7 +36,6 @@ class JobSnapshot:
     message: str
     error: Optional[str]
     export_ready: bool
-    concat_ready: bool
 
 
 @dataclass
@@ -68,14 +55,6 @@ class Job:
     _event_cond: threading.Condition = field(default_factory=lambda: threading.Condition())
 
     def snapshot(self) -> JobSnapshot:
-        work_dir = self.work_dir.resolve()
-        concat_ready = any(
-            (work_dir / name).exists()
-            for name in (
-                "concatenated_audio.mp3",
-                "concatenated_audio.wav",
-            )
-        )
         return JobSnapshot(
             job_id=self.job_id,
             status=self.status,
@@ -86,7 +65,6 @@ class Job:
             message=self.message,
             error=self.error,
             export_ready=self.export_path is not None and self.export_path.exists(),
-            concat_ready=concat_ready,
         )
 
     def add_event(self, event: str, data: Dict[str, Any]) -> int:
@@ -101,7 +79,9 @@ class Job:
         with self._event_cond:
             return [e for e in self._events if int(e.get("id", 0)) > last_event_id]
 
-    def wait_for_events(self, *, last_event_id: int, timeout_s: float) -> Tuple[List[Dict[str, Any]], int]:
+    def wait_for_events(
+        self, *, last_event_id: int, timeout_s: float
+    ) -> Tuple[List[Dict[str, Any]], int]:
         with self._event_cond:
             if not any(int(e.get("id", 0)) > last_event_id for e in self._events):
                 self._event_cond.wait(timeout=timeout_s)
@@ -190,7 +170,6 @@ class JobStore:
         output_format: str,
         request_delay_ms: int,
         speak_parentheticals: bool,
-        concatenate: bool,
         filename_prefix: str,
         character_configs: Dict[str, CharacterConfig],
     ) -> None:
@@ -206,7 +185,6 @@ class JobStore:
                 "output_format": output_format,
                 "request_delay_ms": request_delay_ms,
                 "speak_parentheticals": speak_parentheticals,
-                "concatenate": concatenate,
                 "filename_prefix": filename_prefix,
                 "character_configs": character_configs,
             },
@@ -224,7 +202,6 @@ class JobStore:
         output_format: str,
         request_delay_ms: int,
         speak_parentheticals: bool,
-        concatenate: bool,
         filename_prefix: str,
         character_configs: Dict[str, CharacterConfig],
     ) -> None:
@@ -327,24 +304,6 @@ class JobStore:
                 ("subtitles.vtt", vtt_path),
                 ("reaper.rpp", rpp_path),
             ]
-            concat_error: Optional[str] = None
-
-            if concatenate:
-                # Use the already-written per-line clips and build a single timeline render.
-                ext = "wav" if str(output_format).startswith("pcm_") else "mp3"
-                concat_path = (job.work_dir / f"concatenated_audio.{ext}").resolve()
-                try:
-                    concat_audio(cfg.ffmpeg, [(audio_dir / name).resolve() for name in generated_files], concat_path)
-                    extra_paths.append((concat_path.name, concat_path))
-                except Exception as exc:
-                    concat_error = str(exc)
-                    job.message = f"Complete (concat failed: {concat_error})"
-                    self._emit(job, "warning", {"warning": "concat_failed", "details": concat_error})
-
-            if concat_error:
-                concat_error_path = (job.work_dir / "concat_error.txt").resolve()
-                concat_error_path.write_text(concat_error, encoding="utf-8")
-                extra_paths.append((concat_error_path.name, concat_error_path))
 
             export_path = (job.work_dir / "bundle.zip").resolve()
             audio_paths = [(name, (audio_dir / name).resolve()) for name in generated_files]
@@ -365,12 +324,12 @@ class JobStore:
                 "complete",
                 {
                     "export_ready": snap.export_ready,
-                    "concat_ready": snap.concat_ready,
                     "message": job.message,
                 },
             )
         except Exception as exc:
             import traceback
+
             # Log detailed error internally (Bug 8 fix - use logging, not print)
             logger.error("Job %s failed: %s\n%s", job.job_id, exc, traceback.format_exc())
 
@@ -389,10 +348,13 @@ class JobStore:
             if audio_dir.exists():
                 try:
                     import shutil
+
                     shutil.rmtree(audio_dir)
                     logger.info("Cleaned up audio dir for failed job %s", job.job_id)
                 except Exception as cleanup_exc:
-                    logger.warning("Failed to cleanup audio for job %s: %s", job.job_id, cleanup_exc)
+                    logger.warning(
+                        "Failed to cleanup audio for job %s: %s", job.job_id, cleanup_exc
+                    )
 
             job.status = "error"
             job.error = error_msg  # Generic message only
@@ -408,7 +370,6 @@ class JobStore:
                     "status": job.status,
                     "message": job.message,
                     "export_ready": snap.export_ready,
-                    "concat_ready": snap.concat_ready,
                 },
             )
 

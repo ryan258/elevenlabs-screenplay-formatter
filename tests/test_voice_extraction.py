@@ -10,4 +10,3 @@ Characters:
 - JANE (Voice ID: z9Z9Z9)
 """
     assert extract_voice_ids_from_script(script) == {"JOHN DOE": "abc123", "JANE": "z9Z9Z9"}
-

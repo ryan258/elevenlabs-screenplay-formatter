@@ -19,8 +19,7 @@ python3 -m py_cli \
   --config path/to/project.json \
   --out ./cli_output \
   --delay 500 \
-  --cooldown 0 \
-  --concat
+  --cooldown 0
 ```
 
 ## Batch Mode
@@ -39,30 +38,27 @@ Example `batch.json`:
     "config": "./configs/default.json",
     "out": "./cli_output",
     "delay_ms": 500,
-    "cooldown_ms": 1000,
-    "concat": false
+    "cooldown_ms": 1000
   },
   "presets": {
     "fast": "./configs/fast.json"
   },
   "jobs": [
     { "script": "./scripts/episode_01.txt" },
-    { "script": "./scripts/episode_02.txt", "preset": "fast", "concat": true }
+    { "script": "./scripts/episode_02.txt", "preset": "fast" }
   ]
 }
 ```
 
 ## Arguments
 
-| Flag | Description |
-| --- | --- |
-| `--script <path>` | Screenplay file (text/Markdown). Repeat flag to queue multiple scripts. |
+| Flag              | Description                                                                               |
+| ----------------- | ----------------------------------------------------------------------------------------- |
+| `--script <path>` | Screenplay file (text/Markdown). Repeat flag to queue multiple scripts.                   |
 | `--config <path>` | JSON project config containing `projectSettings` + `characterConfigs` (v0.4-style shape). |
-| `--batch <path>` | Batch config JSON file (see example above). |
-| `--out <dir>` | Output directory (defaults to `cli_output`). |
-| `--delay <ms>` | Delay between API requests (defaults to 500ms). |
-| `--cooldown <ms>` | Cooldown between scripts when running batches (defaults to 0). |
-| `--concat` | Concatenate outputs with ffmpeg after generation. (FFmpeg required.) |
+| `--batch <path>`  | Batch config JSON file (see example above).                                               |
+| `--out <dir>`     | Output directory (defaults to `cli_output`).                                              |
+| `--delay <ms>`    | Delay between API requests (defaults to 500ms).                                           |
+| `--cooldown <ms>` | Cooldown between scripts when running batches (defaults to 0).                            |
 
-The CLI writes per-line audio files (and an optional concatenated file) into the output directory.
-FFmpeg is supported on Windows, macOS, and Linux; see `README.md` for install steps.
+The CLI writes per-line audio files into the output directory.

@@ -1,6 +1,7 @@
 [project]
 name = "elevenlabs-screenplay-formatter"
 version = "1.0.0-dev"
+license = { text = "MIT" }
 description = "Python modular monolith rewrite of ElevenLabs Screenplay Formatter"
 readme = "README.md"
 requires-python = ">=3.9"

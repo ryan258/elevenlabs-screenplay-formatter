@@ -79,7 +79,7 @@ def manifest_to_csv(entries: List[ManifestEntry]) -> str:
 
     def csv_quote(value: str) -> str:
         """Escape quotes AND newlines per CSV spec"""
-        escaped = value.replace('"', '""').replace('\n', '\\n').replace('\r', '\\r')
+        escaped = value.replace('"', '""').replace("\n", "\\n").replace("\r", "\\r")
         return '"' + escaped + '"'
 
     rows: List[str] = []

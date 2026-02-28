@@ -111,6 +111,7 @@ class ParserUnmatchedLine:
 @dataclass(frozen=True)
 class CharacterDetectionInfo:
     """Metadata about how a character was detected during parsing"""
+
     character_name: str
     line_count: int
     word_count: int  # Added
@@ -128,4 +129,3 @@ class ParserDiagnostics:
     dialogue_lines_matched: int = 0
     total_word_count: int = 0  # Added
     parsing_mode: str = ""  # "standard", "fountain", "empty"
-

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -13,6 +15,7 @@ from lib.models import VoiceSettings, WordTimestamp
 
 class NonRetryableError(RuntimeError):
     """Errors that shouldn't be retried (auth, validation, etc.)"""
+
     pass
 
 
@@ -44,7 +47,7 @@ def _parse_rate_limit_remaining(headers: Dict[str, str]) -> Optional[int]:
     return value
 
 
-def _adjust_delay_based_on_rate_limit(
+def adjust_delay_based_on_rate_limit(
     remaining: Optional[int], current_delay_ms: int, base_delay_ms: int
 ) -> int:
     if remaining is None:
@@ -166,12 +169,21 @@ class ElevenLabsClient:
                     body=body,
                 )
                 remaining = _parse_rate_limit_remaining(headers)
-                delay_ms = _adjust_delay_based_on_rate_limit(remaining, delay_ms, base_delay_ms)
+                delay_ms = adjust_delay_based_on_rate_limit(remaining, delay_ms, base_delay_ms)
                 return data, remaining
             except Exception as exc:
                 # Check if error is retryable (Bug 4 fix)
                 error_msg = str(exc).lower()
-                non_retryable_keywords = ["401", "unauthorized", "api key", "400", "bad request", "invalid", "403", "forbidden"]
+                non_retryable_keywords = [
+                    "401",
+                    "unauthorized",
+                    "api key",
+                    "400",
+                    "bad request",
+                    "invalid",
+                    "403",
+                    "forbidden",
+                ]
                 if any(keyword in error_msg for keyword in non_retryable_keywords):
                     # Don't retry auth/validation errors
                     raise NonRetryableError(str(exc)) from exc
@@ -181,11 +193,13 @@ class ElevenLabsClient:
                     break
 
                 # Exponential backoff for retryable errors (429, 5xx)
-                time.sleep(min(5.0, 1.0 * (2 ** attempt)))
+                time.sleep(min(5.0, 1.0 * (2**attempt)))
                 attempt += 1
         raise last_exc if last_exc else RuntimeError("Unknown error generating audio")
 
-    def fetch_alignment(self, *, voice_id: str, text: str, model_id: str) -> Optional[List[WordTimestamp]]:
+    def fetch_alignment(
+        self, *, voice_id: str, text: str, model_id: str
+    ) -> Optional[List[WordTimestamp]]:
         url = _join_url(self._config.base_url, f"/v1/text-to-speech/{voice_id}/alignment")
         try:
             payload = json.dumps({"text": text, "model_id": model_id}).encode("utf-8")
@@ -195,7 +209,7 @@ class ElevenLabsClient:
                 headers={"xi-api-key": self._config.api_key, "Content-Type": "application/json"},
                 body=payload,
             )
-        except Exception:
+        except (urllib.error.URLError, RuntimeError, ValueError):
             return None
 
         alignment = data.get("alignment") or data.get("words") or []
@@ -236,7 +250,6 @@ class ElevenLabsClient:
             raw = exc.read().decode("utf-8", errors="replace") if exc.fp else ""
             raise RuntimeError(_translate_api_error(exc.code, raw)) from exc
 
-
     def _request_json(
         self,
         method: str,
@@ -249,3 +262,43 @@ class ElevenLabsClient:
         return json.loads(data.decode("utf-8"))
 
 
+_VOICES_CACHE_TTL_S = 300
+_voices_cache: Dict[str, Tuple[float, List[Dict[str, Any]]]] = {}
+_voices_cache_lock = threading.Lock()
+
+
+def list_elevenlabs_voices_cached(
+    client: ElevenLabsClient, *, force_refresh: bool, api_key: str
+) -> List[Dict[str, Any]]:
+    global _voices_cache
+
+    if not api_key:
+        return []
+
+    now = time.time()
+    api_key_tag = hashlib.sha256(api_key.encode("utf-8")).hexdigest()[:16]
+
+    with _voices_cache_lock:
+        if not force_refresh and api_key_tag in _voices_cache:
+            fetched_at_s, cached_voices = _voices_cache[api_key_tag]
+            if (now - fetched_at_s) < _VOICES_CACHE_TTL_S:
+                return cached_voices
+
+    voices = client.list_voices()
+
+    out: List[Dict[str, Any]] = []
+    for v in voices:
+        out.append(
+            {
+                "voice_id": v.voice_id,
+                "name": v.name,
+                "category": v.category,
+                "description": v.description,
+                "preview_url": v.preview_url,
+            }
+        )
+
+    with _voices_cache_lock:
+        _voices_cache[api_key_tag] = (now, out)
+
+    return out
