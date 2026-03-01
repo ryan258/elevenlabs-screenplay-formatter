@@ -35,3 +35,5 @@ __pycache__/
 *.sw?
 .claude/settings.local.json
 uploads/
+.gitnexus/
+.claude/
