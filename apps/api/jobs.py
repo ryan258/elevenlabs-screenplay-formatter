@@ -55,17 +55,18 @@ class Job:
     _event_cond: threading.Condition = field(default_factory=lambda: threading.Condition())
 
     def snapshot(self) -> JobSnapshot:
-        return JobSnapshot(
-            job_id=self.job_id,
-            status=self.status,
-            created_at_s=self.created_at_s,
-            updated_at_s=self.updated_at_s,
-            current=self.current,
-            total=self.total,
-            message=self.message,
-            error=self.error,
-            export_ready=self.export_path is not None and self.export_path.exists(),
-        )
+        with self._event_cond:
+            return JobSnapshot(
+                job_id=self.job_id,
+                status=self.status,
+                created_at_s=self.created_at_s,
+                updated_at_s=self.updated_at_s,
+                current=self.current,
+                total=self.total,
+                message=self.message,
+                error=self.error,
+                export_ready=self.export_path is not None and self.export_path.exists(),
+            )
 
     def add_event(self, event: str, data: Dict[str, Any]) -> int:
         with self._event_cond:
@@ -89,6 +90,14 @@ class Job:
             if events:
                 last_event_id = int(events[-1].get("id", last_event_id))
             return events, last_event_id
+
+    def update_state(self, **kwargs: Any) -> None:
+        """Thread-safe method to update job state fields."""
+        with self._event_cond:
+            for key, value in kwargs.items():
+                if hasattr(self, key) and not key.startswith('_'):
+                    setattr(self, key, value)
+            self.updated_at_s = time.time()
 
 
 class JobStore:
@@ -205,8 +214,7 @@ class JobStore:
         filename_prefix: str,
         character_configs: Dict[str, CharacterConfig],
     ) -> None:
-        job.status = "running"
-        job.updated_at_s = time.time()
+        job.update_state(status="running")
         self._emit(job, "status", {"status": "running"})
 
         try:
@@ -221,8 +229,7 @@ class JobStore:
             check_disk_space(job.work_dir, 100 * 1024 * 1024)  # Estimate 100MB needed
 
             parsed = parse_script(script_text, preserve_stage_directions=preserve_stage_directions)
-            job.total = len(parsed.dialogue_chunks)
-            job.updated_at_s = time.time()
+            job.update_state(total=len(parsed.dialogue_chunks))
             errors = validate_character_configs(parsed.dialogue_chunks, character_configs)
             if errors:
                 raise RuntimeError("; ".join(errors))
@@ -236,10 +243,11 @@ class JobStore:
             alignments: List[Optional[List[WordTimestamp]]] = []
 
             def on_progress(p: GenerationProgress) -> None:
-                job.current = p.current
-                job.total = p.total
-                job.message = p.message
-                job.updated_at_s = time.time()
+                job.update_state(
+                    current=p.current,
+                    total=p.total,
+                    message=p.message,
+                )
                 self._emit(
                     job,
                     "progress",
@@ -313,11 +321,7 @@ class JobStore:
                 output_path=export_path,
                 extra_files=extra_paths,
             )
-            job.export_path = export_path
-            job.status = "complete"
-            if not job.message:
-                job.message = "Complete"
-            job.updated_at_s = time.time()
+            job.update_state(export_path=export_path, status="complete", message="Complete" if not job.message else job.message)
             snap = job.snapshot()
             self._emit(
                 job,
@@ -356,10 +360,7 @@ class JobStore:
                         "Failed to cleanup audio for job %s: %s", job.job_id, cleanup_exc
                     )
 
-            job.status = "error"
-            job.error = error_msg  # Generic message only
-            job.message = "Error"
-            job.updated_at_s = time.time()
+            job.update_state(status="error", error=error_msg, message="Error")
             self._emit(job, "job_error", {"error": error_msg})
         finally:
             snap = job.snapshot()
