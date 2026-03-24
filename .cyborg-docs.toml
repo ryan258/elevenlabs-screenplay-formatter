@@ -1,0 +1,23 @@
+version = 1
+blog_root = "/Users/ryanjohnson/Projects/cyborg/my-ms-ai-blog"
+base_ref = "HEAD~1"
+head_ref = "HEAD"
+notes_file = ".cyborg-docs-notes.md"
+site_branch_prefix = "codex/docs-sync"
+
+test_commands = [
+  "python3 -m pytest -q",
+]
+
+site_check_commands = [
+  "bash \"$DOTFILES_DIR/scripts/cyborg_scoped_site_check.sh\" content/log/updating-an-older-repo-to-the-current-gitnexus-workflow.md",
+  "bash scripts/validate-links.sh",
+]
+
+[[pages]]
+key = "gitnexus-upgrade-log"
+path = "content/log/updating-an-older-repo-to-the-current-gitnexus-workflow.md"
+type = "log"
+mode = "update"
+draft = false
+notes = "Keep this as a field report about modernizing the repo's GitNexus workflow. Focus on real repo signals: analyzer status, test entrypoint, stale backup dirs, and the repo-local instruction upgrades."
