@@ -36,4 +36,5 @@ __pycache__/
 .claude/settings.local.json
 uploads/
 .gitnexus/
+.gitnexus.broken-*/
 .claude/
