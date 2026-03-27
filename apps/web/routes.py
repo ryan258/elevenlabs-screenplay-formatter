@@ -1072,6 +1072,9 @@ def generation_start() -> WerkzeugResponse:
 @app.post("/generation/stop/<job_id>")
 def generation_stop(job_id: str) -> WerkzeugResponse:
     cfg = _get_cfg()
+    payload = _payload_from_session(cfg)
+    if not payload or payload.get("lastJobId") != job_id:
+        return _error_response(["Job not found."], status=404, hx_retarget="#job-panel")
     store = _get_store(cfg)
     job = store.cancel(job_id)
     if job is None:

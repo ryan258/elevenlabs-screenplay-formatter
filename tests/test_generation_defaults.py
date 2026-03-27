@@ -70,6 +70,6 @@ def test_generation_page_renders_defaults_and_auto_validation(
     assert 'hx-post="/generation/validate"' in html
     assert 'hx-include="#generation-form"' in html
     assert (
-        'hx-trigger="load, change delay:200ms from:#generation-form, input changed delay:400ms from:#generation-form"'
+        'hx-trigger="change delay:200ms from:#generation-form, input changed delay:400ms from:#generation-form"'
         in html
     )

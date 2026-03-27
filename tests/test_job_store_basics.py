@@ -41,6 +41,12 @@ def test_job_store_cancel_marks_job_cancelling_and_emits_status(tmp_path: Path) 
     assert events[-1]["event"] == "status"
     assert events[-1]["data"]["status"] == "cancelling"
 
+    # Duplicate cancel should not emit another event
+    event_count_before = len(job.get_events_since(0))
+    dup = store.cancel(job.job_id)
+    assert dup is job
+    assert len(job.get_events_since(0)) == event_count_before
+
 
 def test_web_session_store_cleanup_deletes_old_sessions(tmp_path: Path) -> None:
     store = WebSessionStore(tmp_path)

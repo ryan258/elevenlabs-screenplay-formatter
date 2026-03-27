@@ -1,16 +1,15 @@
 from __future__ import annotations
 
-from collections import deque
-from dataclasses import asdict
 import json
+import logging
+import shutil
 import threading
 import time
 import uuid
-from dataclasses import dataclass, field
+from collections import deque
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Deque, Dict, List, Optional, Tuple
-
-import logging
 from apps.api.config import AppConfig
 from lib.elevenlabs.client import ElevenLabsClient
 from lib.exports.zip_bundle import build_zip_bundle_to_path
@@ -110,7 +109,7 @@ class Job:
             if self.status in {"complete", "error", "cancelled"}:
                 return False
             if self.cancel_requested:
-                return True
+                return False
             self.cancel_requested = True
             self.status = "cancelling"
             self.message = "Stopping after the current clip..."
@@ -143,8 +142,6 @@ class JobStore:
                 del self._jobs[job_id]
 
         # Cleanup filesystem outside the lock
-        import shutil
-
         for job_id, work_dir in to_remove:
             try:
                 shutil.rmtree(work_dir, ignore_errors=False)
@@ -431,8 +428,6 @@ class JobStore:
         target.write_bytes(generated.audio_bytes)
 
     def _cleanup_generated_outputs(self, job: Job, *, reason: str) -> None:
-        import shutil
-
         audio_dir = (job.work_dir / "audio").resolve()
         if audio_dir.exists():
             try:
