@@ -20,6 +20,7 @@ _TRANSITION_RE = re.compile(
 )
 _SAME_LINE_DIALOGUE_RE = re.compile(r'^([A-Z0-9\s()."\'-]+):\s*(.*)')
 _UPPERCASE_CHARACTER_RE = re.compile(r"^[A-Z][A-Z0-9\s.'\"()-]*$")
+_ELLIPSIS_SUFFIX_RE = re.compile(r"(?:\.{3,}|…)$")
 
 
 def clean_dialogue(text: str, preserve_brackets: bool = False) -> str:
@@ -71,6 +72,10 @@ def generate_aliases(full_name: str) -> Set[str]:
         aliases.add(f"{tokens[1]} {tokens[2]}")
 
     return aliases
+
+
+def _ends_with_ellipsis(value: str) -> bool:
+    return bool(_ELLIPSIS_SUFFIX_RE.search(value.strip()))
 
 
 @dataclass
@@ -211,7 +216,11 @@ def parse_script(script_text: str, preserve_stage_directions: bool = False) -> P
                 return
 
         found_multi = find_character(trimmed_line)
-        if not found_multi and _UPPERCASE_CHARACTER_RE.match(trimmed_line):
+        if (
+            not found_multi
+            and _UPPERCASE_CHARACTER_RE.match(trimmed_line)
+            and not _ends_with_ellipsis(trimmed_line)
+        ):
             found_multi = register_character(trimmed_line, "uppercase_line", line_number)
         if found_multi:
             flush_dialogue()

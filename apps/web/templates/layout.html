@@ -24,23 +24,15 @@
         <h1>ElevenLabs Screenplay Formatter</h1>
         <p class="subtitle">Python modular monolith (Flask + HTMX + FastAPI)</p>
         <nav class="nav">
-          <a href="/">Script</a>
-          <a href="/characters">Characters</a>
-          <a href="/generation">Generation</a>
-          <a href="/timeline">Timeline</a>
-          <a href="/exports">Exports</a>
+          <a class="nav-link" href="/" {% if request.path == "/" %}aria-current="page"{% endif %}>Script</a>
+          <a class="nav-link" href="/characters" {% if request.path.startswith("/characters") %}aria-current="page"{% endif %}>Characters</a>
+          <a class="nav-link" href="/generation" {% if request.path.startswith("/generation") %}aria-current="page"{% endif %}>Generation</a>
+          <a class="nav-link" href="/timeline" {% if request.path.startswith("/timeline") %}aria-current="page"{% endif %}>Timeline</a>
+          <a class="nav-link" href="/exports" {% if request.path.startswith("/exports") %}aria-current="page"{% endif %}>Exports</a>
           <form action="/reset" method="post" style="margin: 0; display: flex">
             <button
+              class="nav-link"
               type="submit"
-              style="
-                background: none;
-                border: none;
-                padding: 0;
-                color: var(--text);
-                font: inherit;
-                cursor: pointer;
-                border-bottom: 1px solid transparent;
-              "
             >
               New Play
             </button>
@@ -65,6 +57,7 @@
               '[data-role="job-progress"]',
             );
             const exportEl = panel.querySelector('[data-role="job-export"]');
+            let jobState = statusEl ? statusEl.textContent || "" : "";
 
             const es = new EventSource(url);
 
@@ -100,17 +93,63 @@
               exportEl.innerHTML = html;
             }
 
-            function setStatus(text) {
+            function clearExport() {
+              if (exportEl) exportEl.innerHTML = "";
+            }
+
+            function syncJobControls(status) {
+              const controlsEl = panel.querySelector('[data-role="job-controls"]');
+              if (!controlsEl) return;
+
+              const stopButton = controlsEl.querySelector('[data-role="job-stop"]');
+              const stopNote = controlsEl.querySelector('[data-role="job-stop-note"]');
+
+              if (status === "cancelling") {
+                if (stopButton) {
+                  stopButton.textContent = "Stopping...";
+                  stopButton.setAttribute("disabled", "disabled");
+                  stopButton.setAttribute("aria-disabled", "true");
+                  stopButton.setAttribute("aria-busy", "true");
+                  stopButton.classList.add("is-busy");
+                }
+                if (stopNote) {
+                  stopNote.textContent =
+                    "Waiting for the current clip to finish, then generation will stop.";
+                }
+                return;
+              }
+
+              if (status === "complete" || status === "error" || status === "cancelled") {
+                controlsEl.innerHTML = "";
+                return;
+              }
+
+              if (stopButton) {
+                stopButton.textContent = "Stop Job";
+                stopButton.removeAttribute("disabled");
+                stopButton.removeAttribute("aria-disabled");
+                stopButton.removeAttribute("aria-busy");
+                stopButton.classList.remove("is-busy");
+              }
+            }
+
+            function renderStatus(text) {
               if (!statusEl) return;
               statusEl.textContent = text || "";
               statusEl.className =
                 "status status--" + (text || "").toLowerCase();
             }
 
+            function setJobState(text) {
+              jobState = text || "";
+              renderStatus(jobState);
+              syncJobControls(jobState);
+            }
+
             es.addEventListener("snapshot", function (ev) {
               try {
                 const snap = JSON.parse(ev.data || "{}");
-                setStatus(snap.status || "");
+                setJobState(snap.status || "");
                 if (messageEl) messageEl.textContent = snap.message || "";
                 if (progressEl) {
                   const cur = snap.current || 0;
@@ -120,6 +159,21 @@
                     : String(cur);
                 }
                 if (snap.export_ready) setExportReady(snap.job_id);
+              } catch (_) {}
+            });
+
+            es.addEventListener("status", function (ev) {
+              try {
+                const d = JSON.parse(ev.data || "{}");
+                if (d.status) setJobState(d.status);
+                if (messageEl && d.message) messageEl.textContent = d.message;
+                if (progressEl && (d.current !== undefined || d.total !== undefined)) {
+                  const cur = d.current || 0;
+                  const total = d.total || 0;
+                  progressEl.textContent = total
+                    ? cur + " / " + total
+                    : String(cur);
+                }
               } catch (_) {}
             });
 
@@ -134,7 +188,11 @@
             es.addEventListener("progress", function (ev) {
               try {
                 const d = JSON.parse(ev.data || "{}");
-                setStatus(d.status || "running");
+                const transientStatus =
+                  jobState === "cancelling" || jobState === "cancelled"
+                    ? jobState
+                    : d.status || "running";
+                renderStatus(transientStatus);
                 if (messageEl) messageEl.textContent = d.message || "";
                 if (progressEl)
                   progressEl.textContent =
@@ -143,7 +201,7 @@
             });
 
             es.addEventListener("complete", function (ev) {
-              setStatus("complete");
+              setJobState("complete");
               try {
                 const d = JSON.parse(ev.data || "{}");
                 if (messageEl && d.message) messageEl.textContent = d.message;
@@ -153,7 +211,8 @@
             });
 
             es.addEventListener("job_error", function (ev) {
-              setStatus("error");
+              setJobState("error");
+              clearExport();
               if (messageEl) {
                 try {
                   const d = JSON.parse(ev.data || "{}");
@@ -164,10 +223,23 @@
               }
             });
 
+            es.addEventListener("cancelled", function (ev) {
+              setJobState("cancelled");
+              clearExport();
+              if (messageEl) {
+                try {
+                  const d = JSON.parse(ev.data || "{}");
+                  messageEl.textContent = d.message || "Stopped";
+                } catch (_) {
+                  messageEl.textContent = "Stopped";
+                }
+              }
+            });
+
             es.addEventListener("done", function (ev) {
               try {
                 const d = JSON.parse(ev.data || "{}");
-                if (d.status) setStatus(d.status);
+                if (d.status) setJobState(d.status);
                 if (messageEl && d.message) messageEl.textContent = d.message;
                 const jobId = panel.getAttribute("data-job-id");
                 if (jobId && d.export_ready) setExportReady(jobId);
@@ -178,7 +250,7 @@
             es.onopen = function () {};
             es.onerror = function () {
               if (statusEl && statusEl.textContent !== "complete")
-                setStatus("disconnected");
+                renderStatus("disconnected");
             };
           }
 
@@ -200,6 +272,104 @@
           subtree: true,
         });
         bindJobPanels(document);
+      })();
+    </script>
+    <script>
+      (function () {
+        const transientPressMs = 180;
+        const pendingControls = new WeakMap();
+
+        function isButtonLike(control) {
+          return !!(
+            control &&
+            control.classList &&
+            control.classList.contains("btn")
+          );
+        }
+
+        function resolveControl(source) {
+          if (!source || !source.closest) return null;
+          if (isButtonLike(source)) return source;
+          if (source.tagName === "FORM") {
+            return pendingControls.get(source) || null;
+          }
+          return source.closest(".btn");
+        }
+
+        function setPressed(control) {
+          if (!isButtonLike(control)) return;
+          control.classList.remove("is-pressed");
+          window.requestAnimationFrame(function () {
+            control.classList.add("is-pressed");
+            window.setTimeout(function () {
+              control.classList.remove("is-pressed");
+            }, transientPressMs);
+          });
+        }
+
+        function setBusy(control, busy) {
+          if (!isButtonLike(control)) return;
+          if (busy) {
+            if (!control.hasAttribute("aria-busy")) {
+              control.style.width = control.offsetWidth + "px";
+            }
+            control.classList.add("is-busy");
+            control.setAttribute("aria-busy", "true");
+          } else {
+            control.classList.remove("is-busy");
+            control.removeAttribute("aria-busy");
+            control.style.removeProperty("width");
+          }
+        }
+
+        document.addEventListener(
+          "click",
+          function (event) {
+            const control = event.target.closest(".btn");
+            if (!isButtonLike(control)) return;
+            setPressed(control);
+            if (control.form) {
+              pendingControls.set(control.form, control);
+            }
+          },
+          true,
+        );
+
+        document.addEventListener(
+          "submit",
+          function (event) {
+            if (!isButtonLike(event.submitter)) return;
+            pendingControls.set(event.target, event.submitter);
+            setBusy(event.submitter, true);
+          },
+          true,
+        );
+
+        function clearBusy(source) {
+          const control = resolveControl(source);
+          setBusy(control, false);
+          if (source) {
+            pendingControls.delete(source);
+          }
+        }
+
+        document.body.addEventListener("htmx:beforeRequest", function (event) {
+          const source = event.detail && event.detail.elt;
+          const control = resolveControl(source);
+          if (!control) return;
+          if (source) {
+            pendingControls.set(source, control);
+          }
+          setBusy(control, true);
+        });
+
+        ["htmx:afterRequest", "htmx:responseError", "htmx:sendError"].forEach(
+          function (eventName) {
+            document.body.addEventListener(eventName, function (event) {
+              clearBusy(event.detail && event.detail.elt);
+            });
+          },
+        );
       })();
     </script>
   </body>

@@ -51,6 +51,10 @@ class GenerationError(RuntimeError):
         self.completed = completed
 
 
+class GenerationCancelled(RuntimeError):
+    pass
+
+
 def _get_format_details(output_format: str) -> Tuple[str, str]:
     return OUTPUT_FORMAT_DETAILS.get(output_format, OUTPUT_FORMAT_DETAILS["mp3_44100_128"])
 
@@ -87,6 +91,7 @@ def generate_all_audio_iter(
     speak_parentheticals: bool = False,
     fetch_alignment: bool = True,
     on_progress: Optional[Callable[[GenerationProgress], None]] = None,
+    should_cancel: Optional[Callable[[], bool]] = None,
 ) -> Iterator[GeneratedAudio]:
     total = len(dialogue_chunks)
     extension, accept = _get_format_details(output_format)
@@ -98,6 +103,9 @@ def generate_all_audio_iter(
     completed: List[GeneratedAudio] = []
 
     for index, chunk in enumerate(dialogue_chunks):
+        if should_cancel and should_cancel():
+            raise GenerationCancelled("Generation cancelled")
+
         cfg = character_configs.get(chunk.character)
         if cfg is None or not cfg.voice_id:
             raise GenerationError(
@@ -155,11 +163,17 @@ def generate_all_audio_iter(
                 base_delay_ms=base_delay,
             )
 
+            if should_cancel and should_cancel():
+                raise GenerationCancelled("Generation cancelled")
+
             alignment: Optional[List[WordTimestamp]] = None
             if fetch_alignment:
                 alignment = client.fetch_alignment(
                     voice_id=cfg.voice_id, text=text, model_id=model_id
                 )
+
+            if should_cancel and should_cancel():
+                raise GenerationCancelled("Generation cancelled")
 
             if alignment:
                 # Create offset alignment for storage
@@ -213,7 +227,11 @@ def generate_all_audio_iter(
 
             adaptive_delay = adjust_delay_based_on_rate_limit(remaining, adaptive_delay, base_delay)
             if index < total - 1 and adaptive_delay > 0:
+                if should_cancel and should_cancel():
+                    raise GenerationCancelled("Generation cancelled")
                 time.sleep(adaptive_delay / 1000)
+        except GenerationCancelled:
+            raise
         except Exception as exc:
             if on_progress:
                 on_progress(

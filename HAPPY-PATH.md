@@ -5,7 +5,7 @@ This walkthrough shows the fastest way to convert a screenplay into per-line aud
 ## 1) Install + Configure
 
 ```bash
-python3 -m pip install -e ".[dev]"
+uv sync
 export ELEVENLABS_API_KEY="..."
 export ELEVENLABS_BASE_URL="https://api.elevenlabs.io"
 ```
@@ -13,7 +13,7 @@ export ELEVENLABS_BASE_URL="https://api.elevenlabs.io"
 ## 2) Run the App
 
 ```bash
-python3 -m apps.api
+uv run python -m apps.api
 ```
 
 Open `http://localhost:8000`.

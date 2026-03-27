@@ -27,6 +27,21 @@ def test_job_events_ring_buffer_is_non_destructive(tmp_path: Path) -> None:
     assert [e["data"]["n"] for e in b] == [1, 2]
 
 
+def test_job_store_cancel_marks_job_cancelling_and_emits_status(tmp_path: Path) -> None:
+    store = JobStore(tmp_path)
+    job = store.create()
+
+    cancelled = store.cancel(job.job_id)
+
+    assert cancelled is job
+    snap = job.snapshot()
+    assert snap.status == "cancelling"
+    assert snap.message == "Stopping after the current clip..."
+    events = job.get_events_since(0)
+    assert events[-1]["event"] == "status"
+    assert events[-1]["data"]["status"] == "cancelling"
+
+
 def test_web_session_store_cleanup_deletes_old_sessions(tmp_path: Path) -> None:
     store = WebSessionStore(tmp_path)
     data = store.create(payload={"scriptText": "Hello"})

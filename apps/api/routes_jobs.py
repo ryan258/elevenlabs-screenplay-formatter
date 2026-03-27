@@ -279,7 +279,7 @@ async def api_job_events(
 
         snapshot = job.snapshot().__dict__
         yield f"event: snapshot\ndata: {json.dumps(snapshot)}\n\n".encode("utf-8")
-        if snapshot["status"] in {"complete", "error"}:
+        if snapshot["status"] in {"complete", "error", "cancelled"}:
             yield f"event: done\ndata: {json.dumps({'status': snapshot['status']})}\n\n".encode(
                 "utf-8"
             )

@@ -4,6 +4,12 @@
   --muted: #A6ACCD;
   --ok: #98C379;
   --err: #E06C75;
+  --btn-shadow: rgba(0, 0, 0, 0.28);
+  --btn-highlight: rgba(255, 255, 255, 0.14);
+}
+
+html {
+  scrollbar-gutter: stable;
 }
 
 * { box-sizing: border-box; }
@@ -18,8 +24,24 @@ body {
 .site-header { border-bottom: 1px solid var(--muted); }
 .subtitle { color: var(--muted); margin-top: 4px; }
 .nav { display: flex; gap: 12px; margin-top: 12px; }
-.nav a { color: var(--text); text-decoration: none; border-bottom: 1px solid transparent; }
-.nav a:hover { border-bottom-color: var(--muted); }
+.nav-link {
+  color: var(--text);
+  text-decoration: none;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  background: none;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+.nav-link:hover,
+.nav-link:focus-visible {
+  border-bottom-color: var(--muted);
+}
+.nav-link[aria-current="page"] {
+  color: var(--ok);
+  border-bottom-color: var(--ok);
+}
 
 .card {
   border: 1px solid var(--muted);
@@ -66,14 +88,71 @@ textarea {
 .btn {
   background: var(--muted);
   color: var(--bg);
-  border: 0;
-  border-radius: 8px;
+  border: 1px solid rgba(18, 18, 18, 0.45);
+  border-bottom-width: 3px;
+  border-radius: 10px;
   padding: 10px 12px;
-  font-weight: 600;
+  font-weight: 700;
   text-decoration: none;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  box-shadow: 0 8px 18px var(--btn-shadow), inset 0 1px 0 var(--btn-highlight);
+  transform: translateY(0);
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    filter 120ms ease,
+    border-color 120ms ease,
+    background-color 120ms ease;
 }
 .btn.secondary { background: var(--text); }
+.btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.06);
+  box-shadow: 0 12px 24px var(--btn-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+.btn:focus-visible {
+  outline: 2px solid var(--ok);
+  outline-offset: 2px;
+  transform: translateY(-1px);
+}
+.btn:active,
+.btn.is-pressed {
+  transform: translateY(1px) scale(0.985);
+  filter: brightness(0.94);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+.btn[aria-busy="true"],
+.btn.htmx-request,
+.btn.is-busy {
+  cursor: progress;
+  pointer-events: none;
+  filter: saturate(0.7) brightness(0.95);
+}
+.btn[aria-busy="true"]::after,
+.btn.htmx-request::after,
+.btn.is-busy::after {
+  content: "";
+  position: absolute;
+  right: 0.55rem;
+  top: calc(50% - 0.4rem);
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 999px;
+  border: 2px solid rgba(18, 18, 18, 0.2);
+  border-top-color: currentColor;
+  animation: btn-spin 700ms linear infinite;
+}
+.btn[disabled],
+.btn[aria-disabled="true"] {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
 .meta { color: var(--muted); }
 .error { color: var(--err); }
 .ok { color: var(--ok); }
@@ -88,9 +167,12 @@ textarea {
 .status--running { color: var(--ok); }
 .status--generating { color: var(--ok); }
 .status--downloading { color: var(--ok); }
+.status--cancelling { color: var(--muted); }
+.status--cancelled { color: var(--muted); }
 .status--complete { color: var(--ok); }
 .status--error { color: var(--err); }
 .status--disconnected { color: var(--err); }
+.job-stop-note { margin: 6px 0 0; }
 
 .warning-box {
   padding: 10px 12px;
@@ -245,4 +327,10 @@ textarea {
 
 .diff-line--del {
   color: var(--err);
+}
+
+@keyframes btn-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }

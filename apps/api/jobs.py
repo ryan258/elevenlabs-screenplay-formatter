@@ -14,7 +14,12 @@ import logging
 from apps.api.config import AppConfig
 from lib.elevenlabs.client import ElevenLabsClient
 from lib.exports.zip_bundle import build_zip_bundle_to_path
-from lib.generation import GeneratedAudio, GenerationProgress, generate_all_audio_iter
+from lib.generation import (
+    GeneratedAudio,
+    GenerationCancelled,
+    GenerationProgress,
+    generate_all_audio_iter,
+)
 from lib.manifest import build_manifest_entries, manifest_to_csv, manifest_to_srt, manifest_to_vtt
 from lib.models import CharacterConfig, WordTimestamp
 from lib.parser import parse_script
@@ -43,13 +48,14 @@ class Job:
     job_id: str
     created_at_s: float
     updated_at_s: float
-    status: str = "queued"  # queued | running | complete | error
+    status: str = "queued"  # queued | running | cancelling | cancelled | complete | error
     current: int = 0
     total: int = 0
     message: str = ""
     error: Optional[str] = None
     export_path: Optional[Path] = None
     work_dir: Path = field(default_factory=Path)
+    cancel_requested: bool = False
     _event_seq: int = 0
     _events: Deque[Dict[str, Any]] = field(default_factory=lambda: deque(maxlen=2000))
     _event_cond: threading.Condition = field(default_factory=lambda: threading.Condition())
@@ -99,6 +105,24 @@ class Job:
                     setattr(self, key, value)
             self.updated_at_s = time.time()
 
+    def request_cancel(self) -> bool:
+        with self._event_cond:
+            if self.status in {"complete", "error", "cancelled"}:
+                return False
+            if self.cancel_requested:
+                return True
+            self.cancel_requested = True
+            self.status = "cancelling"
+            self.message = "Stopping after the current clip..."
+            self.error = None
+            self.updated_at_s = time.time()
+            self._event_cond.notify_all()
+            return True
+
+    def is_cancel_requested(self) -> bool:
+        with self._event_cond:
+            return self.cancel_requested
+
 
 class JobStore:
     def __init__(self, root_dir: Path) -> None:
@@ -113,7 +137,7 @@ class JobStore:
         to_remove: List[Tuple[str, Path]] = []
         with self._lock:
             for job_id, job in self._jobs.items():
-                if job.status in {"complete", "error"} and job.updated_at_s < cutoff:
+                if job.status in {"complete", "error", "cancelled"} and job.updated_at_s < cutoff:
                     to_remove.append((job_id, job.work_dir))
             for job_id, _ in to_remove:
                 del self._jobs[job_id]
@@ -168,6 +192,25 @@ class JobStore:
     def _emit(self, job: Job, event: str, data: Dict[str, Any]) -> None:
         job.add_event(event, data)
 
+    def cancel(self, job_id: str) -> Optional[Job]:
+        job = self.get(job_id)
+        if job is None:
+            return None
+        changed = job.request_cancel()
+        snap = job.snapshot()
+        if changed:
+            self._emit(
+                job,
+                "status",
+                {
+                    "status": snap.status,
+                    "message": snap.message,
+                    "current": snap.current,
+                    "total": snap.total,
+                },
+            )
+        return job
+
     def start_generation(
         self,
         *,
@@ -214,6 +257,10 @@ class JobStore:
         filename_prefix: str,
         character_configs: Dict[str, CharacterConfig],
     ) -> None:
+        if job.is_cancel_requested():
+            self._mark_cancelled(job, message="Stopped before generation began.")
+            return
+
         job.update_state(status="running")
         self._emit(job, "status", {"status": "running"})
 
@@ -274,12 +321,16 @@ class JobStore:
                 speak_parentheticals=speak_parentheticals,
                 fetch_alignment=True,
                 on_progress=on_progress,
+                should_cancel=job.is_cancel_requested,
             ):
                 self._write_generated_audio(audio_dir, generated)
                 generated_files.append(generated.filename)
                 start_times.append(generated.start_time_ms)
                 end_times.append(generated.end_time_ms)
                 alignments.append(generated.alignment)
+
+            if job.is_cancel_requested():
+                raise GenerationCancelled("Generation cancelled")
 
             entries = build_manifest_entries(
                 parsed.dialogue_chunks,
@@ -331,6 +382,11 @@ class JobStore:
                     "message": job.message,
                 },
             )
+        except GenerationCancelled:
+            message = "Stopped. The current clip may have already finished."
+            if job.current == 0:
+                message = "Stopped before generation began."
+            self._mark_cancelled(job, message=message)
         except Exception as exc:
             import traceback
 
@@ -348,17 +404,7 @@ class JobStore:
                 error_msg = "Authentication failed - check API key"
 
             # Clean up partial audio files on failure (Bug 14 fix)
-            audio_dir = (job.work_dir / "audio").resolve()
-            if audio_dir.exists():
-                try:
-                    import shutil
-
-                    shutil.rmtree(audio_dir)
-                    logger.info("Cleaned up audio dir for failed job %s", job.job_id)
-                except Exception as cleanup_exc:
-                    logger.warning(
-                        "Failed to cleanup audio for job %s: %s", job.job_id, cleanup_exc
-                    )
+            self._cleanup_generated_outputs(job, reason="failed")
 
             job.update_state(status="error", error=error_msg, message="Error")
             self._emit(job, "job_error", {"error": error_msg})
@@ -383,3 +429,46 @@ class JobStore:
             raise ValueError("Invalid output filename") from exc
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(generated.audio_bytes)
+
+    def _cleanup_generated_outputs(self, job: Job, *, reason: str) -> None:
+        import shutil
+
+        audio_dir = (job.work_dir / "audio").resolve()
+        if audio_dir.exists():
+            try:
+                shutil.rmtree(audio_dir)
+                logger.info("Cleaned up audio dir for %s job %s", reason, job.job_id)
+            except Exception as cleanup_exc:
+                logger.warning(
+                    "Failed to cleanup audio for %s job %s: %s",
+                    reason,
+                    job.job_id,
+                    cleanup_exc,
+                )
+
+        for filename in [
+            "manifest.json",
+            "manifest.csv",
+            "subtitles.srt",
+            "subtitles.vtt",
+            "reaper.rpp",
+            "bundle.zip",
+        ]:
+            path = (job.work_dir / filename).resolve()
+            if not path.exists():
+                continue
+            try:
+                path.unlink()
+            except Exception as cleanup_exc:
+                logger.warning(
+                    "Failed to cleanup %s for %s job %s: %s",
+                    filename,
+                    reason,
+                    job.job_id,
+                    cleanup_exc,
+                )
+
+    def _mark_cancelled(self, job: Job, *, message: str) -> None:
+        self._cleanup_generated_outputs(job, reason="cancelled")
+        job.update_state(status="cancelled", error=None, export_path=None, message=message)
+        self._emit(job, "cancelled", {"message": message})

@@ -37,6 +37,9 @@ from lib.generation import generate_one_audio, output_format_extension
 from lib.parser import parse_script
 
 _VOICES_CACHE_TTL_S = 300
+DEFAULT_GENERATION_MODEL = "eleven_turbo_v2"
+DEFAULT_OUTPUT_FORMAT = "pcm_24000"
+DEFAULT_REQUEST_DELAY_MS = 500
 
 
 def _sanitize_error(exc: Exception) -> str:
@@ -158,11 +161,11 @@ def _build_default_payload(
     payload: Dict[str, Any] = {
         "scriptText": script_text,
         "projectSettings": {
-            "model": "",
-            "outputFormat": "mp3_44100_128",
+            "model": DEFAULT_GENERATION_MODEL,
+            "outputFormat": DEFAULT_OUTPUT_FORMAT,
             "speakParentheticals": False,
             "preserveStageDirections": preserve_stage_directions,
-            "requestDelayMs": 500,
+            "requestDelayMs": DEFAULT_REQUEST_DELAY_MS,
         },
         "characterConfigs": character_configs_payload,
         "filename_prefix": "",
@@ -457,14 +460,20 @@ def generation() -> WerkzeugResponse:
         except Exception:
             pass  # Fallback to empty list or default input
 
+    selected_model = str(project_settings.get("model") or DEFAULT_GENERATION_MODEL)
+    if models_list and not any(getattr(model, "model_id", "") == selected_model for model in models_list):
+        selected_model = str(getattr(models_list[0], "model_id", selected_model))
+
     job_id = request.args.get("job_id") or payload.get("lastJobId")
     context: Dict[str, Any] = {
         "parsed": parsed,
         "errors": [],
-        "model": str(project_settings.get("model") or ""),
+        "model": selected_model,
         "models": models_list,
-        "output_format": str(project_settings.get("outputFormat") or "mp3_44100_128"),
-        "request_delay_ms": int(project_settings.get("requestDelayMs") or 500),
+        "output_format": str(project_settings.get("outputFormat") or DEFAULT_OUTPUT_FORMAT),
+        "request_delay_ms": int(
+            project_settings.get("requestDelayMs") or DEFAULT_REQUEST_DELAY_MS
+        ),
         "speak_parentheticals": bool(project_settings.get("speakParentheticals")),
         "filename_prefix": str(payload.get("filename_prefix") or ""),
         "job_id": job_id,
@@ -920,10 +929,16 @@ def generation_validate() -> WerkzeugResponse:
         return redirect("/")
 
     project_settings = payload.get("projectSettings") or {}
-    project_settings["model"] = request.form.get("model", "").strip()
-    project_settings["outputFormat"] = request.form.get("output_format", "mp3_44100_128").strip()
+    project_settings["model"] = (
+        request.form.get("model", DEFAULT_GENERATION_MODEL).strip() or DEFAULT_GENERATION_MODEL
+    )
+    project_settings["outputFormat"] = (
+        request.form.get("output_format", DEFAULT_OUTPUT_FORMAT).strip() or DEFAULT_OUTPUT_FORMAT
+    )
     project_settings["requestDelayMs"] = _parse_int(
-        request.form.get("request_delay_ms", "500") or "500", default=500
+        request.form.get("request_delay_ms", str(DEFAULT_REQUEST_DELAY_MS))
+        or str(DEFAULT_REQUEST_DELAY_MS),
+        default=DEFAULT_REQUEST_DELAY_MS,
     )
     project_settings["speakParentheticals"] = request.form.get("speak_parentheticals") == "on"
     payload["projectSettings"] = project_settings
@@ -961,9 +976,9 @@ def generation_validate() -> WerkzeugResponse:
             "generation.html",
             parsed=parsed,
             errors=errors,
-            model=project_settings.get("model", ""),
-            output_format=project_settings.get("outputFormat", "mp3_44100_128"),
-            request_delay_ms=project_settings.get("requestDelayMs", 500),
+            model=project_settings.get("model", DEFAULT_GENERATION_MODEL),
+            output_format=project_settings.get("outputFormat", DEFAULT_OUTPUT_FORMAT),
+            request_delay_ms=project_settings.get("requestDelayMs", DEFAULT_REQUEST_DELAY_MS),
             speak_parentheticals=project_settings.get("speakParentheticals", False),
             filename_prefix=payload.get("filename_prefix", ""),
             job_id=None,
@@ -986,10 +1001,16 @@ def generation_start() -> WerkzeugResponse:
         return _error_response(["Paste a script first."], status=400)
 
     project_settings = payload.get("projectSettings") or {}
-    project_settings["model"] = request.form.get("model", "").strip()
-    project_settings["outputFormat"] = request.form.get("output_format", "mp3_44100_128").strip()
+    project_settings["model"] = (
+        request.form.get("model", DEFAULT_GENERATION_MODEL).strip() or DEFAULT_GENERATION_MODEL
+    )
+    project_settings["outputFormat"] = (
+        request.form.get("output_format", DEFAULT_OUTPUT_FORMAT).strip() or DEFAULT_OUTPUT_FORMAT
+    )
     project_settings["requestDelayMs"] = _parse_int(
-        request.form.get("request_delay_ms", "500") or "500", default=500
+        request.form.get("request_delay_ms", str(DEFAULT_REQUEST_DELAY_MS))
+        or str(DEFAULT_REQUEST_DELAY_MS),
+        default=DEFAULT_REQUEST_DELAY_MS,
     )
     project_settings["speakParentheticals"] = request.form.get("speak_parentheticals") == "on"
     payload["projectSettings"] = project_settings
@@ -1046,6 +1067,24 @@ def generation_start() -> WerkzeugResponse:
 
     template = "job_panel.html" if _is_hx_request() else "job_started.html"
     return Response(render_template(template, **context), status=200, content_type="text/html")
+
+
+@app.post("/generation/stop/<job_id>")
+def generation_stop(job_id: str) -> WerkzeugResponse:
+    cfg = _get_cfg()
+    store = _get_store(cfg)
+    job = store.cancel(job_id)
+    if job is None:
+        return _error_response(["Job not found."], status=404, hx_retarget="#job-panel")
+
+    snap = job.snapshot()
+    if _is_hx_request():
+        return Response(
+            render_template("job_controls.html", job_id=snap.job_id, status=snap.status),
+            status=200,
+            content_type="text/html",
+        )
+    return redirect(url_for("generation", job_id=snap.job_id))
 
 
 @app.post("/generation/create_share_link")

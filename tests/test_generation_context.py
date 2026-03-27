@@ -3,7 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
-from lib.generation import generate_all_audio, generate_one_audio
+import pytest
+
+from lib.generation import GenerationCancelled, generate_all_audio, generate_all_audio_iter, generate_one_audio
 from lib.models import CharacterConfig, DialogueChunk, VoiceSettings
 
 
@@ -87,3 +89,35 @@ def test_generate_one_audio_passes_previous_and_next_context() -> None:
     )
 
     assert client.seen == [("Hello", "!")]
+
+
+def test_generate_all_audio_iter_stops_before_next_chunk_when_cancel_requested() -> None:
+    chunks = [
+        DialogueChunk(character="A", text="Hello", original_text="Hello"),
+        DialogueChunk(character="A", text="World", original_text="World"),
+    ]
+    cfg = CharacterConfig(
+        voice_id="vid",
+        voice_settings=VoiceSettings(stability=0.5, similarity_boost=0.75, style=0.1, speed=1.0),
+    )
+    client = _FakeClient(seen=[])
+    cancel_requested = {"value": False}
+
+    iterator = generate_all_audio_iter(
+        client=client,  # type: ignore[arg-type]
+        dialogue_chunks=chunks,
+        character_configs={"A": cfg},
+        model_id="m",
+        output_format="mp3_44100_128",
+        speak_parentheticals=True,
+        fetch_alignment=False,
+        should_cancel=lambda: cancel_requested["value"],
+    )
+
+    first = next(iterator)
+    cancel_requested["value"] = True
+
+    assert first.audio_bytes == b"audio"
+    with pytest.raises(GenerationCancelled):
+        next(iterator)
+    assert client.seen == [(None, "World")]

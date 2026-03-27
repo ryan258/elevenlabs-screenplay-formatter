@@ -1,0 +1,35 @@
+<div data-role="job-controls">
+  {% if status in ["queued", "running"] %}
+    <div class="actions">
+      <button
+        class="btn secondary"
+        type="button"
+        data-role="job-stop"
+        hx-post="/generation/stop/{{ job_id }}"
+        hx-target="closest [data-role='job-controls']"
+        hx-swap="outerHTML"
+      >
+        Stop Job
+      </button>
+    </div>
+    <p class="meta job-stop-note" data-role="job-stop-note">
+      Stops before the next ElevenLabs request. The current clip may still finish.
+    </p>
+  {% elif status == "cancelling" %}
+    <div class="actions">
+      <button
+        class="btn secondary"
+        type="button"
+        data-role="job-stop"
+        disabled
+        aria-disabled="true"
+        aria-busy="true"
+      >
+        Stopping...
+      </button>
+    </div>
+    <p class="meta job-stop-note" data-role="job-stop-note">
+      Waiting for the current clip to finish, then generation will stop.
+    </p>
+  {% endif %}
+</div>

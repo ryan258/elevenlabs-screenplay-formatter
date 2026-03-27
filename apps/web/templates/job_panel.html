@@ -5,6 +5,7 @@
     · Progress: <span data-role="job-progress">{{ current }} / {{ total }}</span>
   </p>
   <p data-role="job-message">{{ message }}</p>
+  {% include "job_controls.html" %}
   <div class="actions" data-role="job-export"></div>
   <p class="meta">Job ID: <code>{{ job_id }}</code></p>
 </section>

@@ -56,7 +56,7 @@ See `ROADMAP.md` and `MIGRATION_ROADMAP.md` for the execution plan.
 ### Run the combined app (FastAPI mounting Flask)
 
 ```bash
-python3 -m apps.api
+uv run python -m apps.api
 ```
 
 Open `http://localhost:8000`.
@@ -66,13 +66,13 @@ The Flask UI uses HTMX for progressive enhancement. The template tries `/static/
 If you want hot reload during development:
 
 ```bash
-UVICORN_RELOAD=1 python3 -m apps.api
+UVICORN_RELOAD=1 uv run python -m apps.api
 ```
 
 ### Tests
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -q
+PYTHONDONTWRITEBYTECODE=1 uv run pytest -q
 ```
 
 ### Developer Commands
@@ -155,7 +155,15 @@ See `EXAMPLE_SCREENPLAY.md` and `EXAMPLE_FOUNTAIN.md`.
 
 ### `ModuleNotFoundError: No module named 'uvicorn'` (or `fastapi`)
 
-Install Python deps:
+If you are using `uv` (recommended):
+
+```bash
+uv sync
+```
+
+Then run the app or tests with `uv run ...`, because `/usr/bin/python3` will not see packages installed in the project `.venv`.
+
+If you want to install into your currently active interpreter instead:
 
 ```bash
 python3 -m pip install -e ".[dev]"

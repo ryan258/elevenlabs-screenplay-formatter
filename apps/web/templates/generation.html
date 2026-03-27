@@ -6,7 +6,7 @@
     parsed.dialogue_chunks|length }}
   </p>
 
-  <form method="post" action="/generation/validate">
+  <form id="generation-form" method="post" action="/generation/validate">
     <div class="grid">
       <label class="label">
         Model ID {% if models %}
@@ -134,7 +134,13 @@
 
   <div id="share-link-box"></div>
 
-  <div id="validation">
+  <div
+    id="validation"
+    hx-post="/generation/validate"
+    hx-trigger="load, change delay:200ms from:#generation-form, input changed delay:400ms from:#generation-form"
+    hx-include="#generation-form"
+    hx-swap="innerHTML"
+  >
     {% if errors %} {% include "error_box.html" %} {% endif %}
   </div>
 

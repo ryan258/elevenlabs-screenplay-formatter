@@ -2,4 +2,4 @@
 set -euo pipefail
 
 export UVICORN_RELOAD="${UVICORN_RELOAD:-1}"
-python3 -m apps.api
+uv run python -m apps.api

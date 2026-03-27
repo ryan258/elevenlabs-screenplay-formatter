@@ -23,3 +23,13 @@ def test_parse_script_records_unmatched_lines() -> None:
     assert any(
         item.content == "This is not dialogue" for item in parsed.diagnostics.unmatched_lines
     )
+
+
+def test_parse_script_keeps_interrupted_dialogue_as_dialogue() -> None:
+    parsed = parse_script("Characters:\n- JEAN\n- NARRATOR\n\nJEAN\nI...\n\nNARRATOR\nAnd then it passes.")
+
+    assert parsed.characters == ["JEAN", "NARRATOR"]
+    assert [(chunk.character, chunk.text) for chunk in parsed.dialogue_chunks] == [
+        ("JEAN", "I..."),
+        ("NARRATOR", "And then it passes."),
+    ]
